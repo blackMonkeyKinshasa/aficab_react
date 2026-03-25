@@ -1,10 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { supabase } from '@/lib/supabase';
 import { Link, Stack } from 'expo-router';
 import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import * as React from 'react';
+import { useEffect } from 'react';
 import { Image, type ImageStyle, View } from 'react-native';
 
 const LOGO = {
@@ -25,6 +27,8 @@ const IMAGE_STYLE: ImageStyle = {
 
 export default function Screen() {
   const { colorScheme } = useColorScheme();
+
+  useEffect(() => {}, []);
 
   return (
     <>
