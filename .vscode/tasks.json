@@ -1,0 +1,56 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install requested npm packages",
+			"type": "shell",
+			"command": "npm install @react-navigation/native @rn-primitives/alert-dialog @rn-primitives/avatar @rn-primitives/checkbox @rn-primitives/collapsible @rn-primitives/dialog @rn-primitives/dropdown-menu @rn-primitives/label @rn-primitives/portal @rn-primitives/progress @rn-primitives/radio-group @rn-primitives/select @rn-primitives/slot @rn-primitives/switch @rn-primitives/tabs @rn-primitives/toggle @rn-primitives/tooltip @supabase/supabase-js class-variance-authority zustand && npm install --save-dev prettier prettier-plugin-tailwindcss rimraf",
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "Install requested npm packages",
+			"type": "shell",
+			"command": "npm install @react-navigation/native @rn-primitives/alert-dialog @rn-primitives/avatar @rn-primitives/checkbox @rn-primitives/collapsible @rn-primitives/dialog @rn-primitives/dropdown-menu @rn-primitives/label @rn-primitives/portal @rn-primitives/progress @rn-primitives/radio-group @rn-primitives/select @rn-primitives/slot @rn-primitives/switch @rn-primitives/tabs @rn-primitives/toggle @rn-primitives/tooltip @supabase/supabase-js class-variance-authority zustand ; npm install --save-dev prettier prettier-plugin-tailwindcss rimraf",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Install requested npm packages 2",
+			"type": "shell",
+			"command": "npm install @react-navigation/native @rn-primitives/alert-dialog @rn-primitives/avatar @rn-primitives/checkbox @rn-primitives/collapsible @rn-primitives/dialog @rn-primitives/dropdown-menu @rn-primitives/label @rn-primitives/portal @rn-primitives/progress @rn-primitives/radio-group @rn-primitives/select @rn-primitives/slot @rn-primitives/switch @rn-primitives/tabs @rn-primitives/toggle @rn-primitives/tooltip @supabase/supabase-js class-variance-authority zustand ; npm install --save-dev prettier prettier-plugin-tailwindcss rimraf",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Fix expo doctor dependencies",
+			"type": "shell",
+			"command": "npm uninstall @types/react-native ; npx expo install @react-navigation/native@^7.1.8",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run expo doctor",
+			"type": "shell",
+			"command": "npx expo-doctor --non-interactive",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run expo doctor fixed",
+			"type": "shell",
+			"command": "npx expo-doctor -- --non-interactive",
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Run expo doctor check",
+			"type": "shell",
+			"command": "cd C:\\Users\\hp\\Documents\\projet_expo\\Aficab ; npx expo-doctor",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
