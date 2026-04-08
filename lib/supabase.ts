@@ -2,10 +2,9 @@ import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, processLock } from '@supabase/supabase-js';
+import { isDev, supabaseUrl_dev, supabaseUrl_Prod } from '@/constants/env';
 
-const isDev = true;
-const supabaseUrl_dev = 'https://sepjdrscnqkcwgqsomnm.supabase.co';
-const supabaseUrl_Prod = 'https://zbgzsejuyvtjwmgtigmx.supabase.co';
+
 const supabaseAnonKey_dev =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlcGpkcnNjbnFrY3dncXNvbW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjU3ODgsImV4cCI6MjA2ODAwMTc4OH0.4dHp_aV6X7CelavFBaty5-2qTtGswsjsX4QActqSYtE'
 const supabaseAnonKey_Prod =

@@ -1,4 +1,4 @@
-import { User } from '@/constants/dataType';
+import { User } from '@/constants/dataInterface';
 import { apiFetch } from './apiConfig'
 
 // function GET

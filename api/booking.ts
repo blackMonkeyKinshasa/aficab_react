@@ -1,4 +1,4 @@
- import { BookingType,Booking } from "@/constants/dataType";
+ import { BookingType,Booking } from "@/constants/dataInterface";
 import { apiFetch } from "./apiConfig";
 
 

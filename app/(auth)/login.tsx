@@ -222,14 +222,15 @@ loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: 
   return (
   <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
+                {/* button de l'action  */}
               <Button onPress={signInWithOTP}
             disabled={loading || !email }
             className="bg-orange-500 h-12 rounded-lg mb-6"
-          >
-            <Text className="text-white font-bold text-base">
-              {loading ? 'Connexion...' : "S'inscrire / Se connecter"}
-            </Text>
-          </Button>
+              >
+                <Text className="text-white font-bold text-base">
+                  {loading ? 'Connexion...' : "S'inscrire / Se connecter"}
+                </Text>
+              </Button>
             
 
             </DialogTrigger>

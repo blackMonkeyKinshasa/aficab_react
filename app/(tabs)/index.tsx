@@ -1,86 +1,225 @@
-import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/icon';
-import { Text } from '@/components/ui/text';
-import { supabase } from '@/lib/supabase';
-import { Link, Redirect, Stack ,} from 'expo-router';
-import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Modal,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
+import { Stack } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import * as React from 'react';
-import { useEffect } from 'react';
-import { Image, type ImageStyle, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
+import { getUserByID, updateUserByID } from '@/api/user';
+import { supabase } from '@/lib/supabase';
+import { LoadingView } from '@/components/my-ui/LoadingView';
+import { FormField } from '@/components/my-ui/FormField';
+import { DropdownField } from '@/components/my-ui/DropdownField';
+import { Avatar } from '@/components/my-ui/Avatar';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { Camera } from 'lucide-react-native';
+import { genderOptions } from '@/constants/constants';
+import { takePhoto, pickImageToGallery, uriToBlob } from '@/constants/image-manager';
+import {User} from '@/constants/dataInterface';
+import { uploadAvatar } from '@/api/uploadFiles';
 
-const LOGO = {
-  light: require('@/assets/images/react-native-reusables-light.png'),
-  dark: require('@/assets/images/react-native-reusables-dark.png'),
-};
+const SCREEN_OPTIONS = (title: string, count: number, isDark: boolean, onPress: () => void) => ({
+  title: title,
+  headerTransparent: false,
+  headerRight: () => <NotificationIcon isDark={isDark} count={count} onPress={onPress} />,
+});
 
-const SCREEN_OPTIONS = {
-  title: 'React Native Reusables',
-  headerTransparent: true,
-  headerRight: () => <ThemeToggle />,
-};
+const _tableName = 'User';
 
-const IMAGE_STYLE: ImageStyle = {
-  height: 76,
-  width: 76,
-};
-
-export default function Screen() {
+export default function App() {
   const { colorScheme } = useColorScheme();
-  const route = useRouter();
+  const isDark = colorScheme === 'dark';
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Form fields
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [avatar_url, setAvatarUrl] = useState('');
+  const [id, setId] = useState('');
+  const [phone, setPhone] = useState('');
+  const [genre, setGenre] = useState('');
+  const [image, setImage] = useState<string | null>(null);
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
 
   useEffect(() => {
-
-
+    setLoading(true);
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (user) {
+          console.log('user', user.id);
+          setUserId(user.id ?? '');
+          getUserByID(user.id)
+            .then((data) => {
+              if (data) {
+                setImage(data.avatar_url ?? null);
+                setPhone(data.phone ?? '');
+                setGenre(data.genre ?? '');
+                setEmail(data.email ?? '');
+                setId(data.id ?? '');
+                if (!data.full_name) {
+                  setShowProfileModal(true);
+                } else {
+                  setFullName(data.full_name);
+                }
+              }
+            })
+            .catch((err) => console.error(err))
+            .finally(() => setLoading(false));
+        }
+      })
+      .catch((err) => console.error(err))
+      .finally(() => {}/*setLoading(false)*/);
   }, []);
+
+  const chooseImage = () => {
+    Alert.alert('Choisir une image', 'Sélectionne une option', [
+      { text: 'Caméra', onPress: async () => setImage((await takePhoto()) || '') },
+      { text: 'Galerie', onPress: async () => setImage((await pickImageToGallery()) || '') },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!fullName.trim()) {
+      Alert.alert('Champ requis', 'Veuillez entrer votre nom et prénom.');
+      return;
+    }
+    if (!userId) return;
+
+    setSaving(true);
+
+    try {
+      let avatarUrl = avatar_url;
+
+      if (image && !image.startsWith('http')) {
+        const res = await uploadAvatar(uriToBlob(image));
+        avatarUrl = res.url;
+        console.log('Avatar uploadé avec succès:', res);
+        supabase.auth.updateUser({ data: { avatar_url: res.url } });
+        setAvatarUrl(avatarUrl);
+      }
+
+      await updateUserByID(userId, {
+        full_name: fullName,
+        phone: phone.trim() || null,
+        genre: genre || null,
+      } as User);
+
+      setShowProfileModal(false);
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert('Erreur', err?.message ?? 'Une erreur est survenue.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const bg = isDark ? '#000' : '#f2f2f7';
+  const cardBg = isDark ? '#1c1c1e' : '#fff';
+  const fg = isDark ? '#fff' : '#000';
+  const sub = isDark ? '#aaa' : '#666';
 
   return (
     <>
-      <Stack.Screen options={SCREEN_OPTIONS} />
-      <View className="flex-1 items-center justify-center gap-8 p-4">
-        <Image source={LOGO[colorScheme ?? 'light']} style={IMAGE_STYLE} resizeMode="contain" />
-        <View className="gap-2 p-4">
-          <Text className="ios:text-foreground font-mono text-sm text-muted-foreground">
-            1. Edit <Text variant="code">app/index.tsx</Text> to get started.
-          </Text>
-          <Text className="ios:text-foreground font-mono text-sm text-muted-foreground">
-            2. Save to see your changes instantly.
-          </Text>
-        </View>
-        <View className="flex-row gap-2">
-          <Link href="https://reactnativereusables.com" asChild>
-            <Button>
-              <Text>Browse the Docs</Text>
-            </Button>
-          </Link>
-          <Link href="https://github.com/founded-labs/react-native-reusables" asChild>
-            <Button variant="ghost">
-              <Text>Star the Repo</Text>
-              <Icon as={StarIcon} />
-            </Button>
-          </Link>
-        </View>
-      </View>
+      <Stack.Screen options={SCREEN_OPTIONS('Accueil', 0, isDark, () => router.push('/notificationsPage'))} />
+      <RideBookingScreen />
+      {loading && <LoadingView />}
+
+      {/* Profile completion modal */}
+      <Modal visible={showProfileModal} animationType="slide" onRequestClose={() => {}}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: bg }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Title */}
+            <Text style={[styles.modalTitle, { color: fg }]}>Complétez votre profil</Text>
+            <Text style={[styles.modalSubtitle, { color: sub }]}>
+              Dites-nous comment vous appeler pour continuer.
+            </Text>
+
+            {/* Avatar */}
+            <View style={styles.avatarWrapper}>
+              <View style={[styles.avatarContainer, { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0' }]}>
+                <Avatar uri={image || ''} size={96} borderRadius={48} />
+                <TouchableOpacity style={styles.cameraBtn} onPress={chooseImage}>
+                  <Camera size={18} color="white" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Form */}
+            <View style={styles.formWrapper}>
+              <FormField
+                label="Nom et prénom *"
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Jean Dupont"
+                isDark={isDark}
+              />
+              <FormField
+                label="Numéro de téléphone"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+243821606126"
+                keyboardType="phone-pad"
+                showInfo={true}
+                isDark={isDark}
+              />
+              <DropdownField
+                label="Genre"
+                value={genre}
+                onSelect={setGenre}
+                options={genderOptions}
+                showInfo={true}
+                isDark={isDark}
+                showGenderDropdown={showGenderDropdown}
+                setShowGenderDropdown={setShowGenderDropdown}
+              />
+
+              <Button
+                onPress={handleSaveProfile}
+                disabled={saving}
+                className="bg-orange-500 h-12 rounded-lg mt-8 mb-4"
+              >
+                <Text className="text-white font-bold text-base">
+                  {saving ? 'Enregistrement...' : 'Continuer'}
+                </Text>
+              </Button>
+            </View>
+          </ScrollView>
+          {saving && <LoadingView />}
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 }
 
-const THEME_ICONS = {
-  light: SunIcon,
-  dark: MoonStarIcon,
-};
-
-function ThemeToggle() {
-  const { colorScheme, toggleColorScheme } = useColorScheme();
-
-  return (
-    <Button
-      onPressIn={toggleColorScheme}
-      size="icon"
-      variant="ghost"
-      className="ios:size-9 rounded-full web:mx-4">
-      <Icon as={THEME_ICONS[colorScheme ?? 'light']} className="size-5" />
-    </Button>
-  );
-}
+const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 40 },
+  modalTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 60, marginBottom: 6, paddingHorizontal: 24 },
+  modalSubtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, paddingHorizontal: 32 },
+  avatarWrapper: { alignItems: 'center', marginBottom: 24 },
+  avatarContainer: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
+  formWrapper: { paddingHorizontal: 24 },
+});

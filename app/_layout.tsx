@@ -1,97 +1,135 @@
 import '@/global.css';
 import 'react-native-url-polyfill/auto'
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
 import { NAV_THEME } from '@/lib/theme';
 import { ThemeProvider } from '@react-navigation/native';
 import { PortalHost } from '@rn-primitives/portal';
-import { Stack, Redirect } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
-import { View, Text } from 'react-native';
-import { LoginScreen } from '@/components/my-ui/login';
+import { TouchableOpacity } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ArrowLeft } from 'lucide-react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
+import { en, registerTranslation } from 'react-native-paper-dates';
+import {NotificationIcon} from '@/components/my-ui/NotificationIcon';
 
+registerTranslation('fr', en);
 
+const paperTheme = {
+  colors: {
+    primary: '#FE5900',
+  },
+};
+
+const BackButton = ({ onPress, isDark }: { onPress: () => void; isDark: boolean }) => (
+  <TouchableOpacity onPress={onPress} style={{ marginRight: 16 }}>
+    <ArrowLeft size={24} color={isDark ? '#ffffff' : '#000000'} />
+  </TouchableOpacity>
+);
 
 export default function RootLayout() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
   const { colorScheme } = useColorScheme();
-
-  console.log('🔴 RootLayout rendu - hydrated:', hydrated, 'loading:', loading, 'session:', session?.user?.email || 'null');
-
+  
   useEffect(() => {
-    console.log('🟢 useEffect monté');
     let isMounted = true;
 
-    const initialize = async () => {
-      console.log('📍 Initialisation - appel getSession()');
+    const initializeAuth = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        console.log('📡 getSession() réponse:', { error: error?.message || 'null', session: data.session?.user?.email || 'null' });
-        
-        if (isMounted) {
-          setSession(data.session);
-          console.log('✅ Session définie:', data.session?.user?.email || 'null');
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!isMounted) {
+          return;
         }
-      } catch (error) {
-        console.error('❌ Exception getSession:', error);
+
+        setUser(session?.user ?? null);
       } finally {
         if (isMounted) {
-          console.log('⏱️  setLoading(false)');
-          setLoading(false);
-          console.log('⏱️  setHydrated(true)');
-          setHydrated(true);
+          setAuthReady(true);
         }
       }
     };
 
-    initialize();
+    initializeAuth();
 
-    console.log('🔔 Enregistrement onAuthStateChange');
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
-        console.log('🔔 Event reçu:', event, '| Session:', newSession?.user?.email || 'null');
-        if (isMounted) {
-          console.log('📌 Mise à jour session dans état');
-          setSession(newSession);
-        }
-      }
-    );
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => {
-      console.log('🛑 useEffect cleanup');
       isMounted = false;
-      listener.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
-  // Attendre l'hydratation
-  if (!hydrated) {
-    console.log('⏳ En attente hydratation...');
+  useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
+    const inAuthRoute = pathname === '/login';
+
+    if (!user && !inAuthRoute) {
+      router.replace('/(auth)/login');
+      return;
+    }
+
+    if (user && inAuthRoute) {
+      router.replace('/');
+    }
+  }, [authReady, pathname, router, user]);
+
+
+  if (!authReady) {
     return null;
   }
-
-  // Pendant le chargement, afficher un écran vide
-  if (loading) {
-    console.log('⏳ En attente chargement...');
-    return null;
-  }
-
-  // SI PAS CONNECTÉ → affiche un écran de login local
-  if (session === null) {
-    return <LoginScreen />;
-  }
-
-  // CONNECTÉ → Stack normal
-  console.log('✅ Session valide - Affichage Stack');
   return (
-    <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      <Stack />
-      <PortalHost />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+    <PaperProvider theme={paperTheme}> 
+        <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+
+          <Stack screenOptions={{ headerShown: false }}>
+                {/* Auth Stack */}
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                {/* Main Tabs */}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                {/* Profile Edit Screen - Modal */}
+                <Stack.Screen name="edit-profile" options={{
+                  title: 'Modifier le profil',
+                  headerBackTitle: 'Retour',
+                  headerShown: true,
+                  headerRight: () => (
+                    <NotificationIcon
+                      isDark={colorScheme === 'dark'}
+                      count={0}
+                      onPress={() => console.log("Notifications")}
+                    />
+                  ),
+                }}
+                />
+
+                  {/* Other Screens */}
+                <Stack.Screen name="+not-found" />
+
+                <Stack.Screen name="signup" options={{ headerShown: false }} />
+
+          </Stack>
+          
+          <PortalHost />
+        </ThemeProvider>
+
+    </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
