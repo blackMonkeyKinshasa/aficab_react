@@ -109,13 +109,8 @@ export default function RootLayout() {
                   title: 'Modifier le profil',
                   headerBackTitle: 'Retour',
                   headerShown: true,
-                  headerRight: () => (
-                    <NotificationIcon
-                      isDark={colorScheme === 'dark'}
-                      count={0}
-                      onPress={() => console.log("Notifications")}
-                    />
-                  ),
+                  headerTransparent: false,
+                 
                 }}
                 />
 

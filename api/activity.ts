@@ -1,33 +1,23 @@
 import { apiFetch } from './apiConfig';
 
-/*
-Operations
+// GET /activity?userId=xxx&isRead=xxx
+export function getActivity(
+  params?: { userId?: string; isRead?: boolean; action?: string; bookingId?: string },
+  token?: string
+) {
+  const query = new URLSearchParams();
+  if (params?.userId) query.append('userId', params.userId);
+  if (params?.isRead !== undefined) query.append('isRead', String(params.isRead));
+  if (params?.action) query.append('action', params.action);
+  if (params?.bookingId) query.append('bookingId', params.bookingId);
+  const qs = query.toString();
+  return apiFetch(`/activity${qs ? `?${qs}` : ''}`, token, { method: 'GET' });
+}
 
-get/activity
-post/activity
-
-Retrieve list of activities​Copy link
-Fetches a list of activities based on optional search parameters.
-
-Query Parameters
------------------
-action Type:string
-userId Type:string
-bookingId Type:string
-organizationId Type:string
-isRead Type:string
-pageType:string
-
-ex :
-
-getActivity(token)
-  .then((data) => console.log(data))
-  .catch((err) => console.error(err));
-
-*/
-export function getActivity(token: string) {
-  const endpoint = '/activity';
-  return apiFetch(endpoint, token, {
-    method: 'GET',
+// PATCH /activity  — marquer une notification comme lue
+export function readNotification(id: string, token?: string) {
+  return apiFetch('/activity', token, {
+    method: 'PATCH',
+    body: JSON.stringify({ id }),
   });
 }

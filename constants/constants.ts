@@ -1,0 +1,12 @@
+import { GenderOptions } from './dataInterface';
+export const genderOptions: GenderOptions[] = [
+    { label: 'Homme', value: 'male' },
+    { label: 'Femme', value: 'female' },
+  ];
+
+export type Location = {
+              description: string,
+              lat:number,
+              lng: number,
+            };
+
