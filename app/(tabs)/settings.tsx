@@ -31,12 +31,11 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 
-const SCREEN_OPTIONS = (title : string, count : number, isDark : boolean, onPress: () => void) => ({
+const SCREEN_OPTIONS = (title : string, isDark : boolean, onPress: () => void) => ({
   title: title,
   headerTransparent: false,
   headerRight: () =>  <NotificationIcon
                         isDark={isDark}
-                        count={count}
                         onPress={onPress}
                       />,
 });
@@ -198,7 +197,7 @@ export default function SettingsScreen() {
 
   return (
      <>
-    <Stack.Screen options={SCREEN_OPTIONS('Settings', 0, isDark, () => router.push('../Notifications'))} />
+    <Stack.Screen options={SCREEN_OPTIONS('Settings', isDark, () => router.push('../Notifications'))} />
     <View className={`flex-1 `}>
       <ScrollView showsVerticalScrollIndicator={false}>
 

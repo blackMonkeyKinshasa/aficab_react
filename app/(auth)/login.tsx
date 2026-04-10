@@ -17,9 +17,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-
-
-
 import { Input } from '@/components/ui/input';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
@@ -49,6 +46,9 @@ export default function LoginScreen() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [token, setToken] = useState(''); 
+
+  const isDark = colorScheme === 'dark';
+
 
   const handleEmailLogin = async () => {
     setLoading(true);
@@ -97,11 +97,15 @@ export default function LoginScreen() {
       options: {
         // set this to false if you do not want the user to be automatically signed up
         shouldCreateUser: true,
-        emailRedirectTo: `/index`,
+        emailRedirectTo: `mobile://aficab.com`,
       },
     });
 
-    if (error) Alert.alert(error.message);
+    if (error){
+      Alert.alert(error.message);
+      console.log(error);
+      setDialogOpen(false);
+    }
     setLoading(false);
   }
 
@@ -136,9 +140,9 @@ export default function LoginScreen() {
           {/* Logo */}
           <View className="items-center flex-1 justify-center  mb-8">
             <View className="flex-row items-end">
-              <Text className=" text-gray-900 dark:text-white font-bold text-5xl" >aficab</Text>
-              <Text className="text-orange-500 font-bold" style={{ fontSize: 42 }}>.</Text>
-            </View>
+             <Image source={isDark ? require('@/assets/images/aficab-logo-white.png') : require('@/assets/images/aficab-logo-black.png')}
+                style={{ width: 150, height: 60, resizeMode: 'contain', marginLeft: 10 }} />
+             </View>
           </View>
 
           {/* Description */}
@@ -178,12 +182,12 @@ export default function LoginScreen() {
 
          {/* Google Button avec Dialog */}
         
-  <Button className=" h-12 rounded-lg mb-4 flex-row items-center justify-center bg-gray-200 dark:bg-gray-500">
+  <Button className=" h-12 rounded-lg mb-4 flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800">
                 <FontAwesome name="google" size={24} color={colorScheme === 'dark' ? '#ffffff' : '#000000'}/>
                 <Text className="ml-3 font-semibold text-base  text-gray-900 dark:text-white">Continuer avec Google</Text>
               </Button>
           {/* Apple Button */}
-          <Button className=" h-12 rounded-lg mb-8 flex-row items-center justify-center bg-gray-200 dark:bg-gray-500"
+          <Button className=" h-12 rounded-lg mb-8 flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800"
           onPress={toggleColorScheme}>
             <FontAwesome name="apple" size={24} color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
             <Text className="ml-3 font-semibold text-base  text-gray-900 dark:text-white">Continuer avec Apple</Text>

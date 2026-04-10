@@ -1,5 +1,31 @@
 
 import { Role, ClientType, CarStatus, DriverStatus, ResStatus, ResType } from './databaseEnum';
+import { Location } from './constants';
+
+// --- LocationDoc : données saisies avant la sélection du véhicule ---
+
+export interface LocationDocLOC {
+  type: ResType.LOC;
+  /** Point de départ */
+  location: Location;
+  dateStart: Date;
+  dateEnd: Date;
+}
+
+export interface LocationDocTA {
+  type: ResType.TA;
+  tripType: 'one-way' | 'round-trip';
+  /** Point de départ (ou adresse client) */
+  locationDepart: Location;
+  /** Destination (aéroport ou inversement) */
+  locationDest: Location;
+  dateStart: Date;
+  /** Uniquement si tripType === 'round-trip' */
+  dateReturn?: Date;
+}
+
+/** Union discriminée — utiliser `doc.type` pour distinguer LOC / TA */
+export type LocationDoc = LocationDocLOC | LocationDocTA;
 
 export interface GenderOptions {
   label: string;
@@ -155,3 +181,5 @@ export interface Activity {
   bookingId: string | null;
   booking: Booking | null;
 }
+
+

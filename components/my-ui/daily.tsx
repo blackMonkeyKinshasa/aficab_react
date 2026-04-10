@@ -22,6 +22,9 @@ import {ModalLocationSelector} from '@/components/my-ui/ModalLocationSelector';
 import {ModuleReservation} from '@/components/my-ui/ModuleReservation';
 import { Button } from '@/components/ui/button';
 import { Location } from '@/constants/constants';
+import { useRouter } from 'expo-router';
+import { LocationDocLOC } from '@/constants/dataInterface';
+import { ResType } from '@/constants/databaseEnum';
 
 interface RideBookingScreenProps {
   navigation?: any;
@@ -43,12 +46,30 @@ const formatDate = (d: Date | null) => {
 };
 
 export function Daily() {
+  const router = useRouter();
   const [value, setValue] = useState('account');
   const [visible, setVisible] = useState(false);
   const [location, setLocation] = useState<Location | null>(null);
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateEnd, setDateEnd] = useState<Date | null>(null);
   const isDarkMode = useColorScheme() === 'dark';
+
+  const handleSubmit = () => {
+    if (!location || !dateStart || !dateEnd) return;
+    console.log("location", location);
+    const doc: LocationDocLOC = {
+      type: ResType.LOC,
+      location,
+      dateStart,
+      dateEnd,
+    };
+    router.push({
+      pathname: '/new_booking/[doc]',
+      params: { doc: JSON.stringify(doc) },
+    });
+
+
+  };
 
   const handleDateStartChange = (date: Date | null) => {
     if (!date) {
@@ -104,14 +125,11 @@ export function Daily() {
             </View>
 
              {/* button de l'action  */}
-             <TouchableOpacity style={{ padding: 20 }} onPress={() => {
-                console.log("Location:", location?.description);
-                console.log("Date de début:", dateStart);
-                console.log("Date de fin:", dateEnd);
-              }} > 
+             <TouchableOpacity style={{ padding: 20 }} > 
                       <Button 
                         disabled={location === null || dateStart === null || dateEnd === null}
                         className="bg-orange-500 h-12 rounded-lg mb-6"
+                        onPress={handleSubmit}
                           >
                             <Text className="text-white font-bold text-base ">
                               Voir les offres 

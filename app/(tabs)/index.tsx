@@ -30,7 +30,7 @@ import {User} from '@/constants/dataInterface';
 import { uploadAvatar } from '@/api/uploadFiles';
 import { he } from 'react-native-paper-dates';
 
-const SCREEN_OPTIONS = (title: string, count: number, isDark: boolean, onPress: () => void) => ({
+const SCREEN_OPTIONS = (title: string,  isDark: boolean, onPress: () => void) => ({
  title: '',
   headerTransparent: false,
   headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
@@ -141,12 +141,12 @@ export default function App() {
 
   return (
     <>
-      <Stack.Screen options={SCREEN_OPTIONS('Accueil', 0, isDark, () => router.push('/notificationsPage'))} />
+      <Stack.Screen options={SCREEN_OPTIONS('Accueil', isDark, () => router.push('/notificationsPage'))} />
      
       <View style={{ flex: 1 }}>
        
       <RideBookingScreen />
-      
+
        </View>
       {loading && <LoadingView />}
 

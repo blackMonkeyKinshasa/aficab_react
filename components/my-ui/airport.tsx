@@ -13,6 +13,9 @@ import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector'
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
 import { Button } from '@/components/ui/button';
 import { Location } from '@/constants/constants';
+import { useRouter } from 'expo-router';
+import { LocationDocTA } from '@/constants/dataInterface';
+import { ResType } from '@/constants/databaseEnum';
 
 type TripType = 'one-way' | 'round-trip';
 
@@ -56,6 +59,7 @@ function containsAirport(location: Location | null): boolean {
 }
 
 export function Airport() {
+  const router = useRouter();
   const [tripType, setTripType] = useState<TripType>('one-way');
   const [locationDepart, setLocationDepart] = useState<Location | null>(null);
   const [locationDest, setLocationDest] = useState<Location | null>(null);
@@ -64,6 +68,22 @@ export function Airport() {
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateReturn, setDateReturn] = useState<Date | null>(null);
   const isDarkMode = useColorScheme() === 'dark';
+
+  const handleSubmit = () => {
+    if (!locationDepart || !locationDest || !dateStart) return;
+    const doc: LocationDocTA = {
+      type: ResType.TA,
+      tripType,
+      locationDepart,
+      locationDest,
+      dateStart,
+      ...(tripType === 'round-trip' && dateReturn ? { dateReturn } : {}),
+    };
+    router.push({
+      pathname: '/new_booking/[doc]',
+      params: { doc: JSON.stringify(doc) },
+    });
+  };
 
   const handleDateStartChange = (date: Date) => {
     setDateStart(date);
@@ -152,12 +172,7 @@ export function Airport() {
         <TouchableOpacity
           style={{ padding: 20 }}
           disabled={!isValid}
-          onPress={() => {
-            console.log("Départ:", locationDepart?.description);
-            console.log("Destination:", locationDest?.description);
-            console.log("Date aller:", dateStart);
-            console.log("Date retour:", dateReturn);
-          }}
+          onPress={handleSubmit}
         >
           <Button
             disabled={!isValid}

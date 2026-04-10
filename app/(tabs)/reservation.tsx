@@ -20,6 +20,7 @@ import { Booking } from '@/constants/dataInterface';
 import { ResStatus, ResType } from '@/constants/databaseEnum';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { supabase } from '@/lib/supabase';
+import {ErrorEmptyReservation} from '@/components/my-ui/errorEmptyReservation';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -296,7 +297,7 @@ function BookingCard({
 const SCREEN_OPTIONS = (isDark: boolean, onNotif: () => void) => ({
   title: 'Mes réservations',
   headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} count={0} onPress={onNotif} />,
+  headerRight: () => <NotificationIcon isDark={isDark}  onPress={onNotif} />,
 });
 
 export default function Reservation() {
@@ -340,11 +341,9 @@ export default function Reservation() {
               <BookingCard item={item} isDark={isDark} onPress={() => setSelected(item)} />
             )}
             contentContainerStyle={styles.list}
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
             ListEmptyComponent={
-              <Text style={{ textAlign: 'center', marginTop: 60, color: isDark ? '#aaa' : '#555' }}>
-                Aucune réservation.
-              </Text>
+              <ErrorEmptyReservation isDark={isDark} />
             }
           />
         )}

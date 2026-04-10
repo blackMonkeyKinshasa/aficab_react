@@ -117,7 +117,13 @@ export default function RootLayout() {
                   {/* Other Screens */}
                 <Stack.Screen name="+not-found" />
 
-                <Stack.Screen name="signup" options={{ headerShown: false }} />
+                <Stack.Screen name="new_booking/[doc]" 
+                options={{
+                  title: 'Nouvelle réservation',
+                  headerBackTitle: 'Retour',
+                  headerShown: true,
+                  headerTransparent: false,
+                 }} />
 
           </Stack>
           
