@@ -8,6 +8,7 @@ type Props = {
   label?: string;
   value?: Date | null;
   departureHour?: number;
+  minDate?: Date;
   onChange?: (date: Date) => void;
 };
 
@@ -15,6 +16,7 @@ export function DateField({
 departureHour=8,
   label = "Choisir une date",
   value = null,
+  minDate,
   onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -84,8 +86,8 @@ departureHour=8,
          visible={visible}
           onDismiss={onDismiss}
           onConfirm={onConfirmTime}
-          hours={departureHour}
-          minutes={0}
+          hours={value?.getHours()}
+          minutes={value?.getMinutes()}
           locale="fr"
           label="Selectionnez une heure"
         /> 
@@ -94,8 +96,9 @@ departureHour=8,
         mode="single"
         visible={open}
         onDismiss={() => setOpen(false)}
-        date={date || new Date()}
+        date={minDate || date || new Date()}
         presentationStyle="formSheet"
+        validRange={minDate ? { startDate: minDate } : undefined}
         onConfirm={onConfirm}
       />
      

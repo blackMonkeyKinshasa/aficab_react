@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
 import { Stack } from 'expo-router';
@@ -27,11 +28,14 @@ import { genderOptions } from '@/constants/constants';
 import { takePhoto, pickImageToGallery, uriToBlob } from '@/constants/image-manager';
 import {User} from '@/constants/dataInterface';
 import { uploadAvatar } from '@/api/uploadFiles';
+import { he } from 'react-native-paper-dates';
 
 const SCREEN_OPTIONS = (title: string, count: number, isDark: boolean, onPress: () => void) => ({
-  title: title,
+ title: '',
   headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} count={count} onPress={onPress} />,
+  headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
+  headerLeft: () => <Image source={isDark ? require('@/assets/images/aficab-logo-white.png') : require('@/assets/images/aficab-logo-black.png')}
+   style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }} />, 
 });
 
 const _tableName = 'User';
@@ -138,7 +142,12 @@ export default function App() {
   return (
     <>
       <Stack.Screen options={SCREEN_OPTIONS('Accueil', 0, isDark, () => router.push('/notificationsPage'))} />
+     
+      <View style={{ flex: 1 }}>
+       
       <RideBookingScreen />
+      
+       </View>
       {loading && <LoadingView />}
 
       {/* Profile completion modal */}

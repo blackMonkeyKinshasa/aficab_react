@@ -72,11 +72,11 @@ export function Daily() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>  
 
-            <View style={{ padding: 20 }}>
+            <View style={{ paddingTop: 20, paddingBottom: 10, paddingHorizontal: 20 }}>
                 <TouchableOpacity onPress={()=>setVisible(true)} >
                     <ModuleReservation 
                                 icon={"location-outline"}
-                                title={location ? location.description : "Selectionner un Lieu"}
+                                title={location ? location.description : "Départ"}
                                 isDarkMode={isDarkMode}
                                 />
 
@@ -84,19 +84,21 @@ export function Daily() {
 
             </View>
 
-              <View style={{ padding: 20 }}>
+              <View style={{ paddingTop: 10, paddingBottom: 10, paddingHorizontal: 20 }}>
               <DateField
-                  label="Choisir date et heure de début"
+                  label="Date et heure de début"
                   value={dateStart}
+                  minDate={new Date()}
                   onChange={handleDateStartChange}
                 />
             </View>
 
 
-            <View style={{ padding: 20 }}>
+            <View style={{ paddingTop: 10, paddingBottom: 30, paddingHorizontal: 20 }}>
               <DateField
-                  label="Choisir date et heure de fin"
+                  label="Date et heure de fin"
                   value={dateEnd}
+                  minDate={dateStart && dateStart.getDay() > new Date().getDay() ? dateStart : new Date()}
                   onChange={setDateEnd}
                 />
             </View>
@@ -108,12 +110,12 @@ export function Daily() {
                 console.log("Date de fin:", dateEnd);
               }} > 
                       <Button 
-                        disabled={true}
+                        disabled={location === null || dateStart === null || dateEnd === null}
                         className="bg-orange-500 h-12 rounded-lg mb-6"
                           >
-                            <Text className="text-white font-bold text-base">
-                              {true ? 'Connexion...' : "S'inscrire / Se connecter"}
-                            </Text>
+                            <Text className="text-white font-bold text-base ">
+                              Voir les offres 
+                              </Text>
                       </Button>
 
               </TouchableOpacity>

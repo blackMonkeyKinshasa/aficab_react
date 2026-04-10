@@ -1,7 +1,7 @@
 import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, processLock } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { isDev, supabaseUrl_dev, supabaseUrl_Prod } from '@/constants/env';
 
 
@@ -19,7 +19,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    lock: processLock,
   },
 });
 // Tells Supabase Auth to continuously refresh the session automatically

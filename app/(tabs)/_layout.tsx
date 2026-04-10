@@ -25,8 +25,7 @@ export default function TabsLayout() {
           
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
           headerShown: true,
-          headerTitle: 'Accueil',
-
+         
         }}
       />
       <Tabs.Screen

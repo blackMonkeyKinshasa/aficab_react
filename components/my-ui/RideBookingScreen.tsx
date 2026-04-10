@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import {useColorScheme} from 'nativewind';
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ import { Daily } from '@/components/my-ui/daily';
 import { Airport } from '@/components/my-ui/airport';
 import { cn } from '@/lib/utils';
 import Carousel from "react-native-reanimated-carousel";
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 
 const { width } = Dimensions.get("window");
@@ -48,8 +50,12 @@ interface FormData {
 }
 
 export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
-   const [value, setValue] = useState('account');
+  
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
+  
+  const [value, setValue] = useState('account');
   const [rideType, setRideType] = useState<RideType>('daily');
   const [formData, setFormData] = useState<FormData>({
     location: '',
@@ -114,7 +120,7 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
 const TabHeader = ({
    label,
     onPress,
-    onSelect= false
+    onSelect= false,
    
   }: {
     label: string;
@@ -123,7 +129,11 @@ const TabHeader = ({
   }) => (
   <TouchableOpacity className='items-center justify-center flex-1' onPress={onPress}>
 
-    <View className={`items-center justify-center w-full py-2 px-4 rounded-3xl ${onSelect ? 'border-gray-400 border' : ''}`}>
+    <View className={`items-center  flex-row justify-center w-full py-2 px-4 rounded-3xl ${onSelect ? 'border-gray-400 border' : ''}`}>
+
+
+       { onSelect ?  <Ionicons name={label === 'Daily' ? 'car-sport-outline' : 'airplane-outline'} size={20} color={isDark ? "#fff" : "#000"} style={{marginRight: 8}}/>
+        : null }
                     
         <Text className={cn(onSelect ? 'font-bold text-base dark:text-white text-black' :  'dark:text-gray-400 text-gray-600')}>
           {label}
@@ -137,7 +147,7 @@ const TabHeader = ({
 
   return (
 
-     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
     <View className='flex-1'>
 
     <View className='relative flex-1 bg-gray-800 '>
@@ -165,7 +175,7 @@ const TabHeader = ({
     />
 
         {/* TAB conatiner main */}
-          <View className='absolute top-48  h-full w-full  bg-white dark:bg-black rounded-t-lg'>
+          <View className='absolute top-44  h-full w-full  bg-white dark:bg-black rounded-t-lg'>
 
             {/* Tabs container */}
             <View className='flex-1 items-center  mt-4' >
