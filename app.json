@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -20,14 +22,19 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/aficab-app-logo-white.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/aficab-app-logo-white.png"
     },
-    "plugins": ["expo-router",[
+    "plugins": [
+      "expo-router",
+      [
         "expo-image-picker",
         {
           "cameraPermission": "Autoriser l'accès à la caméra",
@@ -37,7 +44,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e4903418-da7d-4c7b-b1f4-775a13059867"
+      }
     }
-    
   }
 }

@@ -1,12 +1,56 @@
 import { View, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { LocationDoc } from '@/constants/dataInterface';
-import { ResType } from '@/constants/databaseEnum';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { HeaderBackButton } from '@react-navigation/elements';
+import { LocationDoc, LocationDocLOC, LocationDocTA } from '@/constants/dataInterface';
+import { EtapeReservation, ResType } from '@/constants/databaseEnum';
+import { useState } from 'react';
+import { LocAirport } from '@/components/my-ui/LocAirport';
+import { LocDaily } from '@/components/my-ui/LocDaily';
+import { Booking } from '@/constants/dataInterface';
+import { useColorScheme } from 'react-native';
+
+const ETAPE_TITLES: Record<EtapeReservation, string> = {
+  [EtapeReservation.SELECTION]: "Selection d'un vehicule",
+  [EtapeReservation.OPTION]: 'Options de selection',
+  [EtapeReservation.RECAP]: 'Recapitulatif',
+};
+
+const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
+  [EtapeReservation.SELECTION]: EtapeReservation.SELECTION,
+  [EtapeReservation.OPTION]: EtapeReservation.SELECTION,
+  [EtapeReservation.RECAP]: EtapeReservation.OPTION,
+};
+
+const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
+ title,
+  headerTransparent: false,
+  headerLeft: () => <HeaderBackButton tintColor={isDark ? '#FFFFFF' : '#000000'} onPress={onPress} />,
+  headerBackTitle: 'Retour',
+});
+
 
 export default function NewBooking() {
-  const { doc: docParam } = useLocalSearchParams<{ doc: string }>();
 
+  const router = useRouter();
+  const { doc: docParam } = useLocalSearchParams<{ doc: string }>();
   const doc: LocationDoc | null = docParam ? JSON.parse(docParam) : null;
+
+  const isDarkMode = useColorScheme() === 'dark';
+  const [etape, setEtape] = useState<EtapeReservation>(EtapeReservation.SELECTION);
+  const title = ETAPE_TITLES[etape];
+
+  const onSubmit = (doc: Booking) => {
+    console.log(doc);
+  };
+
+  const handleHeaderBackPress = () => {
+    if (etape !== EtapeReservation.SELECTION) {
+      setEtape(PREVIOUS_ETAPE[etape]);
+      return;
+    }
+
+    router.back();
+  };
 
   if (!doc) {
     return (
@@ -17,26 +61,19 @@ export default function NewBooking() {
   }
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+
+    <><Stack.Screen options={{ ...SCREEN_OPTIONS(title, isDarkMode, handleHeaderBackPress), headerShown: true }} />     
+    <View style={{ flex: 1 }}>
       {doc.type === ResType.LOC ? (
         <>
-          <Text>Type : Location journalière</Text>
-          <Text>Départ : {doc.location.description}</Text>
-          <Text>Du : {new Date(doc.dateStart).toLocaleString('fr-FR')}</Text>
-          <Text>Au : {new Date(doc.dateEnd).toLocaleString('fr-FR')}</Text>
+          <LocDaily locationDoc={doc as LocationDocLOC} isDarkMode={isDarkMode} onSubmit={onSubmit} etape={etape} setEtape={setEtape} />
         </>
       ) : (
         <>
-          <Text>Type : Transfert aéroport</Text>
-          <Text>Trajet : {doc.tripType === 'one-way' ? 'Aller simple' : 'Aller-retour'}</Text>
-          <Text>Départ : {doc.locationDepart.description}</Text>
-          <Text>Destination : {doc.locationDest.description}</Text>
-          <Text>Date aller : {new Date(doc.dateStart).toLocaleString('fr-FR')}</Text>
-          {doc.dateReturn && (
-            <Text>Date retour : {new Date(doc.dateReturn).toLocaleString('fr-FR')}</Text>
-          )}
+          <LocAirport locationDoc={doc as LocationDocTA} isDarkMode={isDarkMode} onSubmit={onSubmit} etape={etape} setEtape={setEtape} />
         </>
       )}
     </View>
+    </>
   );
 }

@@ -53,3 +53,9 @@ export enum ClientType {
   STANDARD = 'STANDARD',
   PREMIUM = 'PREMIUM',
 }
+
+export enum EtapeReservation{
+    SELECTION = 'SELECTION',
+    OPTION = 'OPTION',
+    RECAP = 'RECAP',
+}

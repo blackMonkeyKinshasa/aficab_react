@@ -18,7 +18,7 @@ export function ModuleReservation({icon, title,isDarkMode}:any) {
                     size={24}
                     color={isDarkMode ? 'white' : 'black'}
                   />
-                    <Text className={`text-base ml-3 font-normal text-ellipsis ${isDarkMode ? 'text-white' : 'text-black'}`} 
+                    <Text className={`text-base flex-1 ml-3 font-normal text-ellipsis ${isDarkMode ? 'text-white' : 'text-black'}`} 
                     numberOfLines={1}>
                       {title}
                     </Text>

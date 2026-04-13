@@ -119,8 +119,6 @@ export default function RootLayout() {
 
                 <Stack.Screen name="new_booking/[doc]" 
                 options={{
-                  title: 'Nouvelle réservation',
-                  headerBackTitle: 'Retour',
                   headerShown: true,
                   headerTransparent: false,
                  }} />

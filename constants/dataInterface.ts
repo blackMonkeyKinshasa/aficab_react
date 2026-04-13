@@ -55,6 +55,31 @@ export interface LocationPoint {
   lng?: number;
 }
 
+export interface CarCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  image: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  logo: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CarPriceTA {
+  min?: number | string | null;
+  price?: number | string | null;
+  red?: number | string | null;
+  [key: string]: unknown;
+}
+
 export interface Car {
   id: string;
   name: string;
@@ -65,15 +90,18 @@ export interface Car {
   mileage: number;
   priceLOC: number;
   status: CarStatus;
+  category: CarCategory | null;
   categoryId: string | null;
-  organizationId: string;
+  organization: OrganizationSummary | null;
+  organizationId: string | null;
+  defaultDriver: Driver | null;
   defaultDriverId: string | null;
   description: string | null;
-  images: String[];
+  images: string[];
   features: any[];
   extraTime: Record<string, any>;
   priceOptions: any[];
-  priceTA: Record<string, any>;
+  priceTA: CarPriceTA;
   createdAt: string;
   updatedAt: string;
 }

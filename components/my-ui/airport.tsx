@@ -129,7 +129,7 @@ export function Airport() {
         </View>
 
         {/* Destination */}
-        <View style={{ paddingTop: 4, paddingBottom: 10, paddingHorizontal: 20 }}>
+        <View style={{ paddingTop: 4, paddingBottom: 8, paddingHorizontal: 20 }}>
           <TouchableOpacity onPress={() => setVisibleDest(true)}>
             <ModuleReservation
               icon={"navigate-outline"}
@@ -147,7 +147,7 @@ export function Airport() {
         )}
 
         {/* Date de départ */}
-        <View style={{ paddingTop: 10, paddingBottom: 10, paddingHorizontal: 20 }}>
+        <View style={{ paddingTop: 8, paddingBottom: 8, paddingHorizontal: 20 }}>
           <DateField
             label="Date et heure de départ"
             value={dateStart}
@@ -172,11 +172,12 @@ export function Airport() {
         <TouchableOpacity
           style={{ padding: 20 }}
           disabled={!isValid}
-          onPress={handleSubmit}
+        
         >
           <Button
             disabled={!isValid}
             className="bg-orange-500 h-12 rounded-lg mb-20"
+            onPress={handleSubmit}
           >
             <Text className="text-white font-bold text-base">
               Voir les offres
