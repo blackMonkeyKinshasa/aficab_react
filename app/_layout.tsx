@@ -11,17 +11,24 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ArrowLeft } from 'lucide-react-native';
-import { Provider as PaperProvider } from 'react-native-paper';
+import { Provider as PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import { en, registerTranslation } from 'react-native-paper-dates';
 import {NotificationIcon} from '@/components/my-ui/NotificationIcon';
 
 registerTranslation('fr', en);
 
-const paperTheme = {
-  colors: {
-    primary: '#FE5900',
-  },
+const accentColor = '#FE5900';
+
+const paperLightTheme = {
+  ...MD3LightTheme,
+  colors: { ...MD3LightTheme.colors, primary: accentColor },
+};
+
+const paperDarkTheme = {
+  ...MD3DarkTheme,
+  colors: { ...MD3DarkTheme.colors, primary: accentColor },
 };
 
 const BackButton = ({ onPress, isDark }: { onPress: () => void; isDark: boolean }) => (
@@ -95,7 +102,8 @@ export default function RootLayout() {
   }
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <PaperProvider theme={paperTheme}> 
+    <BottomSheetModalProvider>
+    <PaperProvider theme={colorScheme === 'dark' ? paperDarkTheme : paperLightTheme}> 
         <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
@@ -129,6 +137,7 @@ export default function RootLayout() {
         </ThemeProvider>
 
     </PaperProvider>
+    </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }

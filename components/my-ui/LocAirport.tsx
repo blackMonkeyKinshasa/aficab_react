@@ -9,6 +9,7 @@ import { calculateDistance, generateIDBooking } from '@/api/booking';
 import { EtapeReservation, ResStatus, ResType } from "@/constants/databaseEnum";
 import { useRouter } from 'expo-router';
 import { Input } from '@/components/ui/input';
+import {defautColor} from '@/constants/constants'
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
@@ -112,19 +113,6 @@ function getAirportTripPrice(car: Car | null, distanceKm: number | null) {
   return Number((distanceKm * taPrice).toFixed(2));
 }
 
-function getFuelOptionPrice(car: Car | null) {
-  const fuelOption = car?.priceOptions?.find((option: { name?: string; price?: unknown }) => {
-    const optionName = option?.name?.toLowerCase() ?? '';
-    return optionName.includes('carburant') || optionName.includes('fuel');
-  });
-
-  return typeof fuelOption?.price === 'number' ? fuelOption.price : null;
-}
-
-function getExtraTimePrice(value: unknown) {
-  return typeof value === 'number' ? value : null;
-}
-
 type CarItemProps = {
   car: Car;
   theme: Theme;
@@ -192,28 +180,16 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
-  const [fuel, setFuel] = useState(true);
-  const [flex, setFlex] = useState(false);
-  const [premium, setPremium] = useState(false);
   const [comment, setComment] = useState('');
+  const [flyNumber, setFlyNumber] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
+  const [isPositionAller, setPositionAller] = useState(true);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
-  const fuelPrice = getFuelOptionPrice(selectedCar);
-  const flexPrice = getExtraTimePrice(selectedCar?.extraTime?.flex);
-  const premiumPrice = getExtraTimePrice(selectedCar?.extraTime?.premium);
-  const hasFuelOption = fuelPrice !== null;
-  const hasFlexOption = flexPrice !== null;
-  const hasPremiumOption = premiumPrice !== null;
-  const hasAnyOption = hasFuelOption || hasFlexOption || hasPremiumOption;
   const tripPrice = getAirportTripPrice(selectedCar, distanceKm);
-  const optionsTotal =
-    (fuel ? fuelPrice ?? 0 : 0) +
-    (flex ? flexPrice ?? 0 : 0) +
-    (premium ? premiumPrice ?? 0 : 0);
-  const totalPrice = (tripPrice + optionsTotal) * (locationDoc.tripType === 'round-trip' ? 2 : 1);
+  const totalPrice = tripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
 
   const getOrCreateBookingId = async () => {
     if (bookingId) {
@@ -237,39 +213,40 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     return bookingIdRequestRef.current;
   };
 
-  const buildBooking = async (): Promise<Booking | null> => {
-    if (!selectedCar) {
+  const buildBooking = async (car?: Car): Promise<Booking | null> => {
+    const resolvedCar = car ?? selectedCar;
+    if (!resolvedCar) {
       return null;
     }
 
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
     const trimmedComment = comment.trim();
+    const trimmedFlyNumber = flyNumber.trim();
     const trimmedGuestName = guestName.trim();
     const trimmedGuestPhone = guestPhone.trim();
+    const resolvedTripPrice = getAirportTripPrice(resolvedCar, distanceKm);
+    const resolvedTotalPrice = resolvedTripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
 
     return {
       id: resolvedBookingId,
       type: ResType.TA,
       status: ResStatus.PENDING,
-      carId: selectedCar.id,
+      carId: resolvedCar.id,
       clientId: null,
       clientPhone: null,
-      driverId: selectedCar.defaultDriverId,
+      driverId: resolvedCar.defaultDriverId,
       departureAt: toDate(locationDoc.dateStart)?.toISOString() ?? nowIso,
       arrivalAt: toDate(locationDoc.dateReturn)?.toISOString() ?? null,
       departure: toLocationPoint(locationDoc.locationDepart),
       arrival: toLocationPoint(locationDoc.locationDest),
       commentaire: trimmedComment || null,
       isPaid: false,
-      total: totalPrice,
+      total: resolvedTotalPrice,
       options: {
         tripType: locationDoc.tripType,
-        priceTA: selectedCar.priceTA,
+        priceTA: resolvedCar.priceTA,
         distanceKm,
-        fuel: fuel ? fuelPrice ?? 0 : 0,
-        flex: flex ? flexPrice ?? 0 : 0,
-        premium: premium ? premiumPrice ?? 0 : 0,
       },
       guest: trimmedGuestName || trimmedGuestPhone
         ? {
@@ -279,7 +256,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         : null,
       name: trimmedGuestName || null,
       reference: null,
-      taVolNumber: null,
+      taVolNumber: trimmedFlyNumber || null,
       taReturnId: null,
       rideStartAt: null,
       rideEndAt: null,
@@ -288,13 +265,13 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       createAt: bookingCreatedAt ?? nowIso,
       updateAt: nowIso,
       car: {
-        name: selectedCar.name,
-        registrationId: selectedCar.registrationId,
-        images: selectedCar.images,
-        category: selectedCar.category ? { ...selectedCar.category } : null,
+        name: resolvedCar.name,
+        registrationId: resolvedCar.registrationId,
+        images: resolvedCar.images,
+        category: resolvedCar.category ? { ...resolvedCar.category } : null,
       },
       client: null,
-      driver: selectedCar.defaultDriver,
+      driver: resolvedCar.defaultDriver,
       coupon: null,
       review: null,
     };
@@ -323,6 +300,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setIsRefreshing(false);
     }
   };
+
+
 
   useEffect(() => {
     let isMounted = true;
@@ -368,10 +347,12 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     };
   }, [setEtape]);
 
-  const handleNextEtape = async () => {
+
+
+  const handleNextEtape = async (car?: Car) => {
     if (etape === EtapeReservation.RECAP) {
       try {
-        const booking = await buildBooking();
+        const booking = await buildBooking(car);
 
         if (!booking) {
           Alert.alert('Information', 'Veuillez selectionner un vehicule avant de confirmer.');
@@ -393,7 +374,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
   const handleCarPress = (car: Car) => {
     setSelectedCar(car);
-    handleNextEtape();
+    void handleNextEtape(car);
   };
 
   const handleLoadMore = () => {
@@ -414,30 +395,11 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     void loadCars(1, true);
   };
 
-  const handleFuelInfoPress = () => {
-    Alert.alert('Information', 'hello word');
-  };
-
-  const handleFlexChange = (value: boolean) => {
-    setFlex(value);
-    if (value) {
-      setPremium(false);
-    }
-  };
-
-  const handlePremiumChange = (value: boolean) => {
-    setPremium(value);
-    if (value) {
-      setFlex(false);
-    }
-  };
-
-  
     const myButton = () => {
       return (
        <View className="flex-row mt-4">        
               <Button className="h-12 w-full items-center justify-center rounded-lg bg-orange-500" 
-              onPress={handleNextEtape}>
+              onPress={() => void handleNextEtape()}>
               <UIText className="text-base  font-bold text-white">
                 {actionLabel}
               </UIText>
@@ -512,78 +474,42 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       
       <View style={[styles.container]}>
 
-      {/* OPTIONS */}
-      {hasAnyOption ? (
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>Options</Text>
-          </View>
 
-          {/* Fuel */}
-          {hasFuelOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <View style={styles.optionTitleRow}>
-                  <Text style={{ color: theme.text }}>Frais de carburant</Text>
-                  <TouchableOpacity onPress={handleFuelInfoPress} style={styles.infoButton}>
-                    <Ionicons name="information-circle-outline" size={18} color={theme.subText} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  Couvre les frais de carburant pendant toute la duree de la location
-                </Text>
-              </View>
+        {/* FLY NUMBER */}
+      <View style={[styles.section, { borderColor: theme.border }]}>
+        <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
 
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{fuelPrice} $</Text>
-                <Switch value={fuel} onValueChange={setFuel} />
-              </View>
-            </View>
-          ) : null}
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
+            Indiquez votre numero de vol (optionnel)
+          </Text>
 
-          {/* Flex */}
-          {hasFlexOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <Text style={{ color: theme.text }}>Heures supplementaires flex</Text>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  Chauffeur disponible jusqu'a 23 h 30
-                </Text>
-              </View>
+          <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", marginTop:8 }}>
+            Le chauffeur suivra votre arrivée et adaptera l'heure de prise en charge en fonction de votre heure d'atterrissage.
+          </Text>
+         </View>
 
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{flexPrice} $</Text>
-                <Switch value={flex} onValueChange={handleFlexChange} />
-              </View>
-            </View>
-          ) : null}
+        <Input
+          placeholder="Ex : AF1234"
+          placeholderTextColor={theme.subText}
+          value={flyNumber}
+          onChangeText={setFlyNumber}
+          style={
+            styles.input
+         }
+        />
+      </View>
 
-          {/* Premium */}
-          {hasPremiumOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <Text style={{ color: theme.text }}>
-                  Heures supplementaires premium
-                </Text>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  Chauffeur disponible jusqu'a l'aube
-                </Text>
-              </View>
+   
 
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{premiumPrice} $</Text>
-                <Switch value={premium} onValueChange={handlePremiumChange} />
-              </View>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
 
       {/* COMMENT */}
       <View style={[styles.section, { borderColor: theme.border }]}>
-        <View style={styles.sectionHeader}>
-          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>
+        <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
             Commentaire (optionnel)
+          </Text>
+            <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", marginTop:8 }}>
+          Veuillez nous faire part de toute demande particulière
           </Text>
          </View>
 
@@ -602,8 +528,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       {/* BOOKING */}
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.sectionHeader}>
-          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>
-            Je reserve pour une autre personne
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
+            Je reserve pour une autre personne (optionnel)
           </Text>
          </View>
 
@@ -628,6 +554,32 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         />
       </View>
 
+       {/* WARNING GUEST */}
+      <View style={[styles.section, { borderColor: theme.border }]}>
+        <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
+            Veuilez noter :
+          </Text>
+
+          <View style={{flexDirection:"row", marginTop:8 }}>
+              <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
+               <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
+                Pour des raisons de sécurité, la capacité maximale de passagers et de bagages doit être respectée. En cas de doute, choisissez une catégorie supérieure, car les chauffeurs peuvent refuser le transport si le nombre de passagers est dépassé.
+              </Text>
+          </View>          
+
+            <View style={{flexDirection:"row", marginTop:10 }}>
+              <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
+               <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
+                Les images des véhicules ci-dessus sont données à titre d'exemple. Vous pourriez recevoir un autre véhicule de qualité similaire.
+                </Text>
+          </View>          
+
+        
+         </View>
+
+      </View>
+
       {/* BUTTON */}
 
       {myButton()}
@@ -644,22 +596,216 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     );
   };
 
+  const recap = ()=>{
+    const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240?text=Car';
+    const tripTypeLabel = locationDoc.tripType === 'round-trip' ? 'Aller' : 'Aller simple';
+    const isRoundTrip = locationDoc.tripType === 'round-trip' ? true : false;
+    const allerScheduleLabel = formatAirportSchedule({ ...locationDoc, tripType: 'one-way' });
+    const retourScheduleLabel = (() => {
+      const d = toDate(locationDoc.dateReturn);
+      if (!d || Number.isNaN(d.getTime())) return 'Date indisponible';
+      return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })} a ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    })();
+    const activeDateLabel = isPositionAller ? allerScheduleLabel : retourScheduleLabel;
+    const trimmedFlyNumber = flyNumber.trim();
+    const trimmedComment = comment.trim();
+    const trimmedGuestName = guestName.trim();
+    const trimmedGuestPhone = guestPhone.trim();
+
+    return(
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+        <View style={[styles.section, { borderColor: theme.border }]}>
+
+              <View style={{flexDirection:'row'}}>
+                {/*Aller*/}
+                  <TouchableOpacity style={{flex:1}} onPress={() => { setPositionAller(true) }} >
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={[styles.recapSectionTitle, { color:  isPositionAller ? defautColor : theme.text }]}>{tripTypeLabel}</Text>
+                          
+                              {/*ligne de séparation*/}
+                              
+                           <View style={{ flexDirection: 'row',height: 1 , marginVertical: 12}}>
+                              <View style={{ flex: 1, height: 1, backgroundColor: isPositionAller ? defautColor : theme.border }} />  
+                          </View>
+                     </View>
+                  </TouchableOpacity>
+
+                  {/*Retour*/}
+                 { isRoundTrip && (
+                  <TouchableOpacity style={{flex:1}} onPress={() => { setPositionAller(false) }} >
+                   <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={[styles.recapSectionTitle, { color:  !isPositionAller ? defautColor :  theme.text }]}>Retour</Text>
+                       {/*ligne de séparation*/}
+                     <View style={{ flexDirection: 'row',height: 1 , marginVertical: 12}}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: isRoundTrip && !isPositionAller ? defautColor : theme.border}} /> 
+                    </View>
+
+                   </View> 
+                  </TouchableOpacity>)
+                  }
+              </View>
+ 
+             
+         {/*Date et heure ainsi que lieux de depart*/}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                 
+                  <Ionicons name="location-outline" size={18} color={theme.text} />
+                 
+                  <View style={{flex: 1,justifyContent: 'center', marginLeft:4}}>
+                         <Text style={[styles.recapDate, { color: theme.subText }]}>{activeDateLabel}</Text>
+                         <Text numberOfLines={1} style={[styles.recapDescription, { color: theme.text }]}>{
+                          isPositionAller ? 
+                          locationDoc.locationDepart.description ?? 'Adresse indisponible' :
+                          locationDoc.locationDest.description ?? 'Adresse indisponible'
+                        }
+                          </Text>
+                </View>
+          </View>
+
+             {/*Estimation de la distance ou de temps entre lees deux points*/}
+           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft:10}}>
+                 
+                    <View style={{ height: 40, width:1, backgroundColor:  theme.border}} /> 
+
+                 
+                  <View style={{flex: 1,justifyContent: 'center', marginLeft:13}}>
+                        <Text numberOfLines={1} style={[styles.recapDate, { color: theme.subText, marginLeft: 4 }]}>Environ {distanceKm !== null ? distanceKm.toFixed(1) : '0.0'} km</Text>
+                  </View>
+          </View>
+
+         
+          {/*Date et heure ainsi que lieux de d'arrivée*/}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft:4}}>
+                 
+                  <Ionicons name="navigate-outline" size={18} color={theme.text} />
+                 
+                  <View style={{flex: 1,justifyContent: 'center', marginLeft:4}}>
+                        <Text numberOfLines={1} style={[styles.recapDescription, { color: theme.text, marginLeft: 4 }]}>
+                          {
+                         isPositionAller ? 
+                          locationDoc.locationDest.description ?? 'Adresse indisponible' :
+                          locationDoc.locationDepart.description ?? 'Adresse indisponible' 
+                         
+                          }
+                          </Text>
+                  </View>
+          </View>
+          
+          
+          {distanceKm !== null ? (
+            <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>Distance : {distanceKm.toFixed(1)} km</Text>
+          ) : null}
+          {trimmedFlyNumber ? (
+            <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>Numero de vol : {trimmedFlyNumber}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.sectionSansBordure}>
+          <View style={styles.carRow}>
+            <Image source={{ uri: recapImage }} style={styles.carImage} resizeMode="cover" />
+
+            <View style={{ flex: 1, marginLeft: 15 }}>
+
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.recapCarTitle, { color: theme.text }]}>{selectedCar?.name ?? 'Aucun vehicule'}</Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.recapCarSubtitle, { color: theme.subText }]}>{selectedCar?.category?.name ?? 'Sans categorie'}</Text>
+              </View>
+
+              <View style={[styles.recapCarDetails,{ flex : 1}]}>
+                <View style={[styles.recapBadge, { backgroundColor: theme.input }]}>
+                  <Ionicons name="person" size={14} color={theme.text} />
+                  <Text style={[styles.recapBadgeText, { color: theme.text }]}>{selectedCar?.seats ?? 0}</Text>
+                </View>
+                <View style={[styles.recapBadge, { backgroundColor: theme.input }]}>
+                  <Ionicons name="briefcase" size={14} color={theme.text} />
+                  <Text style={[styles.recapBadgeText, { color: theme.text }]}>{selectedCar?.baggage ?? 0}</Text>
+                </View>
+              </View>
+
+            </View>
+          </View>
+        </View>
+
+          {/* WARNING GUEST */}
+      <View style={[styles.section, { borderColor: theme.border }]}>
+        <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
+            Condition d'annulation :
+          </Text>
+
+          <View style={{flexDirection:"row", marginTop:8 }}>
+              <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
+               <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
+                Vous pouvez annuler gratuitement votre reservation jusqu'à 24 heures avant l'heure de prise en charge prévue.
+               </Text>
+          </View>          
+
+                  
+
+        
+         </View>
+
+      </View>
+
+        <View style={[styles.section, { borderColor: theme.border }]}>
+          <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Détail des prix</Text>
+          <View style={styles.recapPriceRow}>
+            <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> → {!isRoundTrip ? 'Aller simple' : 'Aller'} :</Text>
+            <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
+          </View>
+
+          {
+            isRoundTrip && (
+              <View style={styles.recapPriceRow}>
+                <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> ← Retour :</Text>
+                <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
+              </View>
+            )
+          }
+
+              {/*ligne de séparation*/}
+                     <View style={{ flexDirection: 'row',height: 1 , marginVertical: 12}}>
+                      <View style={{ flex: 1, height: 1, backgroundColor: theme.border}} /> 
+                    </View>
+
+          <View style={styles.recapPriceRow}>
+            <Text style={[styles.recapTotalLabel, { color: theme.text }]}>Total</Text>
+            <Text style={[styles.recapTotalValue, { color: theme.text }]}>{totalPrice} $</Text>
+          </View>
+        </View>
+
+        {trimmedComment ? (
+          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Commentaire</Text>
+            <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedComment}</Text>
+          </View>
+        ) : null}
+
+        {trimmedGuestName || trimmedGuestPhone ? (
+          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Reservation pour</Text>
+            {trimmedGuestName ? <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedGuestName}</Text> : null}
+            {trimmedGuestPhone ? <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>{trimmedGuestPhone}</Text> : null}
+          </View>
+        ) : null}
+
+        {myButton()}
+      </ScrollView>
+    );
+  };
+
 
   return (
 
-    <View className="flex-1 px-6">
+    <View className="flex-1 px-6 py-4">
             
               {etape === EtapeReservation.SELECTION && selectCarsPage()}
 
               {etape === EtapeReservation.OPTION && selectOption()}
-              {etape === EtapeReservation.RECAP && 
-              <View className="flex-1 items-center justify-center">
-                <Text>Recapitulatif</Text>
-                <Text style={[styles.selectedCarText, { color: theme.subText }]}>Vehicule selectionne: {selectedCar?.name ?? 'Aucun'}</Text>
-                <Text style={[styles.selectedCarText, { color: theme.subText }]}>Type de trajet: {locationDoc.tripType === 'round-trip' ? 'Aller-retour' : 'Aller simple'}</Text>
-                {distanceKm !== null ? <Text style={[styles.selectedCarText, { color: theme.subText }]}>Distance : {distanceKm.toFixed(1)} km</Text> : null}
-                <Text style={[styles.selectedCarText, { color: theme.subText }]}>Total estime: {totalPrice} $</Text>
-              </View>}
+              {etape === EtapeReservation.RECAP && recap()}
 
              
 
@@ -710,6 +856,13 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 15,
   },
+
+  sectionSansBordure: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 15,
+  },
+
 
   sectionHeader: {
     flexDirection: "row",
@@ -878,5 +1031,63 @@ const styles = StyleSheet.create({
     color: "orange",
     fontWeight: "bold",
     fontSize: 16,
+  },
+
+  recapCarTitle: {
+    fontWeight: "700",
+  },
+
+  recapCarSubtitle: {
+    marginBottom: 8,
+  },
+
+  recapCarDetails: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  recapBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+
+  recapBadgeText: {
+    marginLeft: 4,
+  },
+
+  recapSectionTitle: {
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+
+  recapDescription: {
+    fontSize: 14,
+  },
+  recapDate: {
+    fontSize: 12,
+  },
+
+  recapPriceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 6,
+  },
+
+  recapPriceLabel: {
+  },
+
+  recapPriceValue: {
+    fontWeight: "600",
+  },
+
+  recapTotalLabel: {
+    fontWeight: "700",
+  },
+
+  recapTotalValue: {
+    fontWeight: "700",
   },
 });

@@ -13,3 +13,5 @@ export type Location = {
 
 export const blurhash = "LVR3cy%L_2Rnxtfif8jb~VRkE1xu";
 
+export const defautColor ="#f97316";
+

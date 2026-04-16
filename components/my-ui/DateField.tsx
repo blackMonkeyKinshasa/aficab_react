@@ -33,6 +33,14 @@ departureHour=8,
     setVisible(true);
   
   };
+
+  const onDateChange = ({ date: selectedDate }: { date: Date | undefined }) => {
+    if (selectedDate) {
+      setOpen(false);
+      setDate(selectedDate);
+      setVisible(true);
+    }
+  };
   const onDismiss = React.useCallback(() => {
     setVisible(false)
   }, [setVisible])
@@ -100,6 +108,7 @@ departureHour=8,
         presentationStyle="formSheet"
         validRange={minDate ? { startDate: minDate } : undefined}
         onConfirm={onConfirm}
+        onChange={onDateChange}
       />
      
     </View>

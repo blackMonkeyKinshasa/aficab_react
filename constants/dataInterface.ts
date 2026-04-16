@@ -210,4 +210,6 @@ export interface Activity {
   booking: Booking | null;
 }
 
+export type PaymentMethod = "mpesa" | "orange" | "airtel" | "card"| "cash" ;
+
 

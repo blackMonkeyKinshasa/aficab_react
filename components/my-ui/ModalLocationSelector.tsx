@@ -7,7 +7,9 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  FlatList,
   View,
+  useColorScheme,
 } from 'react-native'
 
 import { Button, IconButton, useTheme } from 'react-native-paper'
@@ -15,6 +17,7 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import {color} from '@/constants/colors';
 import {LocationSelector} from './LocationSelector';
 import { Location } from '@/constants/constants';
+import { useMyStateLocation } from '@/constants/my-state';
 
 export function ModalLocationSelector({
   visible,
@@ -27,9 +30,15 @@ export function ModalLocationSelector({
   onConfirm: (location: Location) => void
 }) {
   const theme = useTheme()
+  const isDark = useColorScheme() === 'dark';
+  const modalBg = isDark ? '#1E2226' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#000000';
+  const subTextColor = isDark ? '#A0A0A0' : '#555555';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
 
   const [location, setLocation] = useState<Location | null>(null);
   const [date, setDate] = useState<Date | null>(null);
+  const {recentLocations, removeLocation} = useMyStateLocation();
 
  
 
@@ -51,10 +60,10 @@ export function ModalLocationSelector({
     >
       <>
       
-        <View className='flex-1 '>
+        <View style={{ flex: 1, backgroundColor: modalBg }}>
 
           {/* Header */}
-           <View className='p-1 flex-row '>
+           <View style={{ padding: 4, flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: borderColor }}>
 
                   <View className='flex-1 flex-row items-center'>
                   
@@ -64,7 +73,7 @@ export function ModalLocationSelector({
                           <IconButton
                               icon={'close'}
                               size={24}
-                              iconColor={'#000'}
+                              iconColor={textColor}
                               onPress={() => {
                                 onDismiss()
                               }}
@@ -80,7 +89,7 @@ export function ModalLocationSelector({
                           }
                             }}>
                           
-                          <Text className='text-lg font-normal' >Save</Text>
+                          <Text style={{ fontSize: 18, fontWeight: '400', color: textColor }}>Save</Text>
 
                         </TouchableOpacity>
 
@@ -95,13 +104,41 @@ export function ModalLocationSelector({
           <View className=' flex-row items-center'>
                 <View style={{ flex: 1, paddingTop: 8 }}>
                       <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
-                        <LocationSelector onSelect={setLocation} />
+                        <LocationSelector onSelect={(location)=>{
+                          setLocation(location);
+                          onConfirm(location);
+                        }} />
                       </View>
-                      {!!location && (
-                        <Text style={{ marginTop: 8, marginHorizontal: 16 }}>
-                          📍 {location.description}
-                        </Text>
-                      )}
+
+                       <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+                        <FlatList
+                          data={recentLocations}
+                          keyExtractor={(recentLocations) => recentLocations.description}
+                          showsVerticalScrollIndicator={false}
+                          renderItem={({ item: loc }) => (
+                          <TouchableOpacity onPress={() => {
+                            setLocation(loc);
+                            onConfirm(loc);
+                          }}>
+                            <View className='flex-row ' >
+                              
+                            <Text style={{ marginTop: 16, flex: 1, color: subTextColor }}>
+                            📍 {loc.description}
+                            </Text>
+
+                            <IconButton icon={'close'} size={20} iconColor={'#999'} onPress={() => {
+                              removeLocation(loc);
+                            }} />
+
+
+                            </View >
+                            
+                          </TouchableOpacity>
+                        )}  
+                        
+                        />
+                      </View>
+                     
 
                 </View>
            </View>

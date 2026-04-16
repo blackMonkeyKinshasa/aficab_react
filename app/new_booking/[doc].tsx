@@ -1,3 +1,4 @@
+
 import { View, Text } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { HeaderBackButton } from '@react-navigation/elements';
@@ -8,6 +9,8 @@ import { LocAirport } from '@/components/my-ui/LocAirport';
 import { LocDaily } from '@/components/my-ui/LocDaily';
 import { Booking } from '@/constants/dataInterface';
 import { useColorScheme } from 'react-native';
+import {PaymentModal} from '@/components/my-ui/PaymentModal';
+ 
 
 const ETAPE_TITLES: Record<EtapeReservation, string> = {
   [EtapeReservation.SELECTION]: "Selection d'un vehicule",
@@ -38,9 +41,11 @@ export default function NewBooking() {
   const isDarkMode = useColorScheme() === 'dark';
   const [etape, setEtape] = useState<EtapeReservation>(EtapeReservation.SELECTION);
   const title = ETAPE_TITLES[etape];
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
   const onSubmit = (doc: Booking) => {
     console.log(doc);
+    setPaymentModalVisible(true);
   };
 
   const handleHeaderBackPress = () => {
@@ -74,6 +79,9 @@ export default function NewBooking() {
         </>
       )}
     </View>
+
+    <PaymentModal visible={paymentModalVisible} onClose={() => setPaymentModalVisible(false)} />
+      
     </>
   );
 }

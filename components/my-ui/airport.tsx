@@ -8,6 +8,7 @@ import {
   StyleSheet,
   useColorScheme,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '@/components/my-ui/DateField';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
@@ -141,8 +142,9 @@ export function Airport() {
 
         {/* Message d'erreur aéroport */}
         {airportError && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-            <Text style={{ color: '#ef4444', fontSize: 13 }}>{airportError}</Text>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="warning-outline" size={16} color="#ef4444" />
+            <Text style={{ color: '#ef4444', fontSize: 13, flex: 1 }}>{airportError}</Text>
           </View>
         )}
 
