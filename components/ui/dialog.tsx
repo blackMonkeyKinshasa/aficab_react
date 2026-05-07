@@ -81,7 +81,7 @@ function DialogContent({
               as={X}
               className={cn('size-4 shrink-0 text-accent-foreground web:pointer-events-none')}
             />
-            <Text className="sr-only">Close</Text>
+            <Text className="sr-only">Fermer</Text>
           </DialogPrimitive.Close>
         </DialogPrimitive.Content>
       </DialogOverlay>

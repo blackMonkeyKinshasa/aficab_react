@@ -1,173 +1,197 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
-  TextInput,
   Image,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Keyboard,
   useColorScheme,
 } from "react-native";
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 
 import { PaymentMethod } from "@/constants/dataInterface";
+import { useAnalytics } from '@/lib/analytics';
+import { color } from '@/constants/colors';
+import { useI18n } from '@/lib/i18n';
+
 
 
 
 interface Props {
   visible: boolean;
+  isPremium: boolean;
+  disableStatusBar?: boolean;
+  onSubmit : (paymentMethod: PaymentMethod,phoneNumber?:string) => void;
   onClose: () => void;
 }
 
-export function PaymentModal({ visible, onClose }: Props) {
-  const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+const PAYMENT_LOGOS = {
+  [PaymentMethod.mpesa]: require("@/assets/money/mpesa.png"),
+  [PaymentMethod.orange]: require("@/assets/money/orange.png"),
+  [PaymentMethod.airtel]: require("@/assets/money/airtel.png"),
+  [PaymentMethod.card]: require("@/assets/money/visa.png"),
+  [PaymentMethod.cash]: require("@/assets/money/cash.png"),
+} as const;
+
+const PaymentCard = memo(function PaymentCard({
+  type,
+  label,
+  logo,
+  isActive,
+  isDark,
+  onPress,
+}: {
+  type: PaymentMethod;
+  label: string;
+  logo: number;
+  isActive: boolean;
+  isDark: boolean;
+  onPress: (type: PaymentMethod) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.card,
+        {
+          backgroundColor: isActive ? (isDark ? '#1a3a25' : '#e8f5ec') : isDark ? '#2a2f35' : '#ffffff',
+          borderColor: isActive ? '#04a24c' : isDark ? '#374151' : '#dddddd',
+        },
+      ]}
+      onPress={() => onPress(type)}
+    >
+      <View style={styles.check}>
+        {isActive && <View style={styles.innerCheck} />}
+      </View>
+
+      <Image source={logo} style={styles.logo} resizeMode="contain" fadeDuration={0} />
+      <Text style={[styles.cardText, { color: isDark ? '#ffffff' : '#000000' }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+});
+
+export function PaymentModal({ visible, isPremium, disableStatusBar = false, onClose , onSubmit}: Props) {
+  const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
-  const containerBg = isDark ? '#1E2226' : '#ffffff';
+  const containerBg = isDark ? color.appDarkBackground : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#000000';
   const subTextColor = isDark ? '#A0A0A0' : '#555555';
-  const cardBg = isDark ? '#2a2f35' : '#ffffff';
-  const cardBorder = isDark ? '#374151' : '#dddddd';
   const inputBorder = isDark ? '#374151' : '#dddddd';
   const inputBg = isDark ? '#111827' : '#ffffff';
   const inputText = isDark ? '#ffffff' : '#000000';
-  const handleIndicatorColor = isDark ? '#6b7280' : '#d1d5db';
-  const snapPoints = useMemo(() => ['60%'], []);
 
-  const [selected, setSelected] = useState<PaymentMethod>("mpesa");
+  const [selected, setSelected] = useState<PaymentMethod>(PaymentMethod.mpesa);
   const [phone, setPhone] = useState("");
-  const showPhoneField = selected !== "cash" && selected !== "card";
-  const paymentLabel = selected === "mpesa"
-    ? "Mpesa"
-    : selected === "orange"
-      ? "Orange Money"
-      : "Airtel Money";
+  const analytics = useAnalytics();
+  const showPhoneField = selected !== PaymentMethod.cash && selected !== PaymentMethod.card;
+  const paymentLabel = selected === PaymentMethod.mpesa
+    ? t('payment.mpesa')
+    : selected === PaymentMethod.orange
+      ? t('payment.orange')
+      : t('payment.airtel');
 
-  useEffect(() => {
-    if (visible) {
-      bottomSheetModalRef.current?.present();
-      return;
-    }
-
-    bottomSheetModalRef.current?.dismiss();
-  }, [visible]);
-
-  const renderBackdrop = (props: any) => (
-    <BottomSheetBackdrop
-      {...props}
-      disappearsOnIndex={-1}
-      appearsOnIndex={0}
-      opacity={0.4}
-      pressBehavior="close"
-    />
+  const paymentOptions = useMemo(
+    () => [
+      { type: PaymentMethod.mpesa, label: t('payment.mpesa'), logo: PAYMENT_LOGOS[PaymentMethod.mpesa] },
+      { type: PaymentMethod.orange, label: t('payment.orange'), logo: PAYMENT_LOGOS[PaymentMethod.orange] },
+      { type: PaymentMethod.airtel, label: t('payment.airtel'), logo: PAYMENT_LOGOS[PaymentMethod.airtel] },
+      { type: PaymentMethod.card, label: t('payment.card'), logo: PAYMENT_LOGOS[PaymentMethod.card] },
+      ...(isPremium
+        ? [{ type: PaymentMethod.cash, label: t('payment.cash'), logo: PAYMENT_LOGOS[PaymentMethod.cash] }]
+        : []),
+    ],
+    [isPremium, t]
   );
-
-  const PaymentCard = ({
-    type,
-    label,
-    logo,
-  }: {
-    type: PaymentMethod;
-    label: string;
-    logo: any;
-  }) => {
-    const isActive = selected === type;
-
-    return (
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: isActive ? (isDark ? '#1a3a25' : '#e8f5ec') : cardBg, borderColor: isActive ? '#04a24c' : cardBorder }]}
-        onPress={() => setSelected(type)}
-      >
-        <View style={styles.check}>
-          {isActive && <View style={styles.innerCheck} />}
-        </View>
-
-        <Image source={logo} style={styles.logo} resizeMode="contain" />
-        <Text style={[styles.cardText, { color: textColor }]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
+  const selectedPaymentLabel = paymentOptions.find((option) => option.type === selected)?.label ?? t('payment.payWith');
 
   return (
-    <BottomSheetModal
-      ref={bottomSheetModalRef}
-      index={0}
-      snapPoints={snapPoints}
-      onDismiss={onClose}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: containerBg }}
-      handleIndicatorStyle={{ backgroundColor: handleIndicatorColor }}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent={!disableStatusBar}
     >
-      <BottomSheetView style={[styles.container, { backgroundColor: containerBg }]}> 
-          <Text style={[styles.title, { color: textColor }]}>
-            Comment souhaitez-vous payer ?
-          </Text>
+      <KeyboardAvoidingView behavior="padding" style={styles.overlay}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={[styles.modalCard, { backgroundColor: containerBg }]}> 
+            <Text style={[styles.title, { color: textColor }]}>
+              {t('payment.title')}
+            </Text>
 
-          <View style={styles.grid}>
-            <PaymentCard
-              type="mpesa"
-              label="M-pesa"
-              logo={require("@/assets/money/mpesa.png")}
-            />
-            <PaymentCard
-              type="orange"
-              label="Orange Money"
-              logo={require("@/assets/money/orange.png")}
-            />
-            <PaymentCard
-              type="airtel"
-              label="Airtel Money"
-              logo={require("@/assets/money/airtel.png")}
-            />
-            <PaymentCard
-              type="card"
-              label="Carte de crédit"
-              logo={require("@/assets/money/visa.png")}
-            />
+            <View style={styles.grid}>
+              {paymentOptions.map((option) => (
+                <PaymentCard
+                  key={option.type}
+                  type={option.type}
+                  label={option.label}
+                  logo={option.logo}
+                  isActive={selected === option.type}
+                  isDark={isDark}
+                  onPress={setSelected}
+                />
+              ))}
+            </View>
 
-            <PaymentCard
-              type="cash"
-              label="Espèces"
-              logo={require("@/assets/money/cash.png")}
-            />
+            {showPhoneField && (
+              <>
+                <Text style={[styles.label, { color: subTextColor, marginBottom: 15 }]}>
+                  {t('payment.phoneInfoFor')} ({paymentLabel}) :
+                </Text>
+
+                <TextInput
+                  placeholder={t('payment.phonePlaceholder')}
+                  placeholderTextColor={subTextColor}
+                  value={phone}
+                  onChangeText={setPhone}
+                  style={[styles.input, { borderColor: inputBorder, backgroundColor: inputBg, color: inputText }]}
+                  keyboardType="phone-pad"
+                />
+              </>
+            )}
+
+            <TouchableOpacity style={styles.button} onPress={() => {
+              analytics.trackPaymentMethodSelected(selected, phone);
+              analytics.trackPaymentSubmitted(selected);
+              onSubmit(selected, phone);
+            }}>
+              <Text style={styles.buttonText}>{`${t('payment.payWith')} ${selectedPaymentLabel}`}</Text>
+            </TouchableOpacity>
           </View>
-
-          {showPhoneField && (
-            <>
-              <Text style={[styles.label, { color: subTextColor }]}>
-                Informations de paiement ({paymentLabel}) :
-              </Text>
-
-              <TextInput
-                placeholder="Saisissez le numéro de téléphone"
-                placeholderTextColor={subTextColor}
-                value={phone}
-                onChangeText={setPhone}
-                style={[styles.input, { borderColor: inputBorder, backgroundColor: inputBg, color: inputText }]}
-                keyboardType="phone-pad"
-              />
-            </>
-          )}
-
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>Payer</Text>
-          </TouchableOpacity>
-
-          
-      </BottomSheetView>
-    </BottomSheetModal>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
+  overlay: {
     flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalCard: {
+    borderRadius: 20,
+    padding: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   title: {
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 15,
+    textAlign: 'center',
   },
   grid: {
     flexDirection: "row",
@@ -227,14 +251,19 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+     marginBottom: 15,
+    marginTop: 15,
   },
   buttonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
+   fontSize: 16,
+
   },
-  close: {
+  closeButton: {
+    marginTop: 12,
+  },
+  closeText: {
     textAlign: "center",
-    marginTop: 10,
-    color: "#888",
   },
 });

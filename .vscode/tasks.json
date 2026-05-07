@@ -51,6 +51,12 @@
 			"command": "cd C:\\Users\\hp\\Documents\\projet_expo\\Aficab ; npx expo-doctor",
 			"isBackground": false,
 			"problemMatcher": []
+		},
+		{
+			"label": "Install updated Expo packages",
+			"type": "shell",
+			"command": "npm install",
+			"isBackground": false
 		}
 	]
 }

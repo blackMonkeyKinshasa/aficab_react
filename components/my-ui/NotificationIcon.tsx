@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { get } from "react-native/Libraries/TurboModule/TurboModuleRegistry";
 import { getActivity } from "@/api/activity";
 import { Activity } from "@/constants/dataInterface";
+import {Bell, type LucideIcon} from 'lucide-react-native';
+import {ErrorEmpty} from '@/components/my-ui/errorEmpty';
 
 type Props = {
   isDark: boolean;
@@ -33,7 +35,7 @@ export function NotificationIcon({ isDark, onPress }: Props) {
   return (
     <TouchableOpacity onPress={() => router.push('/notificationsPage')} style={{ padding: 8 }}>
       <View>
-        <Ionicons name="notifications-outline" size={20} color={isDark ? "#fff" : "#000"} />
+        <Bell size={20} color={isDark ? "#fff" : "#000"} />
 
         {activities.length > 0 && (
           <View

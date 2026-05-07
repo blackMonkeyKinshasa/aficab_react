@@ -1,4 +1,5 @@
 import { DarkTheme, DefaultTheme, type Theme } from '@react-navigation/native';
+import { color } from '@/constants/colors';
 
 export const THEME = {
   light: {
@@ -28,11 +29,11 @@ export const THEME = {
     chart5: 'hsl(27 87% 67%)',
   },
   dark: {
-    background: 'hsl(0 0% 3.9%)',
+    background: color.appDarkBackground,
     foreground: 'hsl(0 0% 98%)',
-    card: 'hsl(0 0% 3.9%)',
+    card: color.appDarkBackground,
     cardForeground: 'hsl(0 0% 98%)',
-    popover: 'hsl(0 0% 3.9%)',
+    popover: color.appDarkBackground,
     popoverForeground: 'hsl(0 0% 98%)',
     primary: 'hsl(0 0% 98%)',
     primaryForeground: 'hsl(0 0% 9%)',

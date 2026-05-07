@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DateField } from '@/components/my-ui/DateField';
@@ -17,6 +18,9 @@ import { Location } from '@/constants/constants';
 import { useRouter } from 'expo-router';
 import { LocationDocTA } from '@/constants/dataInterface';
 import { ResType } from '@/constants/databaseEnum';
+import { useAnalytics } from '@/lib/analytics';
+import { useI18n } from '@/lib/i18n';
+import { useMyStateUser } from '@/store/user-state';
 
 type TripType = 'one-way' | 'round-trip';
 
@@ -61,6 +65,7 @@ function containsAirport(location: Location | null): boolean {
 
 export function Airport() {
   const router = useRouter();
+  const { t } = useI18n();
   const [tripType, setTripType] = useState<TripType>('one-way');
   const [locationDepart, setLocationDepart] = useState<Location | null>(null);
   const [locationDest, setLocationDest] = useState<Location | null>(null);
@@ -69,9 +74,31 @@ export function Airport() {
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateReturn, setDateReturn] = useState<Date | null>(null);
   const isDarkMode = useColorScheme() === 'dark';
+  const analytics = useAnalytics();
+  const userPhone = useMyStateUser((state) => state.user?.phone?.trim() ?? '');
 
   const handleSubmit = () => {
     if (!locationDepart || !locationDest || !dateStart) return;
+
+    if (!userPhone) {
+      Alert.alert(
+        t('booking.phoneRequiredTitle'),
+        t('booking.phoneRequiredMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('booking.addNow'),
+            onPress: () =>
+              router.push({
+                pathname: '/edit-profile',
+                params: { focusField: 'phone', returnToBooking: '1' },
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
     const doc: LocationDocTA = {
       type: ResType.TA,
       tripType,
@@ -80,6 +107,13 @@ export function Airport() {
       dateStart,
       ...(tripType === 'round-trip' && dateReturn ? { dateReturn } : {}),
     };
+    analytics.trackBookingStarted(ResType.TA, {
+      origin: locationDepart.description,
+      destination: locationDest.description,
+      dateStart: dateStart.toISOString(),
+      dateEnd: dateReturn?.toISOString(),
+      tripType,
+    });
     router.push({
       pathname: '/new_booking/[doc]',
       params: { doc: JSON.stringify(doc) },
@@ -98,7 +132,7 @@ export function Airport() {
     locationDest !== null &&
     !containsAirport(locationDepart) &&
     !containsAirport(locationDest)
-      ? "Au moins une des adresses doit contenir un aéroport."
+      ? t('booking.airportRequired')
       : null;
 
   const isValid =
@@ -114,8 +148,8 @@ export function Airport() {
 
         {/* Sélecteur Aller simple / Aller retour */}
         <View style={styles.selectorContainer}>
-          <TripOption label="Aller simple" value="one-way" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
-          <TripOption label="Aller-retour" value="round-trip" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
+          <TripOption label={t('booking.oneWay')} value="one-way" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
+          <TripOption label={t('booking.roundTrip')} value="round-trip" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
         </View>
 
         {/* Départ */}
@@ -123,7 +157,7 @@ export function Airport() {
           <TouchableOpacity onPress={() => setVisibleDepart(true)}>
             <ModuleReservation
               icon={"location-outline"}
-              title={locationDepart ? locationDepart.description : "Départ"}
+              title={locationDepart ? locationDepart.description : t('booking.departure')}
               isDarkMode={isDarkMode}
             />
           </TouchableOpacity>
@@ -134,7 +168,7 @@ export function Airport() {
           <TouchableOpacity onPress={() => setVisibleDest(true)}>
             <ModuleReservation
               icon={"navigate-outline"}
-              title={locationDest ? locationDest.description : "Destination"}
+              title={locationDest ? locationDest.description : t('booking.destination')}
               isDarkMode={isDarkMode}
             />
           </TouchableOpacity>
@@ -151,10 +185,11 @@ export function Airport() {
         {/* Date de départ */}
         <View style={{ paddingTop: 8, paddingBottom: 8, paddingHorizontal: 20 }}>
           <DateField
-            label="Date et heure de départ"
+            label={t('booking.departureDateTime')}
             value={dateStart}
             minDate={new Date()}
             onChange={handleDateStartChange}
+            isStartTime={true}
           />
         </View>
 
@@ -162,10 +197,11 @@ export function Airport() {
         {tripType === 'round-trip' && (
           <View style={{ paddingTop: 10, paddingBottom: 30, paddingHorizontal: 20 }}>
             <DateField
-              label="Date et heure de retour"
+              label={t('booking.returnDateTime')}
               value={dateReturn}
               minDate={dateStart ?? new Date()}
               onChange={setDateReturn}
+              isStartTime={false}
             />
           </View>
         )}
@@ -182,7 +218,7 @@ export function Airport() {
             onPress={handleSubmit}
           >
             <Text className="text-white font-bold text-base">
-              Voir les offres
+              {t('booking.viewOffers')}
             </Text>
           </Button>
         </TouchableOpacity>

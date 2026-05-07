@@ -1,8 +1,8 @@
 import { apiFetch } from './apiConfig';
 
 // POST /upload/avatar  (multipart/form-data)
-export function uploadAvatar(avatarData: FormData, token?: string) {
-  return apiFetch('/upload/avatar', token, {
+export function uploadAvatar(avatarData: FormData) {
+  return apiFetch('/upload/avatar', {
     method: 'POST',
     body: avatarData,
   });

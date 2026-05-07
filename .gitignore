@@ -9,6 +9,7 @@ dist/
 web-build/
 
 # Native
+android/
 *.orig.*
 *.jks
 *.p8
@@ -41,3 +42,8 @@ yarn-error.*
 
 expo-env.d.ts
 # @end expo-cli
+.env.local
+
+# MCP config (contains secrets)
+.cursor/
+.vscode/mcp.json

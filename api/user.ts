@@ -1,33 +1,33 @@
 import { User } from '@/constants/dataInterface';
-import { apiFetch } from './apiConfig';
+import { apiAuthFetch } from './apiConfig';
 
 // GET /user/:uid
-export function getUserByID(userId: string, token?: string) {
-  return apiFetch(`/user/${userId}`, token, { method: 'GET' });
+export function getUserByID(userId: string) {
+  return apiAuthFetch(`/user/${userId}`, { method: 'GET' });
 }
 
 // PATCH /user/:uid
-export function updateUserByID(userId: string, updates: Partial<User>, token?: string) {
-  return apiFetch(`/user/${userId}`, token, {
+export function updateUserByID(userId: string, updates: Partial<User>) {
+  return apiAuthFetch(`/user/${userId}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
 }
 
 // DELETE /user/:uid
-export function deleteUserByID(userId: string, token?: string) {
-  return apiFetch(`/user/${userId}`, token, { method: 'DELETE' });
+export function deleteUserByID(userId: string) {
+  return apiAuthFetch(`/user/${userId}`, { method: 'DELETE' });
 }
 
 // PATCH /user/:uid/device-token
-export function updateDeviceToken(userId: string, token: string, deviceToken: string) {
-  return apiFetch(`/user/${userId}/device-token`, token, {
+export function updateDeviceToken(userId: string, deviceToken: string) {
+  return apiAuthFetch(`/user/${userId}/device-token`, {
     method: 'PATCH',
     body: JSON.stringify({ token: deviceToken }),
   });
 }
 
 // GET /driver/:uid
-export function getDriver(uid: string, token?: string) {
-  return apiFetch(`/driver/${uid}`, token, { method: 'GET' });
+export function getDriver(uid: string) {
+  return apiAuthFetch(`/driver/${uid}`, { method: 'GET' });
 }

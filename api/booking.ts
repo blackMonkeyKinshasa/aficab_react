@@ -1,31 +1,40 @@
-import { Booking, LocationPoint } from '@/constants/dataInterface';
-import { apiFetch } from './apiConfig';
+import {
+  Booking,
+  CreateBookingInput,
+  CreateBookingResponse,
+  CreateReviewResponse,
+  LocationPoint,
+  PawapayPaymentInput,
+  PawapayPaymentResponse,
+} from '@/constants/dataInterface';
+import { apiAuthFetch } from './apiConfig';
 import { ResType } from '@/constants/databaseEnum';
+import { createReview } from './review';
 
 // GET /booking?clientId=xxx
-export function getAllBookings(clientId?: string, token?: string) {
+export function getAllBookings(clientId?: string) {
   const query = clientId ? `?clientId=${clientId}` : '';
-  return apiFetch(`/booking${query}`, token, { method: 'GET' });
+  return apiAuthFetch(`/booking${query}`, { method: 'GET' });
 }
 
 // GET /booking/generate-id?type=xxx
-export function generateIDBooking(bookingType: ResType, token?: string) {
-  return apiFetch(`/booking/generate-id?type=${bookingType}`, token, { method: 'GET' });
+export function generateIDBooking(bookingType: ResType) {
+  return apiAuthFetch(`/booking/generate-id?type=${bookingType}`, { method: 'GET' });
 }
 
 // GET /booking/:id
-export function getBookingById(id: string, token?: string) {
-  return apiFetch(`/booking/${id}`, token, { method: 'GET' });
+export function getBookingById(id: string) {
+  return apiAuthFetch(`/booking/${id}`, { method: 'GET' });
 }
 
 // GET /booking/places?query=xxx
-export function searchPlaces(query: string, token?: string) {
-  return apiFetch(`/booking/places?query=${encodeURIComponent(query)}`, token, { method: 'GET' });
+export function searchPlaces(query: string) {
+  return apiAuthFetch(`/booking/places?query=${encodeURIComponent(query)}`, { method: 'GET' });
 }
 
 // POST /booking
-export function createNewBooking(bookingData: Partial<Booking>, token?: string) {
-  return apiFetch('/booking', token, {
+export function createNewBooking(bookingData: CreateBookingInput): Promise<CreateBookingResponse> {
+  return apiAuthFetch('/booking', {
     method: 'POST',
     body: JSON.stringify(bookingData),
   });
@@ -35,10 +44,9 @@ export function createNewBooking(bookingData: Partial<Booking>, token?: string) 
 export function clientCancelBooking(
   bookingId: string,
   status: string,
-  clientId: string,
-  token?: string
+  clientId: string
 ) {
-  return apiFetch(`/booking/${bookingId}/client-cancel`, token, {
+  return apiAuthFetch(`/booking/${bookingId}/client-cancel`, {
     method: 'POST',
     body: JSON.stringify({ status, clientId }),
   });
@@ -47,10 +55,9 @@ export function clientCancelBooking(
 // POST /booking/directions
 export function calculateDistance(
   origin: LocationPoint,
-  destination: LocationPoint,
-  token?: string
+  destination: LocationPoint
 ) {
-  return apiFetch('/booking/directions', token, {
+  return apiAuthFetch('/booking/directions', {
     method: 'POST',
     body: JSON.stringify({ origin, destination }),
   });
@@ -62,10 +69,9 @@ export function maxicashPay(
   amount: string,
   currency: string,
   paymentMethod: string,
-  paymentNumber: string,
-  token?: string
+  paymentNumber: string
 ) {
-  return apiFetch('/booking/payment/maxicash', token, {
+  return apiAuthFetch('/booking/payment/maxicash', {
     method: 'POST',
     body: JSON.stringify({ reference: transactionId, amount, currency, paymentMethod, paymentNumber }),
   });
@@ -77,10 +83,9 @@ export function maxicashVISA(
   amount: string,
   currency: string,
   client: Record<string, unknown>,
-  isMobile: boolean = true,
-  token?: string
+  isMobile: boolean = true
 ) {
-  return apiFetch('/booking/payment/maxicash-card', token, {
+  return apiAuthFetch('/booking/payment/maxicash-card', {
     method: 'POST',
     body: JSON.stringify({ reference: transactionId, amount, currency, client, isMobile }),
   });
@@ -89,27 +94,39 @@ export function maxicashVISA(
 // POST /booking/payment/maxicash/status
 export function checkPayment(
   referenceID: string,
-  transactionId: string,
-  token?: string
+  transactionId: string
 ) {
-  return apiFetch('/booking/payment/maxicash/status', token, {
+  return apiAuthFetch('/booking/payment/maxicash/status', {
     method: 'POST',
     body: JSON.stringify({ reference: referenceID, transactionId }),
+  });
+}
+
+// POST /booking/payment/pawapay
+export function pawapayPay(paymentData: PawapayPaymentInput): Promise<PawapayPaymentResponse> {
+  return apiAuthFetch('/booking/payment/pawapay', {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
   });
 }
 
 // POST /review
 export function postReview(
   bookingId: string,
+  driverId: string,
   ratingDriving: number,
   ratingPunctuality: number,
   ratingVehicle: number,
   ratingService: number,
-  comment: string = '',
-  token?: string
-) {
-  return apiFetch('/review', token, {
-    method: 'POST',
-    body: JSON.stringify({ bookingId, ratingDriving, ratingPunctuality, ratingVehicle, ratingService, comment }),
+  comment: string = ''
+): Promise<CreateReviewResponse> {
+  return createReview({
+    bookingId,
+    driverId,
+    ratingDriving,
+    ratingPunctuality,
+    ratingVehicle,
+    ratingService,
+    comment,
   });
 }

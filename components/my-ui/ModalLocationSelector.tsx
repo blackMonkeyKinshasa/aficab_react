@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  StatusBar,
   FlatList,
   View,
   useColorScheme,
@@ -17,19 +17,23 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import {color} from '@/constants/colors';
 import {LocationSelector} from './LocationSelector';
 import { Location } from '@/constants/constants';
-import { useMyStateLocation } from '@/constants/my-state';
+import { useMyStateLocation } from '@/store/location-state';
+import { useI18n } from '@/lib/i18n';
 
 export function ModalLocationSelector({
   visible,
   onDismiss,
   onConfirm,
+  disableStatusBar = false,
 }: {
  
   visible: boolean | undefined
   onDismiss: () => any
   onConfirm: (location: Location) => void
+  disableStatusBar?: boolean
 }) {
   const theme = useTheme()
+  const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
   const modalBg = isDark ? '#1E2226' : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#000000';
@@ -38,7 +42,19 @@ export function ModalLocationSelector({
 
   const [location, setLocation] = useState<Location | null>(null);
   const [date, setDate] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const {recentLocations, removeLocation} = useMyStateLocation();
+  const isSearching = searchQuery.trim().length >= 2;
+
+  const handleSelectLocation = useCallback((nextLocation: Location) => {
+    Keyboard.dismiss();
+    setLocation(nextLocation);
+    setSearchQuery('');
+
+    requestAnimationFrame(() => {
+      onConfirm(nextLocation);
+    });
+  }, [onConfirm]);
 
  
 
@@ -54,13 +70,13 @@ export function ModalLocationSelector({
       visible={visible}
       onRequestClose={onDismiss}
       presentationStyle="formSheet"
-      statusBarTranslucent={false}
+      statusBarTranslucent={!disableStatusBar}
       
 
     >
       <>
       
-        <View style={{ flex: 1, backgroundColor: modalBg }}>
+        <View style={{ flex: 1, backgroundColor: modalBg  }}>
 
           {/* Header */}
            <View style={{ padding: 4, flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: borderColor }}>
@@ -89,7 +105,7 @@ export function ModalLocationSelector({
                           }
                             }}>
                           
-                          <Text style={{ fontSize: 18, fontWeight: '400', color: textColor }}>Save</Text>
+                          <Text style={{ fontSize: 18, fontWeight: '400', color: textColor }}>{t('common.save')}</Text>
 
                         </TouchableOpacity>
 
@@ -105,39 +121,38 @@ export function ModalLocationSelector({
                 <View style={{ flex: 1, paddingTop: 8 }}>
                       <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
                         <LocationSelector onSelect={(location)=>{
-                          setLocation(location);
-                          onConfirm(location);
-                        }} />
+                          handleSelectLocation(location);
+                        }} onQueryChange={setSearchQuery} />
                       </View>
 
-                       <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
-                        <FlatList
-                          data={recentLocations}
-                          keyExtractor={(recentLocations) => recentLocations.description}
-                          showsVerticalScrollIndicator={false}
-                          renderItem={({ item: loc }) => (
-                          <TouchableOpacity onPress={() => {
-                            setLocation(loc);
-                            onConfirm(loc);
-                          }}>
-                            <View className='flex-row ' >
+                      {!isSearching ? (
+                        <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
+                          <FlatList
+                            data={recentLocations}
+                            keyExtractor={(recentLocations) => recentLocations.description}
+                            showsVerticalScrollIndicator={false}
+                            renderItem={({ item: loc }) => (
+                            <TouchableOpacity onPress={() => {
+                              handleSelectLocation(loc);
+                            }}>
+                              <View className='flex-row ' >
+                                
+                              <Text style={{ marginTop: 16, flex: 1, color: subTextColor }}>
+                              📍 {loc.description}
+                              </Text>
+
+                              <IconButton icon={'close'} size={20} iconColor={'#999'} onPress={() => {
+                                removeLocation(loc);
+                              }} />
+
+
+                              </View >
                               
-                            <Text style={{ marginTop: 16, flex: 1, color: subTextColor }}>
-                            📍 {loc.description}
-                            </Text>
-
-                            <IconButton icon={'close'} size={20} iconColor={'#999'} onPress={() => {
-                              removeLocation(loc);
-                            }} />
-
-
-                            </View >
-                            
-                          </TouchableOpacity>
-                        )}  
-                        
-                        />
-                      </View>
+                            </TouchableOpacity>
+                          )}  
+                          />
+                        </View>
+                      ) : null}
                      
 
                 </View>

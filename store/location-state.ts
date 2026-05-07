@@ -2,16 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { Location } from './constants';
+import { Location } from '@/constants/constants';
 
-interface MyStateLocation {
+interface LocationState {
   recentLocations: Location[];
   addLocation: (location: Location) => void;
   removeLocation: (location: Location) => void;
   clearLocations: () => void;
 }
 
-export const useMyStateLocation = create<MyStateLocation>()(
+export const useMyStateLocation = create<LocationState>()(
   persist(
     (set) => ({
       recentLocations: [],
@@ -21,14 +21,15 @@ export const useMyStateLocation = create<MyStateLocation>()(
           const normalizedDescription = location.description.trim().toLowerCase();
 
           const exists = state.recentLocations.some(
-            (item) =>
-              item.description.trim().toLowerCase() === normalizedDescription
+            (item) => item.description.trim().toLowerCase() === normalizedDescription
           );
 
-          if (exists) return state;
+          if (exists) {
+            return state;
+          }
 
           return {
-            recentLocations: [location, ...state.recentLocations].slice(0, 5)
+            recentLocations: [location, ...state.recentLocations].slice(0, 5),
           };
         }),
 

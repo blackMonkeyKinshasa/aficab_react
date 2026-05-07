@@ -88,57 +88,54 @@ function buildCarQuery(params: GetCarsParams = {}) {
   return query ? `/car-algo?${query}` : '/car-algo';
 }
 
-export function getCars(params: GetCarsParams = {}, token?: string) {
-  return apiFetch(buildCarQuery(params), token, { method: 'GET' });
+export function getCars(params: GetCarsParams = {}) {
+  return apiFetch(buildCarQuery(params), { method: 'GET' });
 }
 
 // GET /car?typeRes=LOC&status=AVAILABLE
-export function getLocCars(token?: string, params: Omit<GetCarsParams, 'typeRes'> = {}) {
+export function getLocCars(params: Omit<GetCarsParams, 'typeRes'> = {}) {
   return getCars(
     {
       ...params,
       typeRes: ResType.LOC,
       status: params.status ?? 'AVAILABLE',
-    },
-    token
+    }
   );
 }
 
 // GET /car?typeRes=TA&status=AVAILABLE
-export function getTaCars(token?: string, params: Omit<GetCarsParams, 'typeRes'> = {}) {
+export function getTaCars(params: Omit<GetCarsParams, 'typeRes'> = {}) {
   return getCars(
     {
       ...params,
       typeRes: ResType.TA,
       status: params.status ?? 'AVAILABLE',
-    },
-    token
+    }
   );
 }
 
 // GET /car (liste filtrable de toutes les voitures)
-export function getAllCars(token?: string, params: GetCarsParams = {}) {
-  return getCars(params, token);
+export function getAllCars(params: GetCarsParams = {}) {
+  return getCars(params);
 }
 
 // GET /car?isAdmin=true&organizationId=...
-export function getAdminCars(organizationId: string, token?: string, params: Omit<GetCarsParams, 'isAdmin' | 'organizationId'> = {}) {
+export function getAdminCars(organizationId: string, params: Omit<GetCarsParams, 'isAdmin' | 'organizationId'> = {}) {
   return getCars(
     {
       ...params,
       isAdmin: true,
       organizationId,
-    },
-    token
+    }
   );
 }
 
 // GET /car/:cid  (détail d'une voiture)
-export function getCarById(carId: string, token?: string) {
-  return apiFetch(`/car/${carId}`, token, { method: 'GET' });
+export function getCarById(carId: string) {
+  return apiFetch(`/car/${carId}`, { method: 'GET' });
 }
 
 // GET /car/category
-export function getAllCarCategories(token?: string) {
-  return apiFetch('/car/category', token, { method: 'GET' });
+export function getAllCarCategories() {
+  return apiFetch('/car/category', { method: 'GET' });
 }

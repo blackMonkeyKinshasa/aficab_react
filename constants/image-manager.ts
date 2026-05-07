@@ -1,16 +1,13 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Image } from 'react-native';
+
+const MAX_UPLOAD_WIDTH = 1280;
+const UPLOAD_COMPRESS_QUALITY = 0.65;
 
 
 // Ouvrir la galerie
 export async function pickImageToGallery() {
-  // demander permission
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-  if (!permission.granted) {
-    alert("Permission refusée");
-    return;
-  }
-
   // ouvrir galerie
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
@@ -18,10 +15,9 @@ export async function pickImageToGallery() {
   });
 
   if (!result.canceled) {
-  
-    const uri = result.assets[0].uri;
-    console.log(uri);
-    return uri;
+    return result.assets[0].uri;
+  }else{
+    return undefined;
   }
 };
 
@@ -41,20 +37,43 @@ export async function takePhoto() {
   });
 
   if (!result.canceled) {
-    console.log(result.assets[0].uri);
-   return result.assets[0].uri;
-   
+    return result.assets[0].uri;
+  }else {
+    return undefined;
   }
 };
 
-export function uriToBlob(uri: string): FormData {
+function getImageSize(uri: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      () => resolve(null),
+    );
+  });
+}
+
+async function prepareImageForUpload(uri: string): Promise<string> {
+  const imageSize = await getImageSize(uri);
+  const actions = imageSize && imageSize.width > MAX_UPLOAD_WIDTH
+    ? [{ resize: { width: MAX_UPLOAD_WIDTH } }]
+    : [];
+
+  const result = await ImageManipulator.manipulateAsync(uri, actions, {
+    compress: UPLOAD_COMPRESS_QUALITY,
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  return result.uri;
+}
+
+export async function uriToBlob(uri: string): Promise<FormData> {
+  const optimizedUri = await prepareImageForUpload(uri);
   const form = new FormData();
-  const ext = uri.split('.').pop() ?? 'jpg';
-  const mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
   form.append('file', {
-    uri,
-    name: `${Date.now()}.${ext}`,
-    type: mimeType,
+    uri: optimizedUri,
+    name: `${Date.now()}.jpg`,
+    type: 'image/jpeg',
   } as any);
   return form;
 }

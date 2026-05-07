@@ -2,7 +2,7 @@
   "expo": {
     "name": "Aficab",
     "slug": "Aficab",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/aficab-app-logo-white.png",
     "scheme": "aficab",
@@ -10,21 +10,44 @@
     "splash": {
       "image": "./assets/images/aficab-app-logo-white.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/images/aficab-app-logo-white.png",
+        "backgroundColor": "#000000",
+        "resizeMode": "contain"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "121",
+      "bundleIdentifier": "io.kinvtc.mapstracking",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
+        "NSPhotoLibraryUsageDescription": "Autoriser l'acces a la galerie pour selectionner des photos.",
+        "NSPhotoLibraryAddUsageDescription": "Autoriser l'enregistrement de photos dans la galerie.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/aficab-app-logo-white.png",
         "backgroundColor": "#ffffff"
       },
+      "versionCode": 122,
+      "package": "io.kinvtc.mapstracking",
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -34,13 +57,23 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-image-picker",
         {
           "cameraPermission": "Autoriser l'accès à la caméra",
           "photosPermission": "Autoriser l'accès aux photos"
         }
-      ]
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "aficab",
+          "project": "aficab-mobile"
+        }
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -50,6 +83,7 @@
       "eas": {
         "projectId": "e4903418-da7d-4c7b-b1f4-775a13059867"
       }
-    }
+    },
+    "owner": "castello6505"
   }
 }

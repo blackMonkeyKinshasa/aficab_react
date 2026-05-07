@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, ComponentProps } from 'react';
 import {useColorScheme} from 'nativewind';
 import {
   View,
@@ -20,9 +20,11 @@ import { Ionicons } from '@expo/vector-icons';
 import{Icon} from '@/components/ui/icon';
 import { Daily } from '@/components/my-ui/daily';
 import { Airport } from '@/components/my-ui/airport';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import Carousel from "react-native-reanimated-carousel";
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { color } from '@/constants/colors';
 
 
 const { width } = Dimensions.get("window");
@@ -53,6 +55,7 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
   
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
 
   
   const [value, setValue] = useState('account');
@@ -119,11 +122,13 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
 
 const TabHeader = ({
    label,
+    iconName,
     onPress,
     onSelect= false,
    
   }: {
     label: string;
+    iconName: ComponentProps<typeof Ionicons>['name'];
     onPress: () => void;
     onSelect: boolean;
   }) => (
@@ -132,7 +137,7 @@ const TabHeader = ({
     <View className={`items-center  flex-row justify-center w-full py-2 px-4 rounded-3xl ${onSelect ? 'border-gray-400 border' : ''}`}>
 
 
-       { onSelect ?  <Ionicons name={label === 'Daily' ? 'car-sport-outline' : 'airplane-outline'} size={20} color={isDark ? "#fff" : "#000"} style={{marginRight: 8}}/>
+  { onSelect ?  <Ionicons name={iconName} size={20} color={isDark ? "#fff" : "#000"} style={{marginRight: 8}}/>
         : null }
                     
         <Text className={cn(onSelect ? 'font-bold text-base dark:text-white text-black' :  'dark:text-gray-400 text-gray-600')}>
@@ -147,10 +152,9 @@ const TabHeader = ({
 
   return (
 
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
     <View className='flex-1'>
 
-    <View className='relative flex-1 bg-gray-800 '>
+    <View className='relative flex-1 bg-black '>
 
         {/* Carrousel */}
        <Carousel
@@ -164,7 +168,7 @@ const TabHeader = ({
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#04a24c",
+                backgroundColor: "#000",
                 justifyContent: "center",
                 alignItems: "center",
               }}
@@ -175,7 +179,10 @@ const TabHeader = ({
     />
 
         {/* TAB conatiner main */}
-          <View className='absolute top-44  h-full w-full  bg-white dark:bg-black rounded-t-lg'>
+          <View
+            className="absolute top-44 h-full w-full bg-white dark:bg-transparent rounded-t-lg"
+            style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
+          >
 
             {/* Tabs container */}
             <View className='flex-1 items-center  mt-4' >
@@ -183,9 +190,9 @@ const TabHeader = ({
                     {/*  container header tab*/}
                     <View className='flex-row items-center justify-center mt-1 ml-4 mr-4'>
 
-                      <TabHeader label="Daily" onPress={() => setRideType('daily')} onSelect={rideType === 'daily'} />
+                      <TabHeader label={t('booking.dailyTab')} iconName="car-sport-outline" onPress={() => setRideType('daily')} onSelect={rideType === 'daily'} />
                         <View className='w-4' />
-                      <TabHeader label="Airport" onPress={() => setRideType('airport')} onSelect={rideType === 'airport'} />
+                      <TabHeader label={t('booking.airportTab')} iconName="airplane-outline" onPress={() => setRideType('airport')} onSelect={rideType === 'airport'} />
 
                     </View>
 
@@ -210,7 +217,6 @@ const TabHeader = ({
 
     
     </View>
-     </TouchableWithoutFeedback>
   );
 };
 

@@ -1,0 +1,62 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+
+import { User } from '@/constants/dataInterface';
+
+export const USER_CACHE_DURATION_MS = 2 * 24 * 60 * 60 * 1000;
+
+interface UserState {
+  user: User | null;
+  lastFetchedAt: number | null;
+  setUser: (user: User) => void;
+  updateUser: (updates: Partial<User>) => void;
+  clearUser: () => void;
+  shouldRefreshUser: () => boolean;
+}
+
+export const useMyStateUser = create<UserState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      lastFetchedAt: null,
+
+      setUser: (user) =>
+        set({
+          user,
+          lastFetchedAt: Date.now(),
+        }),
+
+      updateUser: (updates) =>
+        set((state) => ({
+          user: state.user
+            ? {
+                ...state.user,
+                ...updates,
+              }
+            : null,
+          lastFetchedAt: state.user ? Date.now() : state.lastFetchedAt,
+        })),
+
+      clearUser: () =>
+        set({
+          user: null,
+          lastFetchedAt: null,
+        }),
+
+      shouldRefreshUser: () => {
+        const { user, lastFetchedAt } = get();
+
+        if (!user || !lastFetchedAt) {
+          return true;
+        }
+
+        return Date.now() - lastFetchedAt >= USER_CACHE_DURATION_MS;
+      },
+    }),
+    {
+      name: 'my-state-user',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);

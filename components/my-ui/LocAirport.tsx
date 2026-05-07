@@ -10,6 +10,12 @@ import { EtapeReservation, ResStatus, ResType } from "@/constants/databaseEnum";
 import { useRouter } from 'expo-router';
 import { Input } from '@/components/ui/input';
 import {defautColor} from '@/constants/constants'
+import { color } from '@/constants/colors';
+import { TranslationKey, useI18n } from '@/lib/i18n';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
+import { validateCoupon } from '@/api/coupon';
+import { CouponValidationValidResponse } from '@/constants/dataInterface';
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
@@ -42,31 +48,31 @@ function toDate(value: Date | string | undefined) {
   return value instanceof Date ? value : new Date(value);
 }
 
-function formatAirportSchedule(locationDoc: LocationDocTA) {
+function formatAirportSchedule(locationDoc: LocationDocTA, locale: string, unavailableLabel: string) {
   const startDate = toDate(locationDoc.dateStart);
   const returnDate = toDate(locationDoc.dateReturn);
 
   if (!startDate || Number.isNaN(startDate.getTime())) {
-    return 'Date indisponible';
+    return unavailableLabel;
   }
 
-  const startLabel = startDate.toLocaleDateString('fr-FR', {
+  const startLabel = startDate.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
     year: '2-digit',
   });
-  const startTimeLabel = startDate.toLocaleTimeString('fr-FR', {
+  const startTimeLabel = startDate.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   });
 
   if (locationDoc.tripType === 'round-trip' && returnDate && !Number.isNaN(returnDate.getTime())) {
-    const returnLabel = returnDate.toLocaleDateString('fr-FR', {
+    const returnLabel = returnDate.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'short',
       year: '2-digit',
     });
-    const returnTimeLabel = returnDate.toLocaleTimeString('fr-FR', {
+    const returnTimeLabel = returnDate.toLocaleTimeString(locale, {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -74,7 +80,7 @@ function formatAirportSchedule(locationDoc: LocationDocTA) {
     return `${startLabel} ${startTimeLabel} - ${returnLabel} ${returnTimeLabel}`;
   }
 
-  return `${startLabel} a ${startTimeLabel}`;
+  return `${startLabel} ${startTimeLabel}`;
 }
 
 function toLocationPoint(location: LocationDocTA['locationDepart'] | LocationDocTA['locationDest']) {
@@ -113,19 +119,44 @@ function getAirportTripPrice(car: Car | null, distanceKm: number | null) {
   return Number((distanceKm * taPrice).toFixed(2));
 }
 
+function getCouponDiscountAmount(coupon: CouponValidationValidResponse | null, orderTotal: number) {
+  if (!coupon) {
+    return 0;
+  }
+
+  if (typeof coupon.discountAmount === 'number') {
+    return coupon.discountAmount;
+  }
+
+  if (typeof coupon.originalAmount === 'number' && typeof coupon.finalAmount === 'number') {
+    return Math.max(0, coupon.originalAmount - coupon.finalAmount);
+  }
+
+  return 0;
+}
+
+function getCouponFinalTotal(coupon: CouponValidationValidResponse | null, orderTotal: number) {
+  if (coupon && typeof coupon.finalAmount === 'number') {
+    return coupon.finalAmount;
+  }
+
+  return Math.max(0, orderTotal - getCouponDiscountAmount(coupon, orderTotal));
+}
+
 type CarItemProps = {
   car: Car;
   theme: Theme;
   isSelected: boolean;
   distanceKm: number | null;
   onPress: (car: Car) => void;
+  t: (key: TranslationKey) => string;
 };
 
 function getAirportPriceLabel(car: Car, distanceKm: number | null) {
   return `$ ${getAirportTripPrice(car, distanceKm)}`;
 }
 
-function CarItem({ car, theme, isSelected, distanceKm, onPress }: CarItemProps) {
+function CarItem({ car, theme, isSelected, distanceKm, onPress, t }: CarItemProps) {
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(car)}>
       <View
@@ -140,7 +171,7 @@ function CarItem({ car, theme, isSelected, distanceKm, onPress }: CarItemProps) 
         </Text>
 
         <Text style={{ color: theme.subText }}>
-          {car.category?.name ?? 'Sans categorie'}
+          {car.category?.name ?? t('booking.categoryUnavailable')}
         </Text>
 
         <View style={styles.row}>
@@ -157,10 +188,10 @@ function CarItem({ car, theme, isSelected, distanceKm, onPress }: CarItemProps) 
           </View>
         </View>
 
-        <Image source={{ uri: car.images[0] ?? 'https://via.placeholder.com/400x240?text=Car' }} style={styles.image} />
+        <Image source={{ uri: car.images[0] ?? 'https://via.placeholder.com/400x240' }} style={styles.image} />
 
         <Text style={styles.price}>
-          {getAirportPriceLabel(car, distanceKm)} /Trip
+          {getAirportPriceLabel(car, distanceKm)} {t('booking.perTrip')}
         </Text>
       </View>
     </TouchableOpacity>
@@ -172,7 +203,8 @@ function CarItem({ car, theme, isSelected, distanceKm, onPress }: CarItemProps) 
 export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
-  const scheduleLabel = formatAirportSchedule(locationDoc);
+  const { appLocale, t } = useI18n();
+  const scheduleLabel = formatAirportSchedule(locationDoc, appLocale, t('booking.airportDateUnavailable'));
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [page, setPage] = useState(1);
@@ -180,16 +212,25 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [code, setCode] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [promoFeedback, setPromoFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+  const [validatedCoupon, setValidatedCoupon] = useState<CouponValidationValidResponse | null>(null);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [flyNumber, setFlyNumber] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [isGuestSectionOpen, setIsGuestSectionOpen] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
   const [isPositionAller, setPositionAller] = useState(true);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
   const tripPrice = getAirportTripPrice(selectedCar, distanceKm);
   const totalPrice = tripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
+  const baseVehicleAmount = totalPrice;
+  const promoDiscountAmount = getCouponDiscountAmount(validatedCoupon, totalPrice);
+  const finalTotalPrice = getCouponFinalTotal(validatedCoupon, totalPrice);
 
   const getOrCreateBookingId = async () => {
     if (bookingId) {
@@ -199,7 +240,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     if (!bookingIdRequestRef.current) {
       bookingIdRequestRef.current = generateIDBooking(ResType.TA).then((generatedBookingId) => {
         if (typeof generatedBookingId !== 'string' || !generatedBookingId) {
-          throw new Error('Impossible de generer un identifiant de reservation.');
+          throw new Error(t('booking.generationImpossible'));
         }
 
         setBookingId(generatedBookingId);
@@ -221,12 +262,12 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
-    const trimmedComment = comment.trim();
     const trimmedFlyNumber = flyNumber.trim();
-    const trimmedGuestName = guestName.trim();
     const trimmedGuestPhone = guestPhone.trim();
     const resolvedTripPrice = getAirportTripPrice(resolvedCar, distanceKm);
     const resolvedTotalPrice = resolvedTripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
+    const resolvedDiscountAmount = resolvedCar.id === selectedCar?.id ? promoDiscountAmount : 0;
+    const resolvedFinalTotal = resolvedCar.id === selectedCar?.id ? finalTotalPrice : resolvedTotalPrice;
 
     return {
       id: resolvedBookingId,
@@ -240,21 +281,23 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       arrivalAt: toDate(locationDoc.dateReturn)?.toISOString() ?? null,
       departure: toLocationPoint(locationDoc.locationDepart),
       arrival: toLocationPoint(locationDoc.locationDest),
-      commentaire: trimmedComment || null,
+      commentaire: comment || null,
       isPaid: false,
-      total: resolvedTotalPrice,
+      total: resolvedFinalTotal,
       options: {
         tripType: locationDoc.tripType,
         priceTA: resolvedCar.priceTA,
         distanceKm,
+        couponCode: appliedCouponCode,
+        couponDiscountAmount: resolvedDiscountAmount,
       },
-      guest: trimmedGuestName || trimmedGuestPhone
+      guest: guestName || trimmedGuestPhone
         ? {
-            fullName: trimmedGuestName || null,
+            fullName: guestName || null,
             phone: trimmedGuestPhone || null,
           }
         : null,
-      name: trimmedGuestName || null,
+      name: guestName || null,
       reference: null,
       taVolNumber: trimmedFlyNumber || null,
       taReturnId: null,
@@ -285,7 +328,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     setIsLoadingMore(true);
 
     try {
-      const res = await getTaCars(undefined, {
+      const res = await getTaCars({
         page: nextPage,
         startDate: locationDoc.dateStart,
         endDate: locationDoc.dateReturn,
@@ -347,6 +390,22 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     };
   }, [setEtape]);
 
+  useEffect(() => {
+    if (appliedCouponCode !== null) {
+      setValidatedCoupon(null);
+      setAppliedCouponCode(null);
+      setPromoFeedback(null);
+    }
+  }, [selectedCar?.id, distanceKm, locationDoc.tripType]);
+
+  useEffect(() => {
+    if (appliedCouponCode && code.trim() !== appliedCouponCode) {
+      setValidatedCoupon(null);
+      setAppliedCouponCode(null);
+      setPromoFeedback(null);
+    }
+  }, [code, appliedCouponCode]);
+
 
 
   const handleNextEtape = async (car?: Car) => {
@@ -355,22 +414,23 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         const booking = await buildBooking(car);
 
         if (!booking) {
-          Alert.alert('Information', 'Veuillez selectionner un vehicule avant de confirmer.');
+          Alert.alert(t('common.information'), t('booking.selectVehicleBeforeConfirm'));
           return;
         }
 
         onSubmit(booking);
       } catch (error) {
-        Alert.alert('Erreur', error instanceof Error ? error.message : 'Generation de reservation impossible.');
+        Alert.alert(t('common.error'), error instanceof Error ? error.message : t('booking.generationImpossible'));
       }
 
       return;
     }
 
     setEtape(NEXT_ETAPE[etape]);
+
   };
 
-  const actionLabel = etape === EtapeReservation.RECAP ? 'Confirmer' : 'Suivant';
+  const actionLabel = etape === EtapeReservation.RECAP ? t('booking.confirmAndPay') : t('common.next');
 
   const handleCarPress = (car: Car) => {
     setSelectedCar(car);
@@ -393,6 +453,52 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     setIsRefreshing(true);
     setHasMore(true);
     void loadCars(1, true);
+  };
+
+  const handleApplyPromoCode = async () => {
+    const normalizedCode = code.trim();
+
+    if (!normalizedCode) {
+      setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
+      return;
+    }
+
+    if (!selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
+      setPromoFeedback({ tone: 'error', message: t('booking.promoCodeUnavailable') });
+      return;
+    }
+
+    setIsApplyingPromo(true);
+
+    try {
+      const response = await validateCoupon({
+        code: normalizedCode,
+        carId: selectedCar.id,
+        bookingType: 'TA',
+        vehicleAmount: baseVehicleAmount,
+        orderTotal: totalPrice,
+      });
+
+      if (response.valid) {
+        setValidatedCoupon(response);
+        setAppliedCouponCode(normalizedCode);
+        setPromoFeedback({ tone: 'success', message: response.message ?? t('booking.promoCodeApplied') });
+        return;
+      }
+
+      setValidatedCoupon(null);
+      setAppliedCouponCode(null);
+      setPromoFeedback({ tone: 'error', message: response.message || t('booking.promoCodeInvalid') });
+    } catch (error) {
+      setValidatedCoupon(null);
+      setAppliedCouponCode(null);
+      setPromoFeedback({
+        tone: 'error',
+        message: error instanceof Error && error.message ? error.message : t('booking.promoCodeInvalid'),
+      });
+    } finally {
+      setIsApplyingPromo(false);
+    }
   };
 
     const myButton = () => {
@@ -418,21 +524,21 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
               ellipsizeMode="tail"
               style={[styles.addressText, { color: theme.text }]}
             >
-              De : {locationDoc.locationDepart.description ?? 'Depart'}
+              {t('booking.from')} : {locationDoc.locationDepart.description ?? t('booking.departure')}
             </Text>
             <Text
               numberOfLines={1}
               ellipsizeMode="tail"
               style={{ color: theme.subText }}
             >
-              A : {locationDoc.locationDest.description ?? 'Destination'}
+              {t('booking.to')} : {locationDoc.locationDest.description ?? t('booking.destination')}
             </Text>
             <Text style={{ color: theme.subText, marginTop: 4 }}>
               {scheduleLabel}
             </Text>
             {distanceKm !== null ? (
               <Text style={{ color: theme.subText, marginTop: 4 }}>
-                Distance : {distanceKm.toFixed(1)} km
+                {t('booking.distance')} : {distanceKm.toFixed(1)} km
               </Text>
             ) : null}
           </View>
@@ -448,10 +554,15 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           onEndReachedThreshold={0.4}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
-          ListFooterComponent={isLoadingMore ? <Text style={[styles.listStateText, { color: theme.subText }]}>Chargement...</Text> : null}
-          ListEmptyComponent={!isRefreshing && !isLoadingMore ? <Text style={[styles.listStateText, { color: theme.subText }]}>Aucun vehicule disponible</Text> : null}
+          ListFooterComponent={isLoadingMore ? <Text style={[styles.listStateText, { color: theme.subText }]}>{t('booking.loading')}</Text> : null}
+          ListEmptyComponent={!isRefreshing && !isLoadingMore ?
+             <ErrorEmpty
+                        isDark={isDark}
+                        title={t(emptyTitleKeyNotifiction)}
+                        description={t(emptyDescriptionKeyNotifiction)}
+                        /> : null}
           renderItem={({ item: car }) => (
-            <CarItem car={car} theme={theme} isSelected={selectedCar?.id === car.id} distanceKm={distanceKm} onPress={handleCarPress} />
+            <CarItem car={car} theme={theme} isSelected={selectedCar?.id === car.id} distanceKm={distanceKm} onPress={handleCarPress} t={t} />
           )}
         />
       </View>
@@ -480,16 +591,16 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
 
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
-            Indiquez votre numero de vol (optionnel)
+            {t('booking.flightNumberOptional')}
           </Text>
 
           <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", marginTop:8 }}>
-            Le chauffeur suivra votre arrivée et adaptera l'heure de prise en charge en fonction de votre heure d'atterrissage.
+            {t('booking.flightNumberDescription')}
           </Text>
          </View>
 
         <Input
-          placeholder="Ex : AF1234"
+          placeholder={t('booking.flightNumberPlaceholder')}
           placeholderTextColor={theme.subText}
           value={flyNumber}
           onChangeText={setFlyNumber}
@@ -500,21 +611,19 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       </View>
 
    
-
-
       {/* COMMENT */}
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
-            Commentaire (optionnel)
+            {t('booking.commentOptional')}
           </Text>
             <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", marginTop:8 }}>
-          Veuillez nous faire part de toute demande particulière
+          {t('booking.commentDescription')}
           </Text>
          </View>
 
         <Input
-          placeholder="Ex : Merci d'arriver 15 minutes avant..."
+          placeholder={t('booking.commentPlaceholder')}
           placeholderTextColor={theme.subText}
           multiline
           value={comment}
@@ -526,52 +635,59 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       </View>
 
       {/* BOOKING */}
-      <View style={[styles.section, { borderColor: theme.border }]}>
-        <View style={styles.sectionHeader}>
-          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
-            Je reserve pour une autre personne (optionnel)
-          </Text>
-         </View>
+      <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
+        <View style={[styles.section, { borderColor: theme.border }]}>
+          <CollapsibleTrigger asChild>
+            <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader}>
+              <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600', flex: 1 }}>
+                {t('booking.bookForOtherPersonOptional')}
+              </Text>
+              <Ionicons
+                name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={theme.subText}
+              />
+            </TouchableOpacity>
+          </CollapsibleTrigger>
 
-        <Input
-          placeholder="Nom complet"
-          placeholderTextColor={theme.subText}
-          value={guestName}
-          onChangeText={setGuestName}
-          style={
-            styles.input
-            }
-        />
+          <CollapsibleContent>
+            <Input
+              placeholder={t('booking.fullName')}
+              placeholderTextColor={theme.subText}
+              value={guestName}
+              onChangeText={setGuestName}
+              style={styles.input}
+            />
 
-        <Input
-          placeholder="Numero de telephone"
-          placeholderTextColor={theme.subText}
-          value={guestPhone}
-          onChangeText={setGuestPhone}
-          style={
-            styles.input
-              }
-        />
-      </View>
+            <Input
+              placeholder={t('booking.phoneNumber')}
+              placeholderTextColor={theme.subText}
+              value={guestPhone}
+              onChangeText={setGuestPhone}
+              style={styles.input}
+            />
+          </CollapsibleContent>
+        </View>
+      </Collapsible>
 
        {/* WARNING GUEST */}
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
-            Veuilez noter :
+            {t('booking.pleaseNote')}
           </Text>
 
           <View style={{flexDirection:"row", marginTop:8 }}>
               <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
                <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
-                Pour des raisons de sécurité, la capacité maximale de passagers et de bagages doit être respectée. En cas de doute, choisissez une catégorie supérieure, car les chauffeurs peuvent refuser le transport si le nombre de passagers est dépassé.
+                {t('booking.warningCapacity')}
               </Text>
           </View>          
 
             <View style={{flexDirection:"row", marginTop:10 }}>
               <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
                <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
-                Les images des véhicules ci-dessus sont données à titre d'exemple. Vous pourriez recevoir un autre véhicule de qualité similaire.
+                {t('booking.warningImages')}
                 </Text>
           </View>          
 
@@ -597,14 +713,14 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   };
 
   const recap = ()=>{
-    const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240?text=Car';
-    const tripTypeLabel = locationDoc.tripType === 'round-trip' ? 'Aller' : 'Aller simple';
+    const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
+    const tripTypeLabel = locationDoc.tripType === 'round-trip' ? t('booking.outbound') : t('booking.oneWay');
     const isRoundTrip = locationDoc.tripType === 'round-trip' ? true : false;
-    const allerScheduleLabel = formatAirportSchedule({ ...locationDoc, tripType: 'one-way' });
+    const allerScheduleLabel = formatAirportSchedule({ ...locationDoc, tripType: 'one-way' }, appLocale, t('booking.airportDateUnavailable'));
     const retourScheduleLabel = (() => {
       const d = toDate(locationDoc.dateReturn);
-      if (!d || Number.isNaN(d.getTime())) return 'Date indisponible';
-      return `${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })} a ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+      if (!d || Number.isNaN(d.getTime())) return t('booking.airportDateUnavailable');
+      return `${d.toLocaleDateString(appLocale, { day: 'numeric', month: 'short', year: '2-digit' })} ${d.toLocaleTimeString(appLocale, { hour: '2-digit', minute: '2-digit' })}`;
     })();
     const activeDateLabel = isPositionAller ? allerScheduleLabel : retourScheduleLabel;
     const trimmedFlyNumber = flyNumber.trim();
@@ -634,7 +750,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
                  { isRoundTrip && (
                   <TouchableOpacity style={{flex:1}} onPress={() => { setPositionAller(false) }} >
                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={[styles.recapSectionTitle, { color:  !isPositionAller ? defautColor :  theme.text }]}>Retour</Text>
+                    <Text style={[styles.recapSectionTitle, { color:  !isPositionAller ? defautColor :  theme.text }]}>{t('booking.return')}</Text>
                        {/*ligne de séparation*/}
                      <View style={{ flexDirection: 'row',height: 1 , marginVertical: 12}}>
                       <View style={{ flex: 1, height: 1, backgroundColor: isRoundTrip && !isPositionAller ? defautColor : theme.border}} /> 
@@ -655,8 +771,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
                          <Text style={[styles.recapDate, { color: theme.subText }]}>{activeDateLabel}</Text>
                          <Text numberOfLines={1} style={[styles.recapDescription, { color: theme.text }]}>{
                           isPositionAller ? 
-                          locationDoc.locationDepart.description ?? 'Adresse indisponible' :
-                          locationDoc.locationDest.description ?? 'Adresse indisponible'
+                          locationDoc.locationDepart.description ?? t('booking.addressUnavailable') :
+                          locationDoc.locationDest.description ?? t('booking.addressUnavailable')
                         }
                           </Text>
                 </View>
@@ -669,7 +785,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
                  
                   <View style={{flex: 1,justifyContent: 'center', marginLeft:13}}>
-                        <Text numberOfLines={1} style={[styles.recapDate, { color: theme.subText, marginLeft: 4 }]}>Environ {distanceKm !== null ? distanceKm.toFixed(1) : '0.0'} km</Text>
+                        <Text numberOfLines={1} style={[styles.recapDate, { color: theme.subText, marginLeft: 4 }]}>{t('booking.approxDistance')} {distanceKm !== null ? distanceKm.toFixed(1) : '0.0'} km</Text>
                   </View>
           </View>
 
@@ -683,8 +799,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
                         <Text numberOfLines={1} style={[styles.recapDescription, { color: theme.text, marginLeft: 4 }]}>
                           {
                          isPositionAller ? 
-                          locationDoc.locationDest.description ?? 'Adresse indisponible' :
-                          locationDoc.locationDepart.description ?? 'Adresse indisponible' 
+                          locationDoc.locationDest.description ?? t('booking.addressUnavailable') :
+                          locationDoc.locationDepart.description ?? t('booking.addressUnavailable') 
                          
                           }
                           </Text>
@@ -692,12 +808,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           </View>
           
           
-          {distanceKm !== null ? (
-            <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>Distance : {distanceKm.toFixed(1)} km</Text>
-          ) : null}
-          {trimmedFlyNumber ? (
-            <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>Numero de vol : {trimmedFlyNumber}</Text>
-          ) : null}
+         
         </View>
 
         <View style={styles.sectionSansBordure}>
@@ -707,21 +818,21 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
             <View style={{ flex: 1, marginLeft: 15 }}>
 
               <View style={{ flex: 1 }}>
-                <Text style={[styles.recapCarTitle, { color: theme.text }]}>{selectedCar?.name ?? 'Aucun vehicule'}</Text>
+                <Text style={[styles.recapCarTitle, { color: theme.text , textAlign: 'center' }]}>{selectedCar?.name ?? t('booking.noVehicle')}</Text>
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={[styles.recapCarSubtitle, { color: theme.subText }]}>{selectedCar?.category?.name ?? 'Sans categorie'}</Text>
+                <Text style={[styles.recapCarSubtitle, { color: theme.subText , textAlign: 'center'}]}>{selectedCar?.category?.name ?? t('booking.categoryUnavailable')}</Text>
               </View>
 
-              <View style={[styles.recapCarDetails,{ flex : 1}]}>
+              <View style={[styles.recapCarDetails,{ flex : 1, alignItems: 'center', justifyContent: 'center'}]}>
                 <View style={[styles.recapBadge, { backgroundColor: theme.input }]}>
                   <Ionicons name="person" size={14} color={theme.text} />
                   <Text style={[styles.recapBadgeText, { color: theme.text }]}>{selectedCar?.seats ?? 0}</Text>
                 </View>
-                <View style={[styles.recapBadge, { backgroundColor: theme.input }]}>
-                  <Ionicons name="briefcase" size={14} color={theme.text} />
-                  <Text style={[styles.recapBadgeText, { color: theme.text }]}>{selectedCar?.baggage ?? 0}</Text>
+                <View style={[styles.recapBadge, { backgroundColor: "#f5d7a1" }]}>
+                  <Ionicons name="briefcase" size={14} color="#000" />
+                  <Text style={[styles.recapBadgeText, { color:"#000" }]}>{selectedCar?.baggage ?? 0}</Text>
                 </View>
               </View>
 
@@ -733,13 +844,13 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={[styles.sectionHeader,{flexDirection:"column"}]}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
-            Condition d'annulation :
+            {t('booking.cancellationPolicy')}
           </Text>
 
           <View style={{flexDirection:"row", marginTop:8 }}>
               <Ionicons name="information-circle-outline" size={16} color={theme.text}  />
                <Text style={{ color: theme.subText, fontSize: 14, fontWeight: "400", flex :1, marginLeft:8 }}>
-                Vous pouvez annuler gratuitement votre reservation jusqu'à 24 heures avant l'heure de prise en charge prévue.
+                {t('booking.cancellationPolicyText')}
                </Text>
           </View>          
 
@@ -750,17 +861,66 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
       </View>
 
+
+        {flyNumber ? (
+                  <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+                    <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.flightNumber')}</Text>
+                    <Text style={[styles.recapDescription, { color: theme.subText }]}>{flyNumber}</Text>
+                  </View>
+                ) : null}
+        
+       {comment ? (
+          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.comment')}</Text>
+            <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedComment}</Text>
+          </View>
+        ) : null}
+
+        {guestName || guestPhone ? (
+          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.reservationFor')}</Text>
+            {guestName ? <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedGuestName}</Text> : null}
+            {guestPhone ? <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>{trimmedGuestPhone}</Text> : null}
+          </View>
+        ) : null}
+
+        <PromoCodeField
+          label={t('booking.promoCodeLabel')}
+          placeholder={t('booking.promoCodePlaceholder')}
+          actionLabel={t('booking.applyPromoCode')}
+          value={code}
+          onChangeText={setCode}
+          onApply={() => void handleApplyPromoCode()}
+          textColor={theme.text}
+          subTextColor={theme.subText}
+          borderColor={theme.border}
+          inputBackgroundColor={theme.input}
+          titleSize={16}
+          isApplying={isApplyingPromo}
+          feedbackMessage={promoFeedback?.message ?? null}
+          feedbackTone={promoFeedback?.tone ?? 'default'}
+        />
+
+        {promoDiscountAmount > 0 ? (
+          <View style={[styles.section, { borderColor: theme.border }]}>
+            <View style={styles.recapPriceRow}>
+              <Text style={[styles.recapPriceLabel, { color: theme.subText }]}>{t('booking.discount')}</Text>
+              <Text style={[styles.recapPriceValue, { color: theme.text }]}>{`- ${promoDiscountAmount} $`}</Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={[styles.section, { borderColor: theme.border }]}>
-          <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Détail des prix</Text>
+          <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.priceDetails')}</Text>
           <View style={styles.recapPriceRow}>
-            <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> → {!isRoundTrip ? 'Aller simple' : 'Aller'} :</Text>
+            <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> → {!isRoundTrip ? t('booking.oneWay') : t('booking.outbound')} :</Text>
             <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
           </View>
 
           {
             isRoundTrip && (
               <View style={styles.recapPriceRow}>
-                <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> ← Retour :</Text>
+                <Text style={[styles.recapPriceLabel, { color: theme.subText }]}> ← {t('booking.return')} :</Text>
                 <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
               </View>
             )
@@ -772,25 +932,12 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
                     </View>
 
           <View style={styles.recapPriceRow}>
-            <Text style={[styles.recapTotalLabel, { color: theme.text }]}>Total</Text>
-            <Text style={[styles.recapTotalValue, { color: theme.text }]}>{totalPrice} $</Text>
+            <Text style={[styles.recapTotalLabel, { color: theme.text }]}>{t('booking.total')}</Text>
+            <Text style={[styles.recapTotalValue, { color: theme.text }]}>{finalTotalPrice} $</Text>
           </View>
         </View>
 
-        {trimmedComment ? (
-          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Commentaire</Text>
-            <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedComment}</Text>
-          </View>
-        ) : null}
-
-        {trimmedGuestName || trimmedGuestPhone ? (
-          <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>Reservation pour</Text>
-            {trimmedGuestName ? <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedGuestName}</Text> : null}
-            {trimmedGuestPhone ? <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>{trimmedGuestPhone}</Text> : null}
-          </View>
-        ) : null}
+       
 
         {myButton()}
       </ScrollView>
@@ -823,7 +970,7 @@ const light = {
 };
 
 const dark = {
-  bg: "#14181B",
+  bg: color.appDarkBackground,
   card: "#1E2226",
   text: "#FFFFFF",
   subText: "#A0A0A0",
@@ -1038,7 +1185,7 @@ const styles = StyleSheet.create({
   },
 
   recapCarSubtitle: {
-    marginBottom: 8,
+    marginBottom: 5,
   },
 
   recapCarDetails: {

@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native'; 
 import { GenderOptions } from '@/constants/dataInterface';
 import { InfoIcon } from '@/components/my-ui/InfoIcon';
+import { useI18n } from '@/lib/i18n';
  
  
  export function DropdownField ({ label, value, onSelect, options, showInfo , isDark,showGenderDropdown, setShowGenderDropdown }
     :{ label: string; value: string; onSelect: (value: string) => void; options: GenderOptions[]; showInfo: boolean; isDark?: boolean; showGenderDropdown: boolean; setShowGenderDropdown: (value: boolean) => void }
         ){
+    const { t } = useI18n();
 
 
               
@@ -43,7 +45,7 @@ import { InfoIcon } from '@/components/my-ui/InfoIcon';
         >
           {value
             ? options.find((opt) => opt.value === value)?.label
-            : 'Sélectionner...'}
+            : t('common.select')}
         </Text>
         <ChevronDown size={24} color={isDark ? '#666666' : '#999999'} />
       </TouchableOpacity>

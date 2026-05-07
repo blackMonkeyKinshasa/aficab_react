@@ -51,8 +51,74 @@ export interface User {
 
 export interface LocationPoint {
   label?: string;
-  lat?: number;
-  lng?: number;
+  /** API expects 'x' for longitude */
+  x?: number;
+  /** API expects 'y' for latitude */
+  y?: number;
+}
+
+import { PaymentMethod } from './databaseEnum';
+export { PaymentMethod };
+
+/** Body sent to POST /booking */
+export interface CreateBookingInput {
+  /** required — client-generated unique ID */
+  id: string;
+  /** required */
+  carId: string;
+  /** required */
+  clientId: string;
+  /** required */
+  currency: string;
+  /** required — ISO8601 */
+  departureAt: string;
+  /** required — { label, x, y } */
+  departure: LocationPoint;
+  /** required */
+  paymentMethod: PaymentMethod;
+  /** required */
+  paymentProvider: string;
+  /** required */
+  total: number;
+  // optional
+  arrival?: LocationPoint;
+  arrivalAt?: string;
+  type?: ResType;
+  status?: string;
+  clientPhone?: string;
+  guest?: Record<string, unknown>;
+  commentaire?: string;
+  reference?: string;
+  taVolNumber?: string;
+  options?: Record<string, unknown>;
+  /** ID of the return booking (TA round-trip) */
+  taReturnId?: string;
+  paymentNumber?: string;
+}
+
+export interface PawapayPaymentInput {
+  transaction_id: string;
+  amount: string;
+  currency: string;
+  paymentMethod: string;
+  paymentNumber: string;
+}
+
+export interface PawapayFailureReason {
+  failureCode: string;
+  failureMessage: string;
+}
+
+export interface PawapayPaymentResponse {
+  depositId: string;
+  status: string;
+  requestedAmount: string;
+  currency: string;
+  payer: string;
+  correspondent: string;
+  created: string;
+  metadata: Record<string, unknown> | null;
+  failureReason: PawapayFailureReason | null;
 }
 
 export interface CarCategory {
@@ -126,6 +192,21 @@ export interface Driver {
   updatedAt: string;
 }
 
+export interface BookingPayment {
+  id: string;
+  transaction_id: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  paymentNumber: string;
+  paymentProvider: string;
+  createdAt: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  paidAt: string | null;
+  bookingId: string;
+  clientId: string;
+}
+
 export interface BookingCoupon {
   id: string;
   bookingId: string;
@@ -149,6 +230,45 @@ export interface BookingReview {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CreateReviewInput {
+  bookingId: string;
+  driverId: string;
+  ratingDriving: number;
+  ratingPunctuality: number;
+  ratingService: number;
+  ratingVehicle: number;
+  comment: string;
+}
+
+export type CreateReviewResponse = BookingReview;
+
+export interface ValidateCouponInput {
+  code: string;
+  carId: string;
+  bookingType: 'LOC' | 'TA';
+  vehicleAmount: number;
+  orderTotal: number;
+}
+
+export interface CouponValidationInvalidResponse {
+  valid: false;
+  code: string;
+  message: string;
+  minAmount?: number;
+}
+
+export interface CouponValidationValidResponse {
+  valid: true;
+  code?: string;
+  message?: string;
+  discountAmount?: number;
+  originalAmount?: number;
+  finalAmount?: number;
+  [key: string]: unknown;
+}
+
+export type ValidateCouponResponse = CouponValidationInvalidResponse | CouponValidationValidResponse;
 
 export interface Booking {
   id: string;
@@ -184,14 +304,23 @@ export interface Booking {
   review: BookingReview | null;
 }
 
+/** Réponse complète du serveur lors de la création d'une réservation */
+export interface CreateBookingResponse extends Booking {
+  payments: BookingPayment[];
+  taParent: Booking | null;
+}
+
 export type ActivityAction =
   | 'car-approved'
   | 'car-pending-approval'
   | 'driver-approved'
   | 'driver-pending-approval'
   | 'booking-new'
+  | 'booking-checkin'
+  | 'booking-checkout'
   | 'booking-driver-notify'
-  | 'booking-driver-cancel';
+  | 'booking-driver-cancel'
+  | 'booking-client-cancel';
 
 export interface Activity {
   id: string;
@@ -210,6 +339,6 @@ export interface Activity {
   booking: Booking | null;
 }
 
-export type PaymentMethod = "mpesa" | "orange" | "airtel" | "card"| "cash" ;
+
 
 

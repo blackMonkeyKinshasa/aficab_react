@@ -1,9 +1,12 @@
 import { Tabs } from 'expo-router';
 import { Home, User, Settings } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
+import { color } from '@/constants/colors';
+import { useI18n } from '@/lib/i18n';
 
 export default function TabsLayout() {
   const { colorScheme } = useColorScheme();
+  const { t } = useI18n();
   const isDark = colorScheme === 'dark';
 
   return (
@@ -12,7 +15,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#FE5900',
         tabBarInactiveTintColor: isDark ? '#EEEEEE' : '#757575',
         tabBarStyle: {
-          backgroundColor: isDark ? '#1a1a1a' : '#fff',
+          backgroundColor: isDark ? color.appDarkBackground : '#fff',
           borderTopColor: isDark ? '#333' : '#e5e5e5',
         },
       }}
@@ -20,10 +23,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Accueil',
-          tabBarLabel: 'Accueil',
+          title: t('tabs.home'),
+          tabBarLabel: t('tabs.home'),
           
-          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          tabBarIcon: (props: { color: string }) => <Home size={24} color={props.color} />,
           headerShown: true,
          
         }}
@@ -31,21 +34,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reservation"
         options={{
-          title: 'Réservation',
-          tabBarLabel: 'Mes réservations',
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          title: t('tabs.bookings'),
+          tabBarLabel: t('tabs.bookings'),
+          tabBarIcon: (props: { color: string }) => <User size={24} color={props.color} />,
           headerShown: true,
-          headerTitle: 'Mes réservations',
+          headerTitle: t('tabs.bookings'),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Paramètres',
-          tabBarLabel: 'Paramètres',
-          tabBarIcon: ({ color }) => <Settings size={24} color={color} />,
+          title: t('tabs.settings'),
+          tabBarLabel: t('tabs.settings'),
+          tabBarIcon: (props: { color: string }) => <Settings size={24} color={props.color} />,
           headerShown: true,
-          headerTitle: 'Paramètres',
+          headerTitle: t('tabs.settings'),
           
         }}
       />

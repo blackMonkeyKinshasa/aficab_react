@@ -1,234 +1,187 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Modal,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-} from 'react-native';
-import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
-import { Stack } from 'expo-router';
+import { Image, View } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import { useRouter } from 'expo-router';
-import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
-import { getUserByID, updateUserByID } from '@/api/user';
-import { supabase } from '@/lib/supabase';
-import { LoadingView } from '@/components/my-ui/LoadingView';
-import { FormField } from '@/components/my-ui/FormField';
-import { DropdownField } from '@/components/my-ui/DropdownField';
-import { Avatar } from '@/components/my-ui/Avatar';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
-import { Camera } from 'lucide-react-native';
-import { genderOptions } from '@/constants/constants';
-import { takePhoto, pickImageToGallery, uriToBlob } from '@/constants/image-manager';
-import {User} from '@/constants/dataInterface';
-import { uploadAvatar } from '@/api/uploadFiles';
-import { he } from 'react-native-paper-dates';
 
-const SCREEN_OPTIONS = (title: string,  isDark: boolean, onPress: () => void) => ({
- title: '',
+import { getUserByID } from '@/api/user';
+import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
+import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
+import { LoadingView } from '@/components/my-ui/LoadingView';
+import { useAppConfigState } from '@/store/app-config-state';
+import { useMyStateUser } from '@/store';
+import { supabase } from '@/lib/supabase';
+import {Role} from '@/constants/databaseEnum';
+import { useAnalytics } from '@/lib/analytics';
+
+type ApiUserError = Error & { status?: number; code?: string };
+
+const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
+  title: '',
   headerTransparent: false,
   headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
-  headerLeft: () => <Image source={isDark ? require('@/assets/images/aficab-logo-white.png') : require('@/assets/images/aficab-logo-black.png')}
-   style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }} />, 
+  headerLeft: () => (
+    <Image
+      source={
+        isDark
+          ? require('@/assets/images/aficab-logo-white.png')
+          : require('@/assets/images/aficab-logo-black.png')
+      }
+      style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
+    />
+  ),
 });
 
-const _tableName = 'User';
+function isUserNotFoundError(error: unknown) {
+  const apiError = error as ApiUserError | undefined;
 
-export default function App() {
+  return apiError?.status === 404 || apiError?.code === 'USER_NOT_FOUND' || apiError?.message === 'User not found';
+}
+
+export default function HomeScreen() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
+  const analytics = useAnalytics();
 
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Form fields
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [avatar_url, setAvatarUrl] = useState('');
-  const [id, setId] = useState('');
-  const [phone, setPhone] = useState('');
-  const [genre, setGenre] = useState('');
-  const [image, setImage] = useState<string | null>(null);
-  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+  const storedUser = useMyStateUser((state) => state.user);
+  const setStoredUser = useMyStateUser((state) => state.setUser);
+  const clearStoredUser = useMyStateUser((state) => state.clearUser);
+  const appIsLock = useAppConfigState((state) => state.appIsLock);
+  const shouldFetchAppConfig = useAppConfigState((state) => state.shouldFetchAppConfig);
+  const refreshAppConfig = useAppConfigState((state) => state.refreshAppConfig);
 
   useEffect(() => {
-    setLoading(true);
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (user) {
-          console.log('user', user.id);
-          setUserId(user.id ?? '');
-          getUserByID(user.id)
-            .then((data) => {
-              if (data) {
-                setImage(data.avatar_url ?? null);
-                setPhone(data.phone ?? '');
-                setGenre(data.genre ?? '');
-                setEmail(data.email ?? '');
-                setId(data.id ?? '');
-                if (!data.full_name) {
-                  setShowProfileModal(true);
-                } else {
-                  setFullName(data.full_name);
-                }
-              }
-            })
-            .catch((err) => console.error(err))
-            .finally(() => setLoading(false));
-        }
-      })
-      .catch((err) => console.error(err))
-      .finally(() => {}/*setLoading(false)*/);
-  }, []);
+    if (storedUser?.id && !storedUser.full_name?.trim()) {
+      router.replace('/create-profile');
+    }
+  }, [router, storedUser?.full_name, storedUser?.id]);
 
-  const chooseImage = () => {
-    Alert.alert('Choisir une image', 'Sélectionne une option', [
-      { text: 'Caméra', onPress: async () => setImage((await takePhoto()) || '') },
-      { text: 'Galerie', onPress: async () => setImage((await pickImageToGallery()) || '') },
-      { text: 'Annuler', style: 'cancel' },
-    ]);
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const { user: cachedUser, shouldRefreshUser } = useMyStateUser.getState();
+    const mustRefreshUser = shouldRefreshUser();
 
-  const handleSaveProfile = async () => {
-    if (!fullName.trim()) {
-      Alert.alert('Champ requis', 'Veuillez entrer votre nom et prénom.');
+    if (cachedUser?.id && !mustRefreshUser) {
       return;
     }
-    if (!userId) return;
 
-    setSaving(true);
+    const loadUser = async () => {
 
-    try {
-      let avatarUrl = avatar_url;
+      
+      try {
+        setLoading(true);
 
-      if (image && !image.startsWith('http')) {
-        const res = await uploadAvatar(uriToBlob(image));
-        avatarUrl = res.url;
-        console.log('Avatar uploadé avec succès:', res);
-        supabase.auth.updateUser({ data: { avatar_url: res.url } });
-        setAvatarUrl(avatarUrl);
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user || !isMounted) {
+          return;
+        }
+
+      
+
+     
+        if (cachedUser?.id === user.id && !mustRefreshUser) {
+          if (!cachedUser.full_name?.trim()) {
+            router.replace('/create-profile');
+          }
+          return;
+        }
+
+        try {
+          const freshUser = await getUserByID(user.id);
+
+          if (freshUser.role !== Role.CLIENT) {
+            analytics.trackRoleMismatchRedirect(user.id, {
+              email: freshUser.email ?? user.email ?? '',
+              role: freshUser.role,
+              sourceScreen: 'home',
+              targetScreen: 'chekRole',
+            });
+            router.replace('/chekRole');
+            return;
+          }
+
+          if (!freshUser || !isMounted) {
+            return;
+          }
+
+          setStoredUser(freshUser);
+
+          if (!freshUser.full_name?.trim()) {
+            router.replace('/create-profile');
+          }
+        } catch (error) {
+          if (isUserNotFoundError(error)) {
+            clearStoredUser();
+            router.replace('/create-profile');
+            return;
+          }
+
+          console.error('Erreur lors de la récupération de l’utilisateur:', error);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
+    };
 
-      await updateUserByID(userId, {
-        full_name: fullName,
-        phone: phone.trim() || null,
-        genre: genre || null,
-      } as User);
+    loadUser();
 
-      setShowProfileModal(false);
-    } catch (err: any) {
-      console.error(err);
-      Alert.alert('Erreur', err?.message ?? 'Une erreur est survenue.');
-    } finally {
-      setSaving(false);
+    return () => {
+      isMounted = false;
+    };
+  }, [analytics, clearStoredUser, router, setStoredUser]);
+
+  useEffect(() => {
+    if (loading || !storedUser?.id || !storedUser.full_name?.trim()) {
+      return;
     }
-  };
 
-  const bg = isDark ? '#000' : '#f2f2f7';
-  const cardBg = isDark ? '#1c1c1e' : '#fff';
-  const fg = isDark ? '#fff' : '#000';
-  const sub = isDark ? '#aaa' : '#666';
+    if (appIsLock) {
+      router.replace('/update-app');
+      return;
+    }
+
+    if (!shouldFetchAppConfig()) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const syncAppConfiguration = async () => {
+      try {
+        const result = await refreshAppConfig();
+
+        if (isMounted && result.appIsLock) {
+          router.replace('/update-app');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération de la configuration mobile:', error);
+      }
+    };
+
+    syncAppConfiguration();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appIsLock, loading, refreshAppConfig, router, shouldFetchAppConfig, storedUser?.full_name, storedUser?.id]);
 
   return (
     <>
       <Stack.Screen options={SCREEN_OPTIONS('Accueil', isDark, () => router.push('/notificationsPage'))} />
-     
+
       <View style={{ flex: 1 }}>
-       
-      <RideBookingScreen />
+        <RideBookingScreen />
+      </View>
 
-       </View>
       {loading && <LoadingView />}
-
-      {/* Profile completion modal */}
-      <Modal visible={showProfileModal} animationType="slide" onRequestClose={() => {}}>
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: bg }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Title */}
-            <Text style={[styles.modalTitle, { color: fg }]}>Complétez votre profil</Text>
-            <Text style={[styles.modalSubtitle, { color: sub }]}>
-              Dites-nous comment vous appeler pour continuer.
-            </Text>
-
-            {/* Avatar */}
-            <View style={styles.avatarWrapper}>
-              <View style={[styles.avatarContainer, { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0' }]}>
-                <Avatar uri={image || ''} size={96} borderRadius={48} />
-                <TouchableOpacity style={styles.cameraBtn} onPress={chooseImage}>
-                  <Camera size={18} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Form */}
-            <View style={styles.formWrapper}>
-              <FormField
-                label="Nom et prénom *"
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="Jean Dupont"
-                isDark={isDark}
-              />
-              <FormField
-                label="Numéro de téléphone"
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+243821606126"
-                keyboardType="phone-pad"
-                showInfo={true}
-                isDark={isDark}
-              />
-              <DropdownField
-                label="Genre"
-                value={genre}
-                onSelect={setGenre}
-                options={genderOptions}
-                showInfo={true}
-                isDark={isDark}
-                showGenderDropdown={showGenderDropdown}
-                setShowGenderDropdown={setShowGenderDropdown}
-              />
-
-              <Button
-                onPress={handleSaveProfile}
-                disabled={saving}
-                className="bg-orange-500 h-12 rounded-lg mt-8 mb-4"
-              >
-                <Text className="text-white font-bold text-base">
-                  {saving ? 'Enregistrement...' : 'Continuer'}
-                </Text>
-              </Button>
-            </View>
-          </ScrollView>
-          {saving && <LoadingView />}
-        </KeyboardAvoidingView>
-      </Modal>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 40 },
-  modalTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginTop: 60, marginBottom: 6, paddingHorizontal: 24 },
-  modalSubtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, paddingHorizontal: 32 },
-  avatarWrapper: { alignItems: 'center', marginBottom: 24 },
-  avatarContainer: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
-  formWrapper: { paddingHorizontal: 24 },
-});

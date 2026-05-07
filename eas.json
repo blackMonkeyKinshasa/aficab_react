@@ -1,18 +1,45 @@
 {
   "cli": {
     "version": ">= 18.6.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal"
     },
+    "ios-simulator": {
+      "extends": "development",
+      "ios": {
+        "simulator": true
+      }
+    },
     "preview": {
       "distribution": "internal"
     },
+    "ios-preview": {
+      "extends": "preview",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "apk": {
+      "extends": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "autoIncrement": true
+    },
+    "ios-production": {
+      "extends": "production"
+    },
+    "aab": {
+      "extends": "production",
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {

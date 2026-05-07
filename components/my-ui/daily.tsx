@@ -1,9 +1,11 @@
 
 import React, { useState, useCallback } from 'react';
+import { Snackbar } from 'react-native-paper';
 import {
   View,
   Text,
   Image,
+  Linking,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -24,7 +26,12 @@ import { Button } from '@/components/ui/button';
 import { Location } from '@/constants/constants';
 import { useRouter } from 'expo-router';
 import { LocationDocLOC } from '@/constants/dataInterface';
-import { ResType } from '@/constants/databaseEnum';
+import { ResType, SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
+import * as Sentry from '@sentry/react-native';
+import { useAnalytics } from '@/lib/analytics';
+import { useI18n } from '@/lib/i18n';
+import { useMyStateUser } from '@/store/user-state';
+import { Alert } from 'react-native';
 
 interface RideBookingScreenProps {
   navigation?: any;
@@ -47,22 +54,53 @@ const formatDate = (d: Date | null) => {
 
 export function Daily() {
   const router = useRouter();
+  const { t } = useI18n();
   const [value, setValue] = useState('account');
   const [visible, setVisible] = useState(false);
   const [location, setLocation] = useState<Location | null>(null);
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateEnd, setDateEnd] = useState<Date | null>(null);
+  const [hasEarlyStartSelection, setHasEarlyStartSelection] = useState(false);
   const isDarkMode = useColorScheme() === 'dark';
+  const analytics = useAnalytics();
+  const userPhone = useMyStateUser((state) => state.user?.phone?.trim() ?? '');
+  const hasLateEndSelection =
+    dateEnd !== null && (dateEnd.getHours() > 20 || (dateEnd.getHours() === 20 && dateEnd.getMinutes() > 0));
+  const showStandardHoursInfo = hasEarlyStartSelection || hasLateEndSelection;
 
   const handleSubmit = () => {
     if (!location || !dateStart || !dateEnd) return;
-    console.log("location", location);
+
+    if (!userPhone) {
+      Alert.alert(
+        t('booking.phoneRequiredTitle'),
+        t('booking.phoneRequiredMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('booking.addNow'),
+            onPress: () =>
+              router.push({
+                pathname: '/edit-profile',
+                params: { focusField: 'phone', returnToBooking: '1' },
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
     const doc: LocationDocLOC = {
       type: ResType.LOC,
       location,
       dateStart,
       dateEnd,
     };
+    analytics.trackBookingStarted(ResType.LOC, {
+      origin: location.description,
+      dateStart: dateStart.toISOString(),
+      dateEnd: dateEnd.toISOString(),
+    });
     router.push({
       pathname: '/new_booking/[doc]',
       params: { doc: JSON.stringify(doc) },
@@ -74,10 +112,12 @@ export function Daily() {
   const handleDateStartChange = (date: Date | null) => {
     if (!date) {
       setDateStart(null);
+      setHasEarlyStartSelection(false);
       return;
     }
     const minHour = new Date(date);
     minHour.setHours(8, 0, 0, 0);
+    setHasEarlyStartSelection(date < minHour);
     const validStart = date < minHour ? minHour : date;
     setDateStart(validStart);
 
@@ -86,18 +126,22 @@ export function Daily() {
     setDateEnd(end);
   };
 
+  const handleDateEndChange = (date: Date | null) => {
+    setDateEnd(date);
+  };
+
   return (
    
     <View style={{ flex: 1, paddingTop: 8 }}>
      
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>  
+      <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
 
             <View style={{ paddingTop: 20, paddingBottom: 10, paddingHorizontal: 20 }}>
                 <TouchableOpacity onPress={()=>setVisible(true)} >
                     <ModuleReservation 
                                 icon={"location-outline"}
-                                title={location ? location.description : "Départ"}
+                                title={location ? location.description : t('booking.departure')}
                                 isDarkMode={isDarkMode}
                                 />
 
@@ -107,23 +151,24 @@ export function Daily() {
 
               <View style={{ paddingTop: 10, paddingBottom: 10, paddingHorizontal: 20 }}>
               <DateField
-                  label="Date et heure de début"
+                  label={t('booking.startDateTime')}
                   value={dateStart}
                   minDate={new Date()}
                   onChange={handleDateStartChange}
+                  isStartTime={true}
                 />
             </View>
 
 
             <View style={{ paddingTop: 10, paddingBottom: 30, paddingHorizontal: 20 }}>
               <DateField
-                  label="Date et heure de fin"
+                  label={t('booking.endDateTime')}
                   value={dateEnd}
                   minDate={dateStart && dateStart.getDay() > new Date().getDay() ? dateStart : new Date()}
-                  onChange={setDateEnd}
+                  onChange={handleDateEndChange}
+                  isStartTime={false}
                 />
             </View>
-
              {/* button de l'action  */}
              <TouchableOpacity style={{ padding: 20 }} > 
                       <Button 
@@ -132,13 +177,29 @@ export function Daily() {
                         onPress={handleSubmit}
                           >
                             <Text className="text-white font-bold text-base ">
-                              Voir les offres 
+                              {t('booking.viewOffers')} →
                               </Text>
                       </Button>
 
               </TouchableOpacity>
 
+           
       </ScrollView >  
+
+      <Snackbar
+      style={{ marginBottom: 150 }}
+        visible={showStandardHoursInfo}
+        duration={Snackbar.DURATION_SHORT}
+        onDismiss={() => { }}
+        action={{
+          label: 'OK',
+          onPress: () => {
+            setHasEarlyStartSelection(false)
+          },
+        
+        }}>
+       {t('booking.standardHoursInfo')}
+      </Snackbar>
 
         {/*fenetre modal pour la selection du lieu*/}
         <ModalLocationSelector

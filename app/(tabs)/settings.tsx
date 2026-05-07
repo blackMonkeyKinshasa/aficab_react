@@ -1,21 +1,29 @@
 import { Text } from '@/components/ui/text';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { useColorScheme } from 'nativewind';
 import { Link, useRouter } from 'expo-router';
-import { useState, useEffect, use } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import{getUserByID} from '@/api/user';
-import { supabase_blank_profile_picture } from '@/constants/env';
 import {Avatar} from '@/components/my-ui/Avatar';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import {NotificationIcon} from '@/components/my-ui/NotificationIcon';
-import {Stack} from 'expo-router';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
-  User as UserIcon,
-  Sun,
-  Globe,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {Stack} from 'expo-router';
+import { useAnalytics } from '@/lib/analytics';
+import { useI18n } from '@/lib/i18n';
+import { useMyStateUser } from '@/store/user-state';
+import { AppLanguage, useAppLanguageState } from '@/store/language-state';
+import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
+import { Ionicons } from '@expo/vector-icons';
+import { ComponentProps } from 'react';
+import {
   Shield,
   HelpCircle,
   MessageCircle,
@@ -23,10 +31,11 @@ import {
   Users,
   LogOut,
   Trash2,
+  ChevronDown,
+  ChevronUp,
   ChevronRight,
-  ArrowLeft,
   MoonStarIcon,
-  StarIcon,
+  Languages,
   SunIcon,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -44,64 +53,71 @@ export default function SettingsScreen() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const router = useRouter();
   const isDark = colorScheme === 'dark';
-  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+  const { language, t } = useI18n();
+  const setLanguage = useAppLanguageState((state) => state.setLanguage);
   const [loading, setLoading] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [avatar_url, setAvatarUrl] = useState('');
+  const [contactOpen, setContactOpen] = useState(false);
+  const cachedUser = useMyStateUser((state) => state.user);
+  const clearStoredUser = useMyStateUser((state) => state.clearUser);
+  const analytics = useAnalytics();
+  const avatarUrl = cachedUser?.avatar_url || '';
+  const displayName = cachedUser?.full_name || t('settings.defaultUser');
+  const displayEmail = cachedUser?.email || t('settings.defaultEmail');
+  const languageOptions: Array<{ label: string; value: AppLanguage }> = [
+    { label: t('language.optionFrench'), value: 'fr' },
+    { label: t('language.optionEnglish'), value: 'en' },
+  ];
   
   const THEME_ICONS = {
     light: SunIcon,
     dark: MoonStarIcon,
   };
 
-  useEffect(() => {
-    setLoading(true);
-    const getUser = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-      setCurrentUser(authUser);
-       if (authUser) {
-          getUserByID(authUser.id).then((data) => {
-                    if (data) {
-                      setFullName(data.full_name || '');
-                      setEmail(data.email || '');
-                      setAvatarUrl(data.avatar_url || '');
+  const handleOpenLink = async (url: string, channel?: 'whatsapp' | 'phone' | 'email') => {
+    if (channel && cachedUser?.id) {
+      analytics.trackSupportChannelSelected(cachedUser.id, {
+        email: cachedUser.email ?? '',
+        role: cachedUser.role ?? 'unknown',
+        sourceScreen: 'settings',
+        channel,
+      });
+    }
 
-                      console.log('Données utilisateur récupérées:', {
-                        full_name: data.full_name,
-                        email: data.email,
-                        avatar_url: data.avatar_url,
-                      }); 
-                     
-                     
-                    }
-                  }).catch((err) => {
-                    console.error('Erreur lors de la récupération du profil:', err);
-                  }).finally(() => {
-                    setLoading(false);
-                  });;
-      };
-    };
-    getUser();
-  }, []);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(t('common.error'), t('settings.openLinkError'));
+    }
+  };
+
+  const handleContactOpenChange = (open: boolean) => {
+    setContactOpen(open);
+
+    if (open && cachedUser?.id) {
+      analytics.trackSupportContactOpened(cachedUser.id, {
+        email: cachedUser.email ?? '',
+        role: cachedUser.role ?? 'unknown',
+        sourceScreen: 'settings',
+      });
+    }
+  };
 
   const handleLogout = async () => {
     Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
+      t('settings.logoutConfirmTitle'),
+      t('settings.logoutConfirmMessage'),
       [
-        { text: 'Annuler', onPress: () => {}, style: 'cancel' },
+        { text: t('common.cancel'), onPress: () => {}, style: 'cancel' },
         {
-          text: 'Déconnexion',
+          text: t('settings.logout'),
           onPress: async () => {
             setLoading(true);
             try {
               await supabase.auth.signOut();
-              router.replace('/(auth)/login');
+              clearStoredUser();
+            //  router.replace('/(auth)/login');
             } catch (err) {
-              Alert.alert('Erreur', 'Une erreur est survenue lors de la déconnexion');
+              Alert.alert(t('common.error'), t('settings.logoutError'));
             } finally {
               setLoading(false);
             }
@@ -114,20 +130,21 @@ export default function SettingsScreen() {
 
   const handleDeleteAccount = async () => {
     Alert.alert(
-      'Supprimer le compte',
-      'Cette action est irréversible. Tous vos données seront supprimées.',
+      t('settings.deleteConfirmTitle'),
+      t('settings.deleteConfirmMessage'),
       [
-        { text: 'Annuler', onPress: () => {}, style: 'cancel' },
+        { text: t('common.cancel'), onPress: () => {}, style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('common.delete'),
           onPress: async () => {
             setLoading(true);
             try {
               // Implémenter la suppression du compte via Supabase
               await supabase.auth.signOut();
-              router.replace('/(auth)/login');
+              clearStoredUser();
+            //  router.replace('/(auth)/login');
             } catch (err) {
-              Alert.alert('Erreur', 'Une erreur est survenue');
+              Alert.alert(t('common.error'), t('settings.deleteError'));
             } finally {
               setLoading(false);
             }
@@ -195,9 +212,41 @@ export default function SettingsScreen() {
     </Text>
   );
 
+  const ContactItem = ({
+    label,
+    value,
+    icon,
+    onPress,
+  }: {
+    label: string;
+    value: string;
+    icon:  ComponentProps<typeof Ionicons>['name'];
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      className={`mx-4 mb-3 flex-row items-center justify-between rounded-xl border px-4 py-3 ${isDark ? 'border-gray-700 bg-neutral-800' : 'border-input bg-gray-100'}`}
+    >
+        <View className="flex-row items-center flex-1">
+           
+            <Ionicons name={icon} size={16} color={isDark ? '#ffffff' : '#12151C'} style={{marginRight: 10}} />
+
+            <View className="flex-1">
+              <Text className={`text-xs font-semibold uppercase tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                {label}
+              </Text>
+             
+            </View>
+
+        </View>
+
+      
+    </TouchableOpacity>
+  );
+
   return (
      <>
-    <Stack.Screen options={SCREEN_OPTIONS('Settings', isDark, () => router.push('../Notifications'))} />
+    <Stack.Screen options={SCREEN_OPTIONS(t('settings.title'), isDark, () => router.push('../Notifications'))} />
     <View className={`flex-1 `}>
       <ScrollView showsVerticalScrollIndicator={false}>
 
@@ -208,17 +257,17 @@ export default function SettingsScreen() {
                 
                   {/** Avatar */}
                       <View className="flex-row items-center mr-4 ml-2 mt-4">
-                            <Avatar uri={avatar_url} size={60} borderRadius={30} />
+                        <Avatar uri={avatarUrl} size={60} borderRadius={30} isDark={isDark} />
                       </View>
 
                   {/** full_name &  email*/}
 
                   <View className="flex-1">
                     <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {currentUser?.user_metadata?.full_name || 'Utilisateur'}
+                      {displayName}
                     </Text>
                     <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {currentUser?.email || 'email@example.com'}
+                      {displayEmail}
                     </Text>
                   </View>
                   
@@ -241,8 +290,42 @@ export default function SettingsScreen() {
 
 
          <MenuItem
+            icon={Languages}
+            label= {t('language.label')}
+            onPress={() => {
+             
+            }}
+          />
+          <View className="px-4 pb-3">
+
+            <Select
+              value={{
+                value: language,
+                label: languageOptions.find((option) => option.value === language)?.label ?? t('common.select'),
+              }}
+              onValueChange={(option) => {
+                setLanguage((option?.value as AppLanguage) ?? 'fr');
+              }}
+            >
+              <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
+                <SelectValue
+                  className={isDark ? 'text-white' : 'text-gray-900'}
+                  placeholder={t('common.select')}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {languageOptions.map((option) => (
+                  <SelectItem key={option.value} label={option.label} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </View>
+
+         <MenuItem
             icon={THEME_ICONS[colorScheme ?? 'light']}
-            label="Thème"
+            label={t('settings.theme')}
             onPress={() => {
               // Changer le theme
               toggleColorScheme();
@@ -250,10 +333,11 @@ export default function SettingsScreen() {
           />
 
 
+
         <Link href="https://aficab.com/politique-de-confidentialite" asChild>
           <MenuItem
             icon={Shield}
-            label="Politique de confidentialité"
+            label={t('settings.privacyPolicy')}
             onPress={() => {
               // Naviguer vers la page de politique
             }}
@@ -264,28 +348,61 @@ export default function SettingsScreen() {
         <Link href="https://aide.aficab.com/" asChild>
           <MenuItem
             icon={HelpCircle}
-            label="FAQ"
+            label={t('settings.faq')}
             onPress={() => {
               // Naviguer vers la FAQ
             }}
           />
          </Link>
 
-        <MenuItem
-          icon={MessageCircle}
-          label="Contactez-nous"
-          onPress={() => {
-            // Ouvrir le formulaire de contact
-          }}
-        />
+        <Collapsible open={contactOpen} onOpenChange={handleContactOpenChange}>
+          <CollapsibleTrigger asChild>
+            <TouchableOpacity className="flex-row items-center justify-between px-4 py-3">
+              <View className="flex-row items-center flex-1">
+                <MessageCircle size={20} color={isDark ? '#ffffff' : '#12151C'} />
+                <Text className={`text-sm font-semibold ml-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {t('settings.contactUs')}
+                </Text>
+              </View>
+              {contactOpen ? (
+                <ChevronUp size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+              ) : (
+                <ChevronDown size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+              )}
+            </TouchableOpacity>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <View className="py-2">
+              <ContactItem
+                label={t('settings.whatsapp')}
+                value={SUPPORT_PHONE}
+                icon="logo-whatsapp"
+                onPress={() => handleOpenLink(SUPPORT_WHATSAPP_URL, 'whatsapp')}
+              />
+              <ContactItem
+                label={t('settings.call')}
+                value={SUPPORT_PHONE}
+                icon="call-outline"
+                onPress={() => handleOpenLink(`tel:${SUPPORT_PHONE}`, 'phone')}
+              />
+              <ContactItem
+                label={t('settings.email')}
+                value="http://www.aficab.com"
+                icon="mail-outline"
+                onPress={() => handleOpenLink(SUPPORT_EMAIL_URL, 'email')}
+              />
+            </View>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* À propos et partage */}
-        <SectionTitle title="À propos et partage" isOrange />
+        <SectionTitle title={t('settings.aboutSharing')} isOrange />
 
         <Link href="https://aficab.com/a-propos" asChild>
             <MenuItem
               icon={Share2}
-              label="À propos de l'application"
+              label={t('settings.aboutApp')}
               onPress={() => {
                 // Naviguer vers la page à propos
               }}
@@ -295,25 +412,25 @@ export default function SettingsScreen() {
 
         <MenuItem
           icon={Users}
-          label="Inviter un ami"
+          label={t('settings.inviteFriend')}
           onPress={() => {
             // Ouvrir le partage
           }}
         />
 
         {/* Compte */}
-        <SectionTitle title="Compte" isOrange />
+        <SectionTitle title={t('settings.account')} isOrange />
 
         <MenuItem
           icon={LogOut}
-          label="Déconnexion"
+          label={t('settings.logout')}
           onPress={handleLogout}
           isDanger={false}
         />
 
         <MenuItem
           icon={Trash2}
-          label="Delete Account"
+          label={t('settings.deleteAccount')}
           onPress={handleDeleteAccount}
           isDanger
         />

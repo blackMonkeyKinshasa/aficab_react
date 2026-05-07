@@ -16,6 +16,7 @@ import { Camera, ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n';
 
 export default function Signup(){
     
@@ -28,16 +29,17 @@ export default function Signup(){
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const { t } = useI18n();
 
   const statusOptions = [
-    { label: 'Passager', value: 'passenger' },
-    { label: 'Conducteur', value: 'driver' },
-    { label: 'Administrateur', value: 'admin' },
+    { label: t('signup.passenger'), value: 'passenger' },
+    { label: t('signup.driver'), value: 'driver' },
+    { label: t('signup.admin'), value: 'admin' },
   ];
 
   const handleSave = async () => {
     if (!fullName || !phoneNumber || !status) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(t('common.error'), t('signup.requiredFields'));
       return;
     }
 
@@ -46,7 +48,7 @@ export default function Signup(){
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        Alert.alert('Erreur', 'Utilisateur non trouvé');
+        Alert.alert(t('common.error'), t('signup.userNotFound'));
         return;
       }
 
@@ -62,13 +64,13 @@ export default function Signup(){
         .eq('id', user.id);
 
       if (error) {
-        Alert.alert('Erreur', error.message);
+        Alert.alert(t('common.error'), error.message);
       } else {
-        Alert.alert('Succès', 'Profil créé avec succès!');
+        Alert.alert(t('signup.successTitle'), t('signup.successMessage'));
         router.replace('/(tabs)');
       }
     } catch (err) {
-      Alert.alert('Erreur', 'Une erreur est survenue');
+      Alert.alert(t('common.error'), t('auth.genericError'));
     } finally {
       setLoading(false);
     }
@@ -96,14 +98,14 @@ export default function Signup(){
               isDark ? 'text-white' : 'text-gray-900'
             }`}
           >
-            Créez votre compte
+            {t('signup.title')}
           </Text>
           <Text
             className={`text-base text-center ${
               isDark ? 'text-gray-400' : 'text-gray-600'
             }`}
           >
-            Veuillez remplir les champs suivants pour finaliser la création de votre compte.
+            {t('signup.subtitle')}
           </Text>
         </View>
 
@@ -139,7 +141,7 @@ export default function Signup(){
                 isDark ? 'text-gray-400' : 'text-gray-600'
               }`}
             >
-              Nom et prénom
+              {t('signup.fullName')}
             </Text>
             <TextInput
               placeholder="User 54452"
@@ -162,7 +164,7 @@ export default function Signup(){
                 isDark ? 'text-gray-400' : 'text-gray-600'
               }`}
             >
-              Numéro de téléphone
+              {t('signup.phoneNumber')}
             </Text>
             <TextInput
               placeholder="+243821606126"
@@ -186,7 +188,7 @@ export default function Signup(){
                 isDark ? 'text-gray-400' : 'text-gray-600'
               }`}
             >
-              Statut
+              {t('signup.status')}
             </Text>
             <TouchableOpacity
               onPress={() => setShowStatusDropdown(!showStatusDropdown)}
@@ -207,7 +209,7 @@ export default function Signup(){
               >
                 {status
                   ? statusOptions.find((opt) => opt.value === status)?.label
-                  : 'Quel est votre statut ?'}
+                  : t('signup.statusPlaceholder')}
               </Text>
               <ChevronDown
                 size={24}
@@ -255,7 +257,7 @@ export default function Signup(){
             className="bg-orange-500 h-12 rounded-lg mt-6"
           >
             <Text className="text-white font-bold text-base">
-              {loading ? 'Enregistrement...' : 'Sauvegarder'}
+              {loading ? t('signup.saving') : t('signup.save')}
             </Text>
           </Button>
 
@@ -266,12 +268,12 @@ export default function Signup(){
                 isDark ? 'text-gray-400' : 'text-gray-600'
               }`}
             >
-              Besoin d'aide ?{' '}
+              {t('auth.needHelp')}{' '}
               <Text
                 className="text-orange-500 font-semibold"
                 onPress={handleContactSupport}
               >
-                Contactez le service client.
+                {t('auth.contactSupport')}
               </Text>
             </Text>
           </View>
