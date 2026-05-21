@@ -114,5 +114,6 @@ export async function apiFetch(endpoint: string, options: any = {}) {
 
 export async function apiAuthFetch(endpoint: string, options: any = {}) {
   const resolvedToken = await getRequiredAccessToken();
+  //console.log('resolvedToken : ', resolvedToken);
   return apiFetch(endpoint, { ...options, headers: { ...options.headers, Authorization: `Bearer ${resolvedToken}` } });
 }

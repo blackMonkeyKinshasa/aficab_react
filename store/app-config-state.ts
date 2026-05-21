@@ -12,6 +12,7 @@ interface AppConfigState {
   lastUpdatePhone: string | null;
   appIsLock: boolean;
   refreshing: boolean;
+  localClientVersion?: number;
   setAppConfig: (appConfig: AppConfiguration, appIsLock: boolean) => void;
   setLastUpdatePhone: (lastUpdatePhone: string) => void;
   shouldFetchAppConfig: () => boolean;
@@ -45,6 +46,7 @@ export const useAppConfigState = create<AppConfigState>()(
       lastUpdatePhone: null,
       appIsLock: false,
       refreshing: false,
+      localClientVersion: getLocalClientVersion(),
 
       setAppConfig: (appConfig, appIsLock) =>
         set({

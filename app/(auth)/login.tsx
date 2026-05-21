@@ -1,13 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthOnboardingSlider } from '@/components/my-ui/AuthOnboardingSlider';
 import { Link, Stack, useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import * as ExpoLinking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import * as React from 'react';
-import { Alert, Image, Keyboard, Linking, NativeModules, type ImageStyle, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Keyboard, Linking, NativeModules, type ImageStyle, View, Platform } from 'react-native';
 import { TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import {  SafeAreaView } from 'react-native-safe-area-context'
 import {
@@ -36,7 +39,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/lib/supabase';
-import { googleWebClientId } from '@/constants/env';
+import { googleIosClientId, googleWebClientId } from '@/constants/env';
 import { useEffect, useState } from 'react';
 import { useAnalytics } from '@/lib/analytics';
 import { Snackbar } from 'react-native-paper';
@@ -46,7 +49,7 @@ import { useI18n } from '@/lib/i18n';
 
 type GoogleSigninModule = {
   GoogleSignin: {
-    configure: (options: { webClientId: string }) => void;
+    configure: (options: { webClientId: string; iosClientId?: string; scopes?: string[] }) => void;
     hasPlayServices: () => Promise<void>;
     signIn: () => Promise<unknown>;
   };
@@ -69,6 +72,19 @@ type OAuthCallbackParams = {
   error_code?: string;
   error_description?: string;
 };
+
+const NATIVE_AUTH_CALLBACK_URL = 'mobile://aficab.com/auth/callback';
+
+function formatAppleFullName(fullName: AppleAuthentication.AppleAuthenticationFullName | null | undefined) {
+  if (!fullName) {
+    return '';
+  }
+
+  return [fullName.givenName, fullName.middleName, fullName.familyName]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(' ')
+    .trim();
+}
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -102,6 +118,33 @@ function getOAuthCallbackParams(url: string): OAuthCallbackParams {
   };
 }
 
+async function signInWithNativeGoogleIdToken(nativeGoogleSigninModule: GoogleSigninModule) {
+  await nativeGoogleSigninModule.GoogleSignin.hasPlayServices();
+
+  const response = await nativeGoogleSigninModule.GoogleSignin.signIn();
+
+  if (!nativeGoogleSigninModule.isSuccessResponse(response)) {
+    return { user: null, errorMessage: null };
+  }
+
+  const idToken = response.data?.idToken;
+
+  if (!idToken) {
+    return { user: null, errorMessage: 'missing-id-token' };
+  }
+
+  const { data, error } = await supabase.auth.signInWithIdToken({
+    provider: 'google',
+    token: idToken,
+  });
+
+  if (error) {
+    return { user: null, errorMessage: error.message };
+  }
+
+  return { user: data.user ?? null, errorMessage: null };
+}
+
 export default function LoginScreen() {
  
   const [email, setEmail] = useState('');
@@ -109,6 +152,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [googleSigninModule, setGoogleSigninModule] = useState<GoogleSigninModule | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const router = useRouter();
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -121,6 +165,16 @@ export default function LoginScreen() {
   const { t } = useI18n();
 
   const isDark = colorScheme === 'dark';
+
+  useEffect(() => {
+    AsyncStorage.getItem('onboarding')
+      .then((value) => {
+        setShowOnboarding(value !== 'done');
+      })
+      .catch(() => {
+        setShowOnboarding(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (!hasNativeGoogleSigninModule()) {
@@ -136,6 +190,8 @@ export default function LoginScreen() {
       if (googleWebClientId) {
         nativeGoogleSignin.GoogleSignin.configure({
           webClientId: googleWebClientId,
+          iosClientId: googleIosClientId,
+          scopes: ['profile', 'email'],
         });
       }
     } catch {
@@ -183,6 +239,11 @@ export default function LoginScreen() {
         { text: t('common.cancel'), style: 'cancel' },
       ]
     );
+  };
+
+  const handleFinishOnboarding = async () => {
+    await AsyncStorage.setItem('onboarding', 'done');
+    setShowOnboarding(false);
   };
 
 
@@ -234,7 +295,7 @@ export default function LoginScreen() {
       options: {
         // set this to false if you do not want the user to be automatically signed up
         shouldCreateUser: true,
-        emailRedirectTo: `mobile://aficab.com`,
+        emailRedirectTo: 'mobile://aficab.com/',
       },
     });
 
@@ -264,8 +325,30 @@ export default function LoginScreen() {
     setError('');
 
     try {
-      if (!nativeGoogleSigninModule) {
-        const redirectTo = ExpoLinking.createURL('/');
+      if (nativeGoogleSigninModule) {
+        const { user, errorMessage } = await signInWithNativeGoogleIdToken(nativeGoogleSigninModule);
+
+        if (errorMessage === 'missing-id-token') {
+          setError(t('auth.googleInvalidToken'));
+          return;
+        }
+
+        if (errorMessage) {
+          setError(errorMessage);
+          return;
+        }
+
+        if (!user) {
+          return;
+        }
+
+        analytics.trackLogin(user.id ?? '', user.email ?? '', 'google');
+        router.replace('/');
+        return;
+      }
+
+      {
+        const redirectTo = NATIVE_AUTH_CALLBACK_URL;
 
         const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -331,33 +414,6 @@ export default function LoginScreen() {
         router.replace('/');
         return;
       }
-
-      await nativeGoogleSigninModule.GoogleSignin.hasPlayServices();
-      const response = await nativeGoogleSigninModule.GoogleSignin.signIn();
-
-      if (!nativeGoogleSigninModule.isSuccessResponse(response)) {
-        return;
-      }
-
-      const idToken = response.data?.idToken;
-
-      if (!idToken) {
-        setError(t('auth.googleInvalidToken'));
-        return;
-      }
-
-      const { data, error: authError } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: idToken,
-      });
-
-      if (authError) {
-        setError(authError.message);
-        return;
-      }
-
-      analytics.trackLogin(data.user?.id ?? '', data.user?.email ?? '', 'google');
-      router.replace('/');
     } catch (error: any) {
       if (error?.code === nativeGoogleSigninModule?.statusCodes.IN_PROGRESS) {
         setError(t('auth.googleInProgress'));
@@ -365,6 +421,130 @@ export default function LoginScreen() {
         setError(t('auth.googlePlayServicesUnavailable'));
       } else {
         setError(error?.message ?? t('auth.googleImpossible'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      if (Platform.OS === 'ios') {
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+
+        if (!credential.identityToken) {
+          setError(t('auth.appleImpossible'));
+          return;
+        }
+
+        const { data, error: authError } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: credential.identityToken,
+        });
+
+        if (authError) {
+          setError(authError.message);
+          return;
+        }
+
+        const fullName = formatAppleFullName(credential.fullName);
+
+        if (fullName || credential.fullName?.givenName || credential.fullName?.familyName) {
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: {
+              full_name: fullName || undefined,
+              given_name: credential.fullName?.givenName ?? undefined,
+              family_name: credential.fullName?.familyName ?? undefined,
+            },
+          });
+
+          if (updateError) {
+            console.warn('apple_metadata_update_failed', updateError);
+          }
+        }
+
+        analytics.trackLogin(data.user?.id ?? '', data.user?.email ?? '', 'apple');
+        router.replace('/');
+        return;
+      }
+
+      const redirectTo = NATIVE_AUTH_CALLBACK_URL;
+
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (oauthError) {
+        setError(oauthError.message);
+        return;
+      }
+
+      if (!data?.url) {
+        setError(t('auth.appleOpenError'));
+        return;
+      }
+
+      const authResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (authResult.type !== 'success' || !authResult.url) {
+        setError(t('auth.appleCancelled'));
+        return;
+      }
+
+      const callbackParams = getOAuthCallbackParams(authResult.url);
+
+      if (callbackParams.error || callbackParams.error_code) {
+        setError(callbackParams.error_description ?? t('auth.appleDenied'));
+        return;
+      }
+
+      let sessionUser = null;
+
+      if (callbackParams.code) {
+        const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(callbackParams.code);
+
+        if (exchangeError) {
+          setError(exchangeError.message);
+          return;
+        }
+
+        sessionUser = exchangeData.session?.user ?? null;
+      } else if (callbackParams.access_token && callbackParams.refresh_token) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: callbackParams.access_token,
+          refresh_token: callbackParams.refresh_token,
+        });
+
+        if (sessionError) {
+          setError(sessionError.message);
+          return;
+        }
+
+        sessionUser = sessionData.user ?? null;
+      } else {
+        setError(t('auth.appleIncomplete'));
+        return;
+      }
+
+      analytics.trackLogin(sessionUser?.id ?? '', sessionUser?.email ?? '', 'apple');
+      router.replace('/');
+    } catch (error: any) {
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
+        setError(t('auth.appleCancelled'));
+      } else {
+        setError(error?.message ?? t('auth.appleImpossible'));
       }
     } finally {
       setLoading(false);
@@ -398,6 +578,30 @@ export default function LoginScreen() {
      
     }
 
+  }
+
+  if (showOnboarding === null) {
+    return (
+      <SafeAreaView
+        className="flex-1 bg-white dark:bg-transparent"
+        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
+      >
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#FE5900" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (showOnboarding) {
+    return (
+      <SafeAreaView
+        className="flex-1 bg-white dark:bg-transparent"
+        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
+      >
+        <AuthOnboardingSlider onDone={handleFinishOnboarding} />
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -443,8 +647,18 @@ export default function LoginScreen() {
 
           {/* Main Button */}
           
-           {GetButtonDialog(dialogOpen, setDialogOpen, colorScheme, signInWithOTP,
-             loading, email, verifyOTP, token, setToken, otpCountdown, handleResendOTP, {
+           <GetButtonDialog
+             dialogOpen={dialogOpen}
+             setDialogOpen={setDialogOpen}
+             signInWithOTP={signInWithOTP}
+             loading={loading}
+             email={email}
+             verifyOTP={verifyOTP}
+             token={token}
+             setToken={setToken}
+             otpCountdown={otpCountdown}
+             handleResendOTP={handleResendOTP}
+             labels={{
                connecting: t('auth.connecting'),
                signUpOrLogin: t('auth.signUpOrLogin'),
                otpTitle: t('auth.otpTitle'),
@@ -455,7 +669,8 @@ export default function LoginScreen() {
                verify: t('auth.verify'),
                otpRequired: t('auth.otpRequired'),
                error: t('common.error'),
-             })}
+             }}
+           />
 
           {/* Divider */}
           <View className="flex-row items-center mb-6">
@@ -480,17 +695,26 @@ export default function LoginScreen() {
                 onPress={handleGoogleLogin}
                 disabled={loading}
               >
-                <FontAwesome name="google" size={24} color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
+                <View className="flex-row items-center justify-center"> 
+                <Image  source={require('@/assets/images/logo_google.png')} style={{ width: 34, height: 34, resizeMode: 'contain'}} />
                 <Text className="ml-3 font-semibold text-base text-gray-900 dark:text-white">{t('auth.googleContinue')}</Text>
+              </View>
               </Button>
             )}
           </View>
           {/* Apple Button */}
-          <Button className=" h-12 rounded-lg mb-8 flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800"
-          onPress={toggleColorScheme}>
+
+          {Platform.OS === 'ios' && (
+             <Button className=" h-12 rounded-lg mb-8 flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800"
+               onPress={handleAppleLogin}
+               disabled={loading}>
+                  <View className="flex-row items-center justify-center"> 
             <FontAwesome name="apple" size={24} color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
             <Text className="ml-3 font-semibold text-base  text-gray-900 dark:text-white">{t('auth.appleContinue')}</Text>
+          </View>
           </Button>
+          )}
+         
         </View>
 
         {/* Footer */}
@@ -498,9 +722,13 @@ export default function LoginScreen() {
           {/* Terms Text */}
           <Text className="text-gray-600 dark:text-gray-400 text-xs leading-5 mb-6">
             {t('auth.legalPrefix')}{' '}
+             <Link href="https://aficab.com/cgu" asChild>  
             <Text className="text-orange-500 text-xs leading-5 mb-6 ">{t('auth.legalTerms')}</Text>
+             </Link>
             {' '}{t('auth.legalMiddle')}{' '}
+             <Link href="https://aficab.com/politique-de-confidentialite" asChild>  
             <Text className="text-orange-500 text-xs leading-5 mb-6">{t('auth.legalPrivacy')}</Text>
+            </Link>
             {t('auth.legalSuffix')}
           </Text>
 
@@ -529,8 +757,30 @@ export default function LoginScreen() {
   );
 }
 
-function GetButtonDialog(dialogOpen: boolean, setDialogOpen: React.Dispatch<React.SetStateAction<boolean>>, colorScheme: "light" | "dark" | undefined , signInWithOTP: () => void,
-loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: string, setToken?: React.Dispatch<React.SetStateAction<string>>, otpCountdown?: number, handleResendOTP?: () => void, labels?: {
+function GetButtonDialog({
+  dialogOpen,
+  setDialogOpen,
+  signInWithOTP,
+  loading,
+  email,
+  verifyOTP,
+  token,
+  setToken,
+  otpCountdown,
+  handleResendOTP,
+  labels,
+}: {
+  dialogOpen: boolean;
+  setDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  signInWithOTP: () => void;
+  loading?: boolean;
+  email?: string;
+  verifyOTP?: (token: string) => void;
+  token?: string;
+  setToken?: React.Dispatch<React.SetStateAction<string>>;
+  otpCountdown?: number;
+  handleResendOTP?: () => void;
+  labels?: {
   connecting: string;
   signUpOrLogin: string;
   otpTitle: string;
@@ -541,6 +791,7 @@ loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: 
   verify: string;
   otpRequired: string;
   error: string;
+  };
 }) {
   const minutes = Math.floor((otpCountdown ?? 0) / 60);
   const seconds = (otpCountdown ?? 0) % 60;
@@ -558,7 +809,7 @@ loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: 
     error: labels?.error ?? '',
   };
   
-
+  const [buttonEnabled, setButtonEnabled] = useState(true);
   
   return (
   <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -590,7 +841,15 @@ loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: 
                 <Input
                   placeholder={resolvedLabels.otpPlaceholder}
                 keyboardType="number-pad"
-                onChangeText={setToken}
+                onChangeText={(text) => {
+                   setToken?.(text);
+                  if(text.length === 6) {
+                     setButtonEnabled(false);
+                      Keyboard.dismiss();
+                      verifyOTP && verifyOTP(text);
+                  }
+                
+                }}
                 textAlign='center'
                 />
                 </View>
@@ -612,7 +871,9 @@ loading?: boolean, email?: string, verifyOTP?: (token: string) => void, token?: 
 
                    {/* Button Valider */}
                     <Button className="bg-orange-500 h-12 rounded-lg flex-1 flex-row items-center justify-center "
+                     disabled={!buttonEnabled}
                      onPress={() => {
+                      setButtonEnabled(false);
                         Keyboard.dismiss();
                         if (token) {
                           verifyOTP && verifyOTP(token);

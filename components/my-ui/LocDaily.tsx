@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { getLocCars } from "@/api/car";
 import { useRouter } from 'expo-router';
 import {Input} from '@/components/ui/input';
-import { generateIDBooking } from '@/api/booking';
+import { generateIDBooking, getAllBookings } from '@/api/booking';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -18,6 +18,9 @@ import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { validateCoupon } from '@/api/coupon';
 import { CouponValidationValidResponse } from '@/constants/dataInterface';
+import { supabase } from '@/lib/supabase';
+
+const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
 
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
@@ -205,7 +208,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const [isRefreshing, setIsRefreshing] = useState(false);
   const router = useRouter();
   const analytics = useAnalytics();
-  const [fuel, setFuel] = useState(true);
+  const [fuel, setFuel] = useState(false);
   const [flex, setFlex] = useState(false);
   const [premium, setPremium] = useState(false);
   const [code, setCode] = useState('');
@@ -221,6 +224,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
+  const autoPromoAttemptedRef = useRef(false);
   const fuelPrice = getFuelOptionPrice(selectedCar);
   const flexPrice = getExtraTimePrice(selectedCar?.extraTime?.flex);
   const premiumPrice = getExtraTimePrice(selectedCar?.extraTime?.premium);
@@ -344,6 +348,10 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setPromoFeedback(null);
     }
   }, [code, appliedCouponCode]);
+
+  useEffect(() => {
+    autoPromoAttemptedRef.current = false;
+  }, [etape, selectedCar?.id, fuel, flex, premium, rentalDays]);
 
   const loadCars = async (nextPage: number, replace = false) => {
     if (isLoadingMore) {
@@ -469,8 +477,8 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
   };
 
-  const handleApplyPromoCode = async () => {
-    const normalizedCode = code.trim();
+  const handleApplyPromoCode = async (promoCodeOverride?: string) => {
+    const normalizedCode = (promoCodeOverride ?? code).trim();
 
     if (!normalizedCode) {
       setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
@@ -483,6 +491,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
 
     setIsApplyingPromo(true);
+    setCode(normalizedCode);
 
     try {
       const response = await validateCoupon({
@@ -496,7 +505,14 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       if (response.valid) {
         setValidatedCoupon(response);
         setAppliedCouponCode(normalizedCode);
-        setPromoFeedback({ tone: 'success', message: response.message ?? t('booking.promoCodeApplied') });
+        setPromoFeedback({
+          tone: 'success',
+          message: response.message ?? (
+            normalizedCode === FIRST_BOOKING_PROMO_CODE
+              ? t('booking.promoCodeWelcomeApplied')
+              : t('booking.promoCodeApplied')
+          ),
+        });
         return;
       }
 
@@ -514,6 +530,55 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setIsApplyingPromo(false);
     }
   };
+
+  useEffect(() => {
+    if (etape !== EtapeReservation.RECAP || !selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
+      return;
+    }
+
+    if (autoPromoAttemptedRef.current) {
+      return;
+    }
+
+    if (appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
+      return;
+    }
+
+    if (code.trim() && code.trim() !== FIRST_BOOKING_PROMO_CODE) {
+      return;
+    }
+
+    autoPromoAttemptedRef.current = true;
+    let isMounted = true;
+
+    const applyWelcomePromoIfEligible = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user || !isMounted) {
+          return;
+        }
+
+        const bookings = await getAllBookings(user.id);
+
+        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) {
+          return;
+        }
+
+        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE);
+      } catch {
+        // L'auto-application reste silencieuse si la verification d'eligibilite echoue.
+      }
+    };
+
+    void applyWelcomePromoIfEligible();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
 
   const myButton = () => {
     return (
@@ -769,7 +834,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
           style={styles.carImage}
         />
 
-        <View style={{ marginLeft: 10 }}>
+        <View style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <Text style={[styles.carName, { color: theme.text }]}>
             {selectedCar?.name ?? t('booking.noVehicle')}
           </Text>

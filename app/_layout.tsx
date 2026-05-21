@@ -8,12 +8,13 @@ import { Stack, usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'nativewind';
 import { ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
-import { Provider as PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { Provider as PaperProvider, MD3DarkTheme, MD3LightTheme, Snackbar } from 'react-native-paper';
 import { en, fr, registerTranslation } from 'react-native-paper-dates';
 import {NotificationIcon} from '@/components/my-ui/NotificationIcon';
 import { useMyStateUser } from '@/store';
@@ -33,7 +34,9 @@ import * as Sentry from '@sentry/react-native';
 import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
 import * as Location from 'expo-location';
 import { isDev, isExpoGo } from '@/constants/env';
+import { Role } from '@/constants/databaseEnum';
 import { color } from '@/constants/colors';
+import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 
 const POSTHOG_API_KEY = 'phc_m8BC53KhbQB5qoynPaxb3PDRzqrv7Y9MSFkXcfu5UvYX';
@@ -41,6 +44,10 @@ const POSTHOG_HOST = 'https://us.i.posthog.com';
 
 const posthogClient = new PostHog(POSTHOG_API_KEY, {
   host: POSTHOG_HOST,
+});
+
+void SplashScreen.preventAutoHideAsync().catch((error) => {
+  console.warn('splash_prevent_auto_hide_failed', error);
 });
 
 function reportStartupError(context: string, error: unknown) {
@@ -107,17 +114,96 @@ function RootLayoutInner() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [isSyncingUser, setIsSyncingUser] = useState(false);
+  const [pushTokenSnackbarVisible, setPushTokenSnackbarVisible] = useState(false);
+  const [pushTokenSnackbarMessage, setPushTokenSnackbarMessage] = useState('');
   const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const { colorScheme } = useColorScheme();
   const posthog = usePostHog();
+  const analytics = useAnalytics();
   const storedUser = useMyStateUser((state) => state.user);
   const setStoredUser = useMyStateUser((state) => state.setUser);
   const updateStoredUser = useMyStateUser((state) => state.updateUser);
   const syncedDeviceTokenRef = useRef<string | null>(null);
   const receivedListenerRef = useRef<NotificationSubscription | null>(null);
   const responseListenerRef = useRef<NotificationSubscription | null>(null);
+
+  const showPushTokenSnackbar_ = (message: string | null | undefined) => {
+    if (!message) {
+      return;
+    }
+
+    setPushTokenSnackbarMessage(message);
+    setPushTokenSnackbarVisible(true);
+  };
+
+  const showPushTokenTrace_ = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
+    const baseTrace = [`trace expo token (${source})`, ...trace].join(' -> ');
+    const message = detail ? `${baseTrace} -> resultat: ${detail}` : baseTrace;
+    showPushTokenSnackbar_(message);
+  };
+
+  const syncExpoPushToken = async (userId: string, currentDeviceToken?: string | null) => {
+    const {
+      token: expoPushToken,
+      errorMessage,
+      trace,
+      stage,
+    } = await registerForPushNotificationsAsync();
+
+    if (!expoPushToken) {
+      return {
+        expoPushToken: null,
+        errorMessage: errorMessage ?? 'Le token Expo est indisponible pour le moment.',
+        trace,
+        stage,
+      };
+    }
+
+    if (currentDeviceToken === expoPushToken) {
+      syncedDeviceTokenRef.current = expoPushToken;
+      return {
+        expoPushToken,
+        errorMessage: null,
+        trace: [...trace, 'token deja present dans le profil utilisateur'],
+        stage: 'already-synced-in-profile',
+      };
+    }
+
+    if (syncedDeviceTokenRef.current === expoPushToken) {
+      return {
+        expoPushToken,
+        errorMessage: null,
+        trace: [...trace, 'token deja synchronise dans cette session'],
+        stage: 'already-synced-in-session',
+      };
+    }
+
+    const persistedTrace = [...trace, 'enregistrement du token dans le backend'];
+    const persistedUser = await persistUserDeviceToken(userId, expoPushToken);
+    syncedDeviceTokenRef.current = expoPushToken;
+    updateStoredUser({ deviceToken: expoPushToken });
+    const persistedBackendToken =
+      persistedUser && typeof persistedUser === 'object' && 'deviceToken' in persistedUser
+        ? String(persistedUser.deviceToken ?? '')
+        : '';
+
+    return {
+      expoPushToken,
+      errorMessage: null,
+      backendMessage: persistedBackendToken
+        ? `backend deviceToken=${persistedBackendToken}`
+        : 'backend a confirme la mise a jour du token',
+      trace: [
+        ...persistedTrace,
+        persistedBackendToken
+          ? `backend a retourne deviceToken=${persistedBackendToken}`
+          : 'backend a confirme la mise a jour du token',
+      ],
+      stage: 'persisted',
+    };
+  };
 
   const syncStoredUser = async () => {
     if (isSyncingUser) {
@@ -139,8 +225,42 @@ function RootLayoutInner() {
 
       if (refreshedUser) {
         setStoredUser(refreshedUser);
+
+        if (refreshedUser.role !== Role.CLIENT) {
+          analytics.trackRoleMismatchRedirect(authUser.id, {
+            email: refreshedUser.email ?? authUser.email ?? '',
+            role: refreshedUser.role,
+            sourceScreen: 'home',
+            targetScreen: 'checkRole',
+          });
+          router.replace('/chekRole');
+          return;
+        }
+
+        if (refreshedUser.deviceToken) {
+        /*  showPushTokenTrace('manuel', [
+            'profil recharge',
+            'token deja present sur le compte',
+          ], 'aucune regeneration necessaire');*/
+          return;
+        }
+
+        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(authUser.id, refreshedUser.deviceToken);
+
+        if (!expoPushToken) {
+       //   showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
+          return;
+        }
+
+      /*  showPushTokenTrace(
+          'manuel',
+          ['profil recharge', 'aucun token sur le compte', ...trace],
+          backendMessage ?? 'token disponible et synchronise'
+        );*/
+       
       }
     } catch (error) {
+      //showPushTokenSnackbar('Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.');
       console.error('profile_manual_sync_failed', error);
     } finally {
       setIsSyncingUser(false);
@@ -158,6 +278,16 @@ function RootLayoutInner() {
 
     router.push(targetRoute as never);
   };
+
+  useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
+    SplashScreen.hideAsync().catch((error) => {
+      reportStartupError('splash_hide_failed', error);
+    });
+  }, [authReady]);
 
   useEffect(() => {
     Sentry.setTag('platform', Platform.OS);
@@ -277,39 +407,50 @@ function RootLayoutInner() {
   useEffect(() => {
     let isMounted = true;
 
+    console.log( 'device token :', storedUser?.deviceToken);
+
     const syncDeviceToken = async () => {
       // Le token push n'est synchronise qu'une fois l'auth connue,
       // puis seulement si le token local a change pour eviter les ecritures inutiles.
       if (!authReady) {
+        console.log('auth not ready');
         return;
       }
 
       if (!user) {
         syncedDeviceTokenRef.current = null;
+        console.log('no user, skipping push token sync');
         return;
       }
 
       try {
-        const expoPushToken = await registerForPushNotificationsAsync();
+        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(
+          user.id,
+          storedUser?.id === user.id ? storedUser.deviceToken : null
+        );
+
+        console.log('push token received', expoPushToken);
 
         if (!expoPushToken || !isMounted) {
+          console.log('push token not received');
+          if (isMounted) {
+          //  showPushTokenTrace('auto', ['effet de synchronisation demarre', ...trace], errorMessage);
+          }
           return;
         }
-
-        if (storedUser?.id === user.id && storedUser.deviceToken === expoPushToken) {
-          syncedDeviceTokenRef.current = expoPushToken;
-          return;
+        if (isMounted) {
+         /* showPushTokenTrace(
+            'auto',
+            ['effet de synchronisation demarre', ...trace],
+            backendMessage ?? 'token disponible et synchronise'
+          );*/
         }
+        console.log('push token synced');
 
-        if (syncedDeviceTokenRef.current === expoPushToken) {
-          return;
-        }
 
-        await persistUserDeviceToken(user.id, expoPushToken);
-        syncedDeviceTokenRef.current = expoPushToken;
-        updateStoredUser({ deviceToken: expoPushToken });
       } catch (error) {
         reportStartupError('push_token_sync_failed', error);
+        console.log('push token sync failed', error);
       }
     };
 
@@ -422,6 +563,17 @@ function RootLayoutInner() {
           </Stack>
           
           <PortalHost />
+                    <Snackbar
+                      visible={pushTokenSnackbarVisible}
+                      onDismiss={() => setPushTokenSnackbarVisible(false)}
+                      duration={4500}
+                      action={{
+                        label: t('common.close'),
+                        onPress: () => setPushTokenSnackbarVisible(false),
+                      }}
+                    >
+                      {pushTokenSnackbarMessage}
+                    </Snackbar>
         </ThemeProvider>
 
     </PaperProvider>

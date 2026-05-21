@@ -1,7 +1,8 @@
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Platform, Pressable } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
 
 const buttonVariants = cva(
   cn(
@@ -90,16 +91,72 @@ const buttonTextVariants = cva(
 
 type ButtonProps = React.ComponentProps<typeof Pressable> &
   React.RefAttributes<typeof Pressable> &
-  VariantProps<typeof buttonVariants>;
+  VariantProps<typeof buttonVariants> & {
+    loading?: boolean;
+    loadingIndicatorColor?: string;
+  };
 
-function Button({ className, variant, size, ...props }: ButtonProps) {
+function getIndicatorColor(variant?: VariantProps<typeof buttonVariants>['variant']) {
+  if (variant === 'outline' || variant === 'secondary' || variant === 'ghost') {
+    return '#111827';
+  }
+
+  return '#ffffff';
+}
+
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return typeof value === 'object' && value !== null && 'then' in value && typeof value.then === 'function';
+}
+
+function Button({ className, variant, size, loading = false, loadingIndicatorColor, onPress, children, disabled, ...props }: ButtonProps) {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const resolvedIndicatorColor = useMemo(
+    () => loadingIndicatorColor ?? getIndicatorColor(variant),
+    [loadingIndicatorColor, variant]
+  );
+  const isLoading = loading || internalLoading;
+
+  const handlePress: ButtonProps['onPress'] = async (event) => {
+    if (disabled || isLoading || !onPress) {
+      return;
+    }
+
+    const result = onPress(event) as unknown;
+
+    if (isPromiseLike(result)) {
+      setInternalLoading(true);
+
+      try {
+        await result;
+      } finally {
+        setInternalLoading(false);
+      }
+    }
+  };
+
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
-        className={cn(props.disabled && 'opacity-50', buttonVariants({ variant, size }), className)}
+        className={cn((disabled || isLoading) && 'opacity-50', buttonVariants({ variant, size }), className)}
         role="button"
+        disabled={disabled || isLoading}
+        onPress={handlePress}
         {...props}
-      />
+      >
+        {typeof children === 'function' ? children : (
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ opacity: isLoading ? 0 : 1 }}>
+              {children}
+            </View>
+
+            {isLoading ? (
+              <View style={{ position: 'absolute', alignSelf: 'center' }}>
+                <ActivityIndicator color={resolvedIndicatorColor} />
+              </View>
+            ) : null}
+          </View>
+        )}
+      </Pressable>
     </TextClassContext.Provider>
   );
 }

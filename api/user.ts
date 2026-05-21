@@ -27,6 +27,11 @@ export function updateDeviceToken(userId: string, deviceToken: string) {
   });
 }
 
+// GET /user/:uid/device-token
+export function getUserDeviceToken(userId: string) {
+  return apiAuthFetch(`/user/${userId}/device-token`, { method: 'GET' });
+}
+
 // GET /driver/:uid
 export function getDriver(uid: string) {
   return apiAuthFetch(`/driver/${uid}`, { method: 'GET' });

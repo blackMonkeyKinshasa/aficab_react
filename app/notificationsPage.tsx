@@ -1,5 +1,6 @@
 import { View, Text, SectionList, StyleSheet, TouchableOpacity } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
+import { usePreventRemove } from '@react-navigation/native';
 import { useColorScheme } from 'nativewind';
 import { getActivity } from '@/api/activity';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import { readNotification } from '@/api/activity';
 import { color } from '@/constants/colors';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import {ErrorEmpty} from '@/components/my-ui/errorEmpty';
+import {useMyStateNotif} from '@/store/notification-state'
 
 function formatDate(iso: string, locale: string) {
   const d = new Date(iso);
@@ -48,19 +50,59 @@ function formatRelativeDate(iso: string, locale: string) {
   const date = new Date(iso).getTime();
   const diffMs = date - Date.now();
   const diffMinutes = Math.round(diffMs / 60000);
-  const rtf = new Intl.RelativeTimeFormat(locale.startsWith('fr') ? 'fr' : 'en', { numeric: 'auto' });
+  const isFrench = locale.startsWith('fr');
+
+  const formatUnit = (value: number, unit: 'minute' | 'hour' | 'day') => {
+    if (isFrench) {
+      if (unit === 'minute') {
+        if (value === 0) return 'maintenant';
+        if (value === -1) return 'il y a 1 minute';
+        if (value === 1) return 'dans 1 minute';
+        return value < 0 ? `il y a ${Math.abs(value)} minutes` : `dans ${value} minutes`;
+      }
+
+      if (unit === 'hour') {
+        if (value === -1) return 'il y a 1 heure';
+        if (value === 1) return 'dans 1 heure';
+        return value < 0 ? `il y a ${Math.abs(value)} heures` : `dans ${value} heures`;
+      }
+
+      if (value === 0) return "aujourd'hui";
+      if (value === -1) return 'hier';
+      if (value === 1) return 'demain';
+      return value < 0 ? `il y a ${Math.abs(value)} jours` : `dans ${value} jours`;
+    }
+
+    if (unit === 'minute') {
+      if (value === 0) return 'now';
+      if (value === -1) return '1 minute ago';
+      if (value === 1) return 'in 1 minute';
+      return value < 0 ? `${Math.abs(value)} minutes ago` : `in ${value} minutes`;
+    }
+
+    if (unit === 'hour') {
+      if (value === -1) return '1 hour ago';
+      if (value === 1) return 'in 1 hour';
+      return value < 0 ? `${Math.abs(value)} hours ago` : `in ${value} hours`;
+    }
+
+    if (value === 0) return 'today';
+    if (value === -1) return 'yesterday';
+    if (value === 1) return 'tomorrow';
+    return value < 0 ? `${Math.abs(value)} days ago` : `in ${value} days`;
+  };
 
   if (Math.abs(diffMinutes) < 60) {
-    return rtf.format(diffMinutes, 'minute');
+    return formatUnit(diffMinutes, 'minute');
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (Math.abs(diffHours) < 24) {
-    return rtf.format(diffHours, 'hour');
+    return formatUnit(diffHours, 'hour');
   }
 
   const diffDays = Math.round(diffHours / 24);
-  return rtf.format(diffDays, 'day');
+  return formatUnit(diffDays, 'day');
 }
 
 function getBookingTiming(activity: Activity, locale: string) {
@@ -88,9 +130,12 @@ function getBookingPreview(activity: Activity, locale: string) {
     .filter((value): value is string => Boolean(value && value !== 'N/A'));
 
   return {
-    vehicle: booking.car?.name ?? activity.target ?? activity.bookingId ?? '—',
+    vehicle: activity.car?.name ?? activity.target ?? activity.bookingId ?? '—',
     departureTime: booking.departureAt
-      ? new Date(booking.departureAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+      ? new Date(booking.departureAt).toLocaleTimeString(locale, {  weekday: 'long',   
+  day: '2-digit',    
+  month: '2-digit',
+  year: 'numeric',hour: '2-digit', minute: '2-digit' })
       : '—',
     route: routeParts.length > 0 ? routeParts.join(' → ') : '—',
   };
@@ -179,6 +224,13 @@ function getActionMeta(action: ActivityAction, activity: Activity, t: ReturnType
         icon: '!',
         tone: '#dc2626',
       };
+    case 'booking-auto-canceled':
+      return {
+        title: 'Reservation annulee automatiquement',
+        body: `La reservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a ete annulee par le systeme car elle n'a pas ete honoree avant la date de depart.`,
+        icon: '!',
+        tone: '#dc2626',
+      };
     default:
       return { title: 'Nouvelle activite', body: activity.target ?? '', icon: '•', tone: '#6b7280' };
   }
@@ -221,7 +273,7 @@ function NotificationItem({
 
         <View style={styles.contentWrap}>
           <View style={styles.itemHeader}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]} numberOfLines={1}>
+            <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]} numberOfLines={2}>
               {meta.title}
             </Text>
             {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: meta.tone }]} />}
@@ -292,6 +344,7 @@ export default function Notifications() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { clearCountNotif } = useMyStateNotif();
 
   const navigation = useNavigation();
   const isMarkingAsReadRef = useRef(false);
@@ -326,7 +379,7 @@ export default function Notifications() {
       if (user) {
         console.log('user', user.id);
         getActivity({userId :user.id})
-          .then((data) => setActivities(data))
+          .then((data) => {setActivities(data)}) 
           .catch(() => setError(t('notifications.loadError')))
           .finally(() => setLoading(false));
       }
@@ -337,33 +390,31 @@ export default function Notifications() {
    
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (event: { preventDefault: () => void; data: { action: never } }) => {
-      const unreadNotifications = activities.filter((activity) => !activity.isRead);
+  usePreventRemove(activities.some((activity) => !activity.isRead), ({ data }) => {
+    const unreadNotifications = activities.filter((activity) => !activity.isRead);
 
-      if (unreadNotifications.length === 0 || isMarkingAsReadRef.current) {
-        return;
-      }
+    if (unreadNotifications.length === 0 || isMarkingAsReadRef.current) {
+      return;
+    }
 
-      event.preventDefault();
-      isMarkingAsReadRef.current = true;
+    isMarkingAsReadRef.current = true;
 
-      Promise.allSettled(unreadNotifications.map((activity) => readNotification(activity.id)))
-        .then(() => {
-          setActivities((currentActivities) =>
-            currentActivities.map((activity) =>
-              activity.isRead ? activity : { ...activity, isRead: true }
-            )
-          );
-        })
-        .finally(() => {
-          isMarkingAsReadRef.current = false;
-          navigation.dispatch(event.data.action);
+    Promise.allSettled(unreadNotifications.map((activity) => readNotification(activity.id)))
+      .then(() => {
+        setActivities((currentActivities) =>
+          currentActivities.map((activity) =>
+            activity.isRead ? activity : { ...activity, isRead: true }
+          )
+        );
+        clearCountNotif();
+        requestAnimationFrame(() => {
+          navigation.dispatch(data.action);
         });
-    });
-
-    return unsubscribe;
-  }, [activities, navigation]);
+      })
+      .finally(() => {
+        isMarkingAsReadRef.current = false;
+      });
+  });
 
   const handleNotificationPress = (selectedActivity: Activity) => {
     let shouldCallApi = false;
@@ -388,7 +439,7 @@ export default function Notifications() {
         pathname: '/(tabs)/reservation',
         params: {
           highlightBookingId: selectedActivity.bookingId,
-          openBookingId: selectedActivity.bookingId,
+        //  openBookingId: selectedActivity.bookingId, /*pour ouvrir les detail*/
         },
       });
     };
@@ -412,7 +463,7 @@ export default function Notifications() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('notifications.title'), headerShown: true, headerBackTitle: t('booking.back') }} />
+      <Stack.Screen options={{ title: t('notifications.title'), headerShown: true, headerBackTitle: t('booking.back'), headerBackButtonMenuEnabled: false }} />
       <View style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#f2f2f7' }]}>
         {loading ? (
           <LoadingView />

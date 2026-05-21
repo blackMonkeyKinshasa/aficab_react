@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { User } from '@/constants/dataInterface';
 
-export const USER_CACHE_DURATION_MS = 2 * 24 * 60 * 60 * 1000;
+export const USER_CACHE_DURATION_MS = 1 * 24 * 60 * 60 * 1000;
 
 interface UserState {
   user: User | null;

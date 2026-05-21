@@ -1,5 +1,5 @@
 
-import { View, Text, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { HeaderBackButton } from '@react-navigation/elements';
 import {
@@ -467,7 +467,10 @@ export default function NewBooking() {
           onPressMyBookings={() => router.replace({
             pathname: '/(tabs)/reservation',
             params: confirmationState.bookingId
-              ? { highlightBookingId: confirmationState.bookingId }
+              ? { 
+                highlightBookingId: confirmationState.bookingId, 
+                showBadgeId: confirmationState.bookingId
+              }
               : undefined,
           })}
           onPressContact={() => router.replace('/(tabs)/settings')}
@@ -477,37 +480,44 @@ export default function NewBooking() {
   }
 
   return (
-
-    <><Stack.Screen options={{ ...SCREEN_OPTIONS(title, isDarkMode, handleHeaderBackPress), headerShown: true, headerBackTitle: t('booking.back') }} />     
-    <View style={{ flex: 1 }}>
-      {doc.type === ResType.LOC ? (
-        <>
-          <LocDaily locationDoc={doc as LocationDocLOC} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
-        </>
-      ) : (
-        <>
-          <LocAirport locationDoc={doc as LocationDocTA} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
-        </>
-      )}
-    </View>
-
-    {submitting ? (
-      <View style={styles.loadingOverlay}>
-        <View style={styles.loadingCard}>
-          <ActivityIndicator size="large" color="#ff6600" />
-          <Text style={styles.loadingTitle}>{t('booking.paymentProcessing')}</Text>
-          <Text style={styles.loadingText}>{t('booking.paymentWaitingConfirmation')}</Text>
+    <>
+      <Stack.Screen options={{ ...SCREEN_OPTIONS(title, isDarkMode, handleHeaderBackPress), headerShown: true, headerBackTitle: t('booking.back') }} />
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.container}>
+          {doc.type === ResType.LOC ? (
+            <>
+              <LocDaily locationDoc={doc as LocationDocLOC} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
+            </>
+          ) : (
+            <>
+              <LocAirport locationDoc={doc as LocationDocTA} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
+            </>
+          )}
         </View>
-      </View>
-    ) : null}
 
-    <PaymentModal visible={paymentModalVisible} isPremium={storedUser?.clientType===ClientType.PREMIUM} onClose={() => closePaymentModal('backdrop')} onSubmit={onSubmitPayement} />
-      
+        {submitting ? (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color="#ff6600" />
+              <Text style={styles.loadingTitle}>{t('booking.paymentProcessing')}</Text>
+              <Text style={styles.loadingText}>{t('booking.paymentWaitingConfirmation')}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <PaymentModal visible={paymentModalVisible} isPremium={storedUser?.clientType===ClientType.PREMIUM} onClose={() => closePaymentModal('backdrop')} onSubmit={onSubmitPayement} />
+      </KeyboardAvoidingView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',

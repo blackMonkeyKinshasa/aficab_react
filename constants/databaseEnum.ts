@@ -6,6 +6,7 @@ export enum Role {
   DRIVER = 'DRIVER',
   CLIENT = 'CLIENT',
   PARTNER = 'PARTNER',
+  ORG_BOOKER= 'ORG_BOOKER',
 }
 
 export enum ResType {

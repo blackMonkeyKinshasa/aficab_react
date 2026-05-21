@@ -8,36 +8,39 @@ import { getActivity } from "@/api/activity";
 import { Activity } from "@/constants/dataInterface";
 import {Bell, type LucideIcon} from 'lucide-react-native';
 import {ErrorEmpty} from '@/components/my-ui/errorEmpty';
+import { useMyStateNotif } from "@/store/notification-state";
 
-type Props = {
-  isDark: boolean;
-  onPress?: () => void;
+ type Props = {
+  isDark: boolean,
+  onPress?: () => void,
 };
 
 export function NotificationIcon({ isDark, onPress }: Props) {
 
   const [activities, setActivities] = useState<Activity[]>([]);
-
+  const { countNotif, setCountNotif, clearCountNotif } = useMyStateNotif();
+   
   useEffect(() => {
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        getActivity({userId:user.id, isRead:false}).then((data) => {
+        getActivity({userId:user.id, isRead:'0'}).then((data) => {
             setActivities(data);
-            console.log('Notification count:', data.length);
+            console.log('Notification count: 0', data.length);
+            setCountNotif(data.length);
           })
           .catch((err) => console.error(err));
       }
     }).catch((err) => console.error(err));
   
-  }, []);
+  }, [countNotif]);
     const router = useRouter();
   return (
     <TouchableOpacity onPress={() => router.push('/notificationsPage')} style={{ padding: 8 }}>
       <View>
         <Bell size={20} color={isDark ? "#fff" : "#000"} />
 
-        {activities.length > 0 && (
+        {countNotif > 0 && (
           <View
             style={{
               position: "absolute",
@@ -57,7 +60,7 @@ export function NotificationIcon({ isDark, onPress }: Props) {
                 fontSize: 10,
                 fontWeight: "bold",
               }}
-            >{activities.length > 99 ? "99+" : activities.length}</Text>
+            >{countNotif > 99 ? "99+" : countNotif}</Text>
           </View>
         )}
       </View>

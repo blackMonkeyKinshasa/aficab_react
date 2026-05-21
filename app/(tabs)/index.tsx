@@ -63,6 +63,16 @@ export default function HomeScreen() {
     const mustRefreshUser = shouldRefreshUser();
 
     if (cachedUser?.id && !mustRefreshUser) {
+      if (cachedUser.role === Role.DRIVER) {
+            analytics.trackRoleMismatchRedirect(cachedUser.id, {
+              email: cachedUser.email ?? cachedUser.email ?? '',
+              role: cachedUser?.role,
+              sourceScreen: 'home',
+              targetScreen: 'chekRole',
+            });
+            router.replace('/chekRole');
+            return;
+          }
       return;
     }
 

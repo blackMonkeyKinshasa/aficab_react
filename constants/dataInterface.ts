@@ -320,7 +320,8 @@ export type ActivityAction =
   | 'booking-checkout'
   | 'booking-driver-notify'
   | 'booking-driver-cancel'
-  | 'booking-client-cancel';
+  | 'booking-client-cancel'
+  | 'booking-auto-canceled';
 
 export interface Activity {
   id: string;

@@ -172,7 +172,7 @@ export default function CreateProfile() {
 
       setStoredUser(refreshedUser);
       hydrateForm(refreshedUser);
-     // router.replace('/');
+      router.replace('/');
     } catch (error: any) {
 
       if (error.code === "DUPLICATE_ENTRY") {

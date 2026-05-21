@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking,ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Inclus par défaut dans Expo
 import { supabase } from '@/lib/supabase';
-import { useMyStateUser } from '@/store/user-state';
+import { resetUserSessionState, useMyStateUser } from '@/store';
 import { useColorScheme } from 'nativewind';
 import { getUserByID } from '@/api/user';
 import { User } from '@/constants/dataInterface';
@@ -12,10 +12,10 @@ import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/consta
 import { useAnalytics } from '@/lib/analytics';
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
+import { Button } from '@/components/ui/button';
 
 export default function ChekRole() {
   const router = useRouter();
-  const clearStoredUser = useMyStateUser((state) => state.clearUser);
   const setStoredUser = useMyStateUser((state) => state.updateUser);
   const storedUser = useMyStateUser((state) => state.user);
   const { colorScheme } = useColorScheme();
@@ -123,13 +123,19 @@ export default function ChekRole() {
     }
 
     await supabase.auth.signOut();
-    clearStoredUser();
-    router.replace('/(auth)/login');
+    resetUserSessionState();
+   // router.replace('/(auth)/login');
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+
+        <ScrollView
+              showsVerticalScrollIndicator={false}
+              className="flex-1"
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
       
       <View style={styles.content}>
         <View style={[styles.heroCard, { backgroundColor: isDark ? '#111111' : '#FFF4EB', borderColor: isDark ? '#27272A' : '#FED7AA' }]}>
@@ -142,15 +148,12 @@ export default function ChekRole() {
           <Text style={[styles.description, styles.heroDescription, { color: isDark ? '#A3A3A3' : '#666666' }]}>
             {tf('role.notClientDescription', { accountLabel })}
           </Text>
-        </View>
 
-        <View style={[styles.infoCard, { backgroundColor: isDark ? '#0F0F10' : '#FFFFFF', borderColor: isDark ? '#27272A' : '#E5E7EB' }]}>
-          <View style={styles.infoRow}>
+          <View style={[styles.infoRow, { marginTop: 24 }]}>
             <Text style={[styles.infoLabel, { color: isDark ? '#A3A3A3' : '#6B7280' }]}>{t('role.emailLabel')}</Text>
             <Text style={[styles.infoValue, { color: isDark ? '#FFFFFF' : '#111827' }]}>{currentUser?.email ?? t('role.emailMissing')}</Text>
           </View>
 
-          
         </View>
 
         <View style={styles.textContainer}>
@@ -163,24 +166,34 @@ export default function ChekRole() {
           </Text>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.primaryButton, { shadowColor: '#FF5C00' }]} 
-          onPress={handleContactSupport}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="headset" size={18} color="#FFFFFF" />
-          <Text style={styles.buttonText}>{t('settings.contactUs')}</Text>
-        </TouchableOpacity>
+        <Button
+             className="h-14 flex-row items-center justify-center rounded-2xl my-3"
+             style={{ backgroundColor: color.primary, width: "100%", minHeight:56, paddingVertical:16}}
+             onPress={handleContactSupport}
+           >
+              <View className="flex-row items-center justify-center">
+                      <MaterialCommunityIcons name="headset" size={18} color="#FFFFFF" />
+                      <Text style={styles.buttonText}>{t('settings.contactUs')}</Text>
+              </View>
+            
+        </Button>
 
-        <TouchableOpacity 
-          style={styles.secondaryButton} 
-          onPress={handleLogout}
-          activeOpacity={0.8}
+        <Button 
+        className="h-14 flex-row items-center justify-center rounded-2xl border my-3 "
+        variant="outline"
+        style={{ width: "100%", minHeight:56, paddingVertical:16,}}
+           
+        onPress={handleLogout}
+         
         >
+           <View className="flex-row items-center justify-center">
           <MaterialCommunityIcons name="logout-variant" size={20} color="#FF5C00" />
           <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-        </TouchableOpacity>
+          </View>
+        </Button>
+
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -191,8 +204,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    justifyContent : 'center',
+    alignItems : 'center',
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingVertical: 12,
   },
   heroCard: {
     borderWidth: 1,

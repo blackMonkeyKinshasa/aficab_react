@@ -5,7 +5,7 @@ import { Text as UIText } from '@/components/ui/text';
 import { useEffect, useRef, useState } from 'react';
 import { Ionicons } from "@expo/vector-icons";
 import { getTaCars } from "@/api/car";
-import { calculateDistance, generateIDBooking } from '@/api/booking';
+import { calculateDistance, generateIDBooking, getAllBookings } from '@/api/booking';
 import { EtapeReservation, ResStatus, ResType } from "@/constants/databaseEnum";
 import { useRouter } from 'expo-router';
 import { Input } from '@/components/ui/input';
@@ -14,13 +14,22 @@ import { color } from '@/constants/colors';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
+import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { validateCoupon } from '@/api/coupon';
 import { CouponValidationValidResponse } from '@/constants/dataInterface';
+import { supabase } from '@/lib/supabase';
+
+const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
   [EtapeReservation.OPTION]: EtapeReservation.RECAP,
   [EtapeReservation.RECAP]: EtapeReservation.RECAP,
+};
+
+const PREVIOUS_ETAPE: Partial<Record<EtapeReservation, EtapeReservation>> = {
+  [EtapeReservation.OPTION]: EtapeReservation.SELECTION,
+  [EtapeReservation.RECAP]: EtapeReservation.OPTION,
 };
 
 type Props = {
@@ -204,6 +213,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
   const { appLocale, t } = useI18n();
+  const emptyCarsTitleKey = 'booking.noVehicleAvailable';
+  const emptyCarsDescriptionKey = 'booking.dailyCars.empty.description';
   const scheduleLabel = formatAirportSchedule(locationDoc, appLocale, t('booking.airportDateUnavailable'));
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
@@ -226,6 +237,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
   const [isPositionAller, setPositionAller] = useState(true);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
+  const autoPromoAttemptedRef = useRef(false);
   const tripPrice = getAirportTripPrice(selectedCar, distanceKm);
   const totalPrice = tripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
   const baseVehicleAmount = totalPrice;
@@ -406,6 +418,10 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     }
   }, [code, appliedCouponCode]);
 
+  useEffect(() => {
+    autoPromoAttemptedRef.current = false;
+  }, [etape, selectedCar?.id, distanceKm, locationDoc.tripType]);
+
 
 
   const handleNextEtape = async (car?: Car) => {
@@ -455,8 +471,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     void loadCars(1, true);
   };
 
-  const handleApplyPromoCode = async () => {
-    const normalizedCode = code.trim();
+  const handleApplyPromoCode = async (promoCodeOverride?: string) => {
+    const normalizedCode = (promoCodeOverride ?? code).trim();
 
     if (!normalizedCode) {
       setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
@@ -469,6 +485,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     }
 
     setIsApplyingPromo(true);
+    setCode(normalizedCode);
 
     try {
       const response = await validateCoupon({
@@ -482,7 +499,14 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       if (response.valid) {
         setValidatedCoupon(response);
         setAppliedCouponCode(normalizedCode);
-        setPromoFeedback({ tone: 'success', message: response.message ?? t('booking.promoCodeApplied') });
+        setPromoFeedback({
+          tone: 'success',
+          message: response.message ?? (
+            normalizedCode === FIRST_BOOKING_PROMO_CODE
+              ? t('booking.promoCodeWelcomeApplied')
+              : t('booking.promoCodeApplied')
+          ),
+        });
         return;
       }
 
@@ -501,15 +525,77 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     }
   };
 
+  useEffect(() => {
+    if (etape !== EtapeReservation.RECAP || !selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
+      return;
+    }
+
+    if (autoPromoAttemptedRef.current) {
+      return;
+    }
+
+    if (appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
+      return;
+    }
+
+    if (code.trim() && code.trim() !== FIRST_BOOKING_PROMO_CODE) {
+      return;
+    }
+
+    autoPromoAttemptedRef.current = true;
+    let isMounted = true;
+
+    const applyWelcomePromoIfEligible = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user || !isMounted) {
+          return;
+        }
+
+        const bookings = await getAllBookings(user.id);
+
+        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) {
+          return;
+        }
+
+        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE);
+      } catch {
+        // L'auto-application reste silencieuse si la verification d'eligibilite echoue.
+      }
+    };
+
+    void applyWelcomePromoIfEligible();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
+
+  const handlePreviousEtape = () => {
+    const previousEtape = PREVIOUS_ETAPE[etape];
+
+    if (previousEtape) {
+      setEtape(previousEtape);
+      return;
+    }
+
+    router.back();
+  };
+
     const myButton = () => {
       return (
-       <View className="flex-row mt-4">        
-              <Button className="h-12 w-full items-center justify-center rounded-lg bg-orange-500" 
+       <View className="mt-4 flex-row gap-3">       
+            
+              <Button className="h-12 items-center justify-center rounded-lg bg-orange-500" style={{ flex: etape !== EtapeReservation.SELECTION ? 1 : undefined, width: etape === EtapeReservation.SELECTION ? '100%' : undefined }}
               onPress={() => void handleNextEtape()}>
               <UIText className="text-base  font-bold text-white">
                 {actionLabel}
               </UIText>
             </Button>
+            
         </View>
       );
     };
@@ -557,9 +643,9 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           ListFooterComponent={isLoadingMore ? <Text style={[styles.listStateText, { color: theme.subText }]}>{t('booking.loading')}</Text> : null}
           ListEmptyComponent={!isRefreshing && !isLoadingMore ?
              <ErrorEmpty
-                        isDark={isDark}
-                        title={t(emptyTitleKeyNotifiction)}
-                        description={t(emptyDescriptionKeyNotifiction)}
+                        isDark={isDarkMode}
+                        title={t(emptyCarsTitleKey)}
+                        description={t(emptyCarsDescriptionKey)}
                         /> : null}
           renderItem={({ item: car }) => (
             <CarItem car={car} theme={theme} isSelected={selectedCar?.id === car.id} distanceKm={distanceKm} onPress={handleCarPress} t={t} />

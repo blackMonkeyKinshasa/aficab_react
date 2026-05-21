@@ -1,5 +1,5 @@
 import { Text } from '@/components/ui/text';
-import { View, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, Linking, Share } from 'react-native';
 import { useColorScheme } from 'nativewind';
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -18,7 +18,8 @@ import {
 import {Stack} from 'expo-router';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
-import { useMyStateUser } from '@/store/user-state';
+import { deleteUserByID } from '@/api/user';
+import { resetUserSessionState, useMyStateUser } from '@/store';
 import { AppLanguage, useAppLanguageState } from '@/store/language-state';
 import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +40,7 @@ import {
   SunIcon,
   type LucideIcon,
 } from 'lucide-react-native';
+import { useAppConfigState } from '@/store/app-config-state';
 
 const SCREEN_OPTIONS = (title : string, isDark : boolean, onPress: () => void) => ({
   title: title,
@@ -58,7 +60,6 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const cachedUser = useMyStateUser((state) => state.user);
-  const clearStoredUser = useMyStateUser((state) => state.clearUser);
   const analytics = useAnalytics();
   const avatarUrl = cachedUser?.avatar_url || '';
   const displayName = cachedUser?.full_name || t('settings.defaultUser');
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
     { label: t('language.optionFrench'), value: 'fr' },
     { label: t('language.optionEnglish'), value: 'en' },
   ];
+  const { refreshAppConfig, localClientVersion  } = useAppConfigState();
   
   const THEME_ICONS = {
     light: SunIcon,
@@ -114,7 +116,7 @@ export default function SettingsScreen() {
             setLoading(true);
             try {
               await supabase.auth.signOut();
-              clearStoredUser();
+              resetUserSessionState();
             //  router.replace('/(auth)/login');
             } catch (err) {
               Alert.alert(t('common.error'), t('settings.logoutError'));
@@ -139,9 +141,18 @@ export default function SettingsScreen() {
           onPress: async () => {
             setLoading(true);
             try {
-              // Implémenter la suppression du compte via Supabase
+              const {
+                data: { user: authUser },
+              } = await supabase.auth.getUser();
+              const userId = cachedUser?.id ?? authUser?.id;
+
+              if (!userId) {
+                throw new Error('Utilisateur introuvable pour la suppression du compte.');
+              }
+
+              await deleteUserByID(userId);
               await supabase.auth.signOut();
-              clearStoredUser();
+              resetUserSessionState();
             //  router.replace('/(auth)/login');
             } catch (err) {
               Alert.alert(t('common.error'), t('settings.deleteError'));
@@ -163,7 +174,7 @@ export default function SettingsScreen() {
   }: {
     icon: LucideIcon;
     label: string;
-    onPress: () => void;
+    onPress: () => void | Promise<void>;
     isDanger?: boolean;
   }) => (
     <TouchableOpacity
@@ -413,8 +424,10 @@ export default function SettingsScreen() {
         <MenuItem
           icon={Users}
           label={t('settings.inviteFriend')}
-          onPress={() => {
-            // Ouvrir le partage
+          onPress={async () => {
+            await Share.share({
+              message: `👉 Rejoins Aficab et profite d’un service de transport fiable, rapide et confortable à Kinshasa. : https://aficab.com/redirect`,
+            });
           }}
         />
 
@@ -438,6 +451,16 @@ export default function SettingsScreen() {
         </View>
         {/* Espacement bas */}
         <View className="h-8" />
+        <TouchableOpacity onPress={() => {
+          setLoading(true);
+          refreshAppConfig();
+          setLoading(false);
+
+        }} className="flex-row items-center justify-center">
+        <Text className="text-center text-sm text-gray-500">Build version : {localClientVersion}</Text>
+        </TouchableOpacity>
+         <View className="h-8" />
+
       </ScrollView>
        {loading && (
               <LoadingView />

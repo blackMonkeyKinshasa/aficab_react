@@ -1,13 +1,17 @@
 import { cn } from '@/lib/utils';
 import { Platform, TextInput, type TextInputProps } from 'react-native';
 
+type TextareaProps = TextInputProps & {
+  placeholderClassName?: string;
+};
+
 function Textarea({
   className,
   multiline = true,
   numberOfLines = Platform.select({ web: 2, native: 8 }), // On web, numberOfLines also determines initial height. On native, it determines the maximum height.
   placeholderClassName,
   ...props
-}: TextInputProps & React.RefAttributes<TextInput>) {
+}: TextareaProps) {
   return (
     <TextInput
       className={cn(
@@ -18,10 +22,12 @@ function Textarea({
         props.editable === false && 'opacity-50',
         className
       )}
-      placeholderClassName={cn('text-muted-foreground', placeholderClassName)}
       multiline={multiline}
       numberOfLines={numberOfLines}
       textAlignVertical="top"
+      {...(Platform.OS === 'web'
+        ? ({ placeholderClassName: cn('text-muted-foreground', placeholderClassName) } as Record<string, string>)
+        : {})}
       {...props}
     />
   );

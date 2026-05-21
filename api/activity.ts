@@ -2,7 +2,7 @@ import { apiAuthFetch } from './apiConfig';
 
 // GET /activity?userId=xxx&isRead=xxx
 export function getActivity(
-  params?: { userId?: string; isRead?: boolean; action?: string; bookingId?: string }
+  params?: { userId?: string; isRead?: string; action?: string; bookingId?: string }
 ) {
   const query = new URLSearchParams();
   if (params?.userId) query.append('userId', params.userId);

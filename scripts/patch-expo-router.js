@@ -19,6 +19,7 @@ module.exports = {
 `;
 
 const expoLocationTsconfigFile = path.join(process.cwd(), 'node_modules', 'expo-location', 'tsconfig.json');
+const expoSplashScreenTsconfigFile = path.join(process.cwd(), 'node_modules', 'expo-splash-screen', 'tsconfig.json');
 const expoKeepAwakeDir = path.join(process.cwd(), 'node_modules', 'expo-keep-awake');
 const gorhomBottomSheetDir = path.join(process.cwd(), 'node_modules', '@gorhom', 'bottom-sheet');
 const reactNavigationElementsDir = path.join(
@@ -403,6 +404,29 @@ function patchExpoLocationTsconfig() {
   console.log('Patched expo-location/tsconfig.json with rootDir.');
 }
 
+function patchExpoSplashScreenTsconfig() {
+  if (!fs.existsSync(expoSplashScreenTsconfigFile)) {
+    console.warn('expo-splash-screen tsconfig not found in node_modules. Skipping patch.');
+    return;
+  }
+
+  const fileContent = fs.readFileSync(expoSplashScreenTsconfigFile, 'utf8');
+  const parsed = parseJsonWithComments(fileContent);
+
+  if (parsed.compilerOptions?.rootDir === './src') {
+    console.log('expo-splash-screen/tsconfig.json already has rootDir, no patch needed.');
+    return;
+  }
+
+  parsed.compilerOptions = {
+    ...(parsed.compilerOptions ?? {}),
+    rootDir: './src',
+  };
+
+  fs.writeFileSync(expoSplashScreenTsconfigFile, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8');
+  console.log('Patched expo-splash-screen/tsconfig.json with rootDir.');
+}
+
 function patchHermesParser() {
   if (!fs.existsSync(hermesParserDir)) {
     console.warn('hermes-parser package not found in node_modules. Skipping patch.');
@@ -777,7 +801,7 @@ function patchExpoCliBundledNativeModulesFallback() {
   replaceExactString(
     bundledNativeModulesFile,
     "            if (error instanceof _errors.CommandError && (error.code === 'OFFLINE' || error.code === 'API')) {\n                _log.warn((0, _chalk().default)`Unable to reach well-known versions endpoint. Using local dependency map {bold expo/bundledNativeModules.json} for version validation`);\n            } else {\n                throw error;\n            }",
-    "            if (error instanceof _errors.CommandError && (error.code === 'OFFLINE' || error.code === 'API') || error instanceof TypeError && error.message === 'fetch failed') {\n                _log.warn((0, _chalk().default)`Unable to reach well-known versions endpoint. Using local dependency map {bold expo/bundledNativeModules.json} for version validation`);\n            } else {\n                throw error;\n            }"
+    "            if (error instanceof _errors.CommandError && (error.code === 'OFFLINE' || error.code === 'API') || error instanceof TypeError && (error.message === 'fetch failed' || error.message === 'Body is unusable: Body has already been read')) {\n                _log.warn((0, _chalk().default)`Unable to reach well-known versions endpoint. Using local dependency map {bold expo/bundledNativeModules.json} for version validation`);\n            } else {\n                throw error;\n            }"
   );
 }
 
@@ -1268,6 +1292,7 @@ function patchExpoLocalMavenRepos() {
 patchExpoRouter();
 patchExpoRouterAssets();
 patchExpoLocationTsconfig();
+patchExpoSplashScreenTsconfig();
 patchHermesParser();
 patchExpoKeepAwake();
 patchReactNavigationElements();

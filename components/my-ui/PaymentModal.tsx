@@ -27,6 +27,7 @@ interface Props {
   disableStatusBar?: boolean;
   onSubmit : (paymentMethod: PaymentMethod,phoneNumber?:string) => void;
   onClose: () => void;
+  submitting?: boolean;
 }
 
 const PAYMENT_LOGOS = {
@@ -73,7 +74,7 @@ const PaymentCard = memo(function PaymentCard({
   );
 });
 
-export function PaymentModal({ visible, isPremium, disableStatusBar = false, onClose , onSubmit}: Props) {
+export function PaymentModal({ visible, isPremium, disableStatusBar = false, onClose , onSubmit, submitting = false}: Props) {
   const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
   const containerBg = isDark ? color.appDarkBackground : '#ffffff';
@@ -107,6 +108,13 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
   );
   const selectedPaymentLabel = paymentOptions.find((option) => option.type === selected)?.label ?? t('payment.payWith');
 
+  React.useEffect(() => {
+    if (!visible) {
+      setSelected(PaymentMethod.mpesa);
+      setPhone('');
+    }
+  }, [visible]);
+
   return (
     <Modal
       visible={visible}
@@ -116,7 +124,7 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
       statusBarTranslucent={!disableStatusBar}
     >
       <KeyboardAvoidingView behavior="padding" style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={submitting ? undefined : onClose} />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={[styles.modalCard, { backgroundColor: containerBg }]}> 
             <Text style={[styles.title, { color: textColor }]}>
@@ -132,7 +140,7 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
                   logo={option.logo}
                   isActive={selected === option.type}
                   isDark={isDark}
-                  onPress={setSelected}
+                  onPress={submitting ? () => undefined : setSelected}
                 />
               ))}
             </View>
@@ -143,23 +151,27 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
                   {t('payment.phoneInfoFor')} ({paymentLabel}) :
                 </Text>
 
-                <TextInput
-                  placeholder={t('payment.phonePlaceholder')}
-                  placeholderTextColor={subTextColor}
-                  value={phone}
-                  onChangeText={setPhone}
-                  style={[styles.input, { borderColor: inputBorder, backgroundColor: inputBg, color: inputText }]}
-                  keyboardType="phone-pad"
-                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                  <Text style={{ color: subTextColor, marginRight: 10 }}>+243</Text>
+                  <TextInput
+                    placeholder={t('payment.phonePlaceholder')}
+                    placeholderTextColor={subTextColor}
+                    value={phone}
+                    onChangeText={setPhone}
+                    style={[styles.input, { borderColor: inputBorder, backgroundColor: inputBg, color: inputText }]}
+                    keyboardType="phone-pad"
+                    editable={!submitting}
+                  />
+                </View>
               </>
             )}
 
-            <TouchableOpacity style={styles.button} onPress={() => {
+            <TouchableOpacity style={[styles.button, submitting && styles.buttonDisabled]} disabled={submitting} onPress={() => {
               analytics.trackPaymentMethodSelected(selected, phone);
               analytics.trackPaymentSubmitted(selected);
               onSubmit(selected, phone);
             }}>
-              <Text style={styles.buttonText}>{`${t('payment.payWith')} ${selectedPaymentLabel}`}</Text>
+              <Text style={styles.buttonText}>{submitting ? t('booking.paymentProcessing') : `${t('payment.payWith')} ${selectedPaymentLabel}`}</Text>
             </TouchableOpacity>
           </View>
         </TouchableWithoutFeedback>
@@ -259,6 +271,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
    fontSize: 16,
 
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   closeButton: {
     marginTop: 12,

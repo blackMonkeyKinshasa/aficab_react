@@ -2,8 +2,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
-import { updateUserByID } from '@/api/user';
-import { User } from '@/constants/dataInterface';
+import { updateDeviceToken } from '@/api/user';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -22,6 +21,13 @@ export type NotificationLike = {
 
 export type NotificationResponseLike = {
   notification: NotificationLike;
+};
+
+export type PushTokenRegistrationResult = {
+  token: string | null;
+  errorMessage: string | null;
+  stage: string;
+  trace: string[];
 };
 
 let notificationsHandlerConfigured = false;
@@ -82,53 +88,101 @@ export function getNotificationTargetRoute(notification: NotificationLike) {
   return '/notificationsPage';
 }
 
-export async function registerForPushNotificationsAsync() {
+export async function registerForPushNotificationsAsync(): Promise<PushTokenRegistrationResult> {
+  const trace = ['debut du flux expo token'];
+
   if (Platform.OS === 'web') {
-    return null;
+    trace.push('blocage: plateforme web');
+    return {
+      token: null,
+      errorMessage: 'Les notifications push ne sont pas disponibles sur le web.',
+      stage: 'web',
+      trace,
+    };
   }
 
+  trace.push('verification du module expo-notifications');
   const notifications = ensureNotificationsReady();
 
   if (!notifications) {
     console.log('Les notifications push distantes ne sont pas prises en charge dans Expo Go.');
-    return null;
+    trace.push('blocage: module indisponible ou expo go');
+    return {
+      token: null,
+      errorMessage: 'Les notifications push distantes ne sont pas prises en charge dans Expo Go.',
+      stage: 'notifications-module-unavailable',
+      trace,
+    };
   }
 
   if (Platform.OS === 'android') {
+    trace.push('configuration du canal android');
     await notifications.setNotificationChannelAsync('default', {
       name: 'default',
       importance: notifications.AndroidImportance.MAX,
     });
   }
 
+  trace.push('verification appareil physique');
   if (!Device.isDevice) {
     console.log('Les notifications push necessitent un appareil physique.');
-    return null;
+    trace.push('blocage: appareil non physique');
+    return {
+      token: null,
+      errorMessage: 'Les notifications push necessitent un appareil physique.',
+      stage: 'not-physical-device',
+      trace,
+    };
   }
 
+  trace.push('verification permission notifications');
   const { status: existingStatus } = await notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
+    trace.push(`permission actuelle: ${existingStatus}`);
     const { status } = await notifications.requestPermissionsAsync();
     finalStatus = status;
+    trace.push(`permission apres demande: ${finalStatus}`);
+  } else {
+    trace.push('permission deja accordee');
   }
 
   if (finalStatus !== 'granted') {
-    return null;
+    trace.push('blocage: permission refusee');
+    return {
+      token: null,
+      errorMessage: 'La permission des notifications a ete refusee.',
+      stage: 'permission-denied',
+      trace,
+    };
   }
 
+  trace.push('lecture du projectId eas');
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
 
   if (!projectId) {
-    throw new Error('EAS projectId manquant pour enregistrer le token push.');
+    trace.push('blocage: projectId eas manquant');
+    return {
+      token: null,
+      errorMessage: 'EAS projectId manquant pour enregistrer le token push.',
+      stage: 'missing-project-id',
+      trace,
+    };
   }
 
+  trace.push('generation du token expo');
   const { data } = await notifications.getExpoPushTokenAsync({ projectId });
+  trace.push('token expo genere avec succes');
 
-  return data;
+  return {
+    token: data,
+    errorMessage: null,
+    stage: 'success',
+    trace,
+  };
 }
 
 export async function getLastNotificationResponseAsync(): Promise<NotificationResponseLike | null> {
@@ -171,9 +225,5 @@ export function addNotificationResponseReceivedListener(
 }
 
 export async function persistUserDeviceToken(userId: string, deviceToken: string) {
-  const updates: Pick<User, 'deviceToken'> = {
-    deviceToken,
-  };
-
-  return updateUserByID(userId, updates);
+  return updateDeviceToken(userId, deviceToken);
 }
