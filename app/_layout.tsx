@@ -1,24 +1,36 @@
 import '@/global.css';
-import 'react-native-url-polyfill/auto'
-import { User } from '@supabase/supabase-js';
-import { NAV_THEME } from '@/lib/theme';
+import 'react-native-url-polyfill/auto';
+
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Platform, TouchableOpacity } from 'react-native';
+
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '@react-navigation/native';
 import { PortalHost } from '@rn-primitives/portal';
+import * as Sentry from '@sentry/react-native';
+import { User } from '@supabase/supabase-js';
+import * as Location from 'expo-location';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'nativewind';
-import { ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { StatusBar } from 'expo-status-bar';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
-import { Provider as PaperProvider, MD3DarkTheme, MD3LightTheme, Snackbar } from 'react-native-paper';
+import { useColorScheme } from 'nativewind';
+import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {
+  MD3DarkTheme,
+  MD3LightTheme,
+  Provider as PaperProvider,
+  Snackbar,
+} from 'react-native-paper';
 import { en, fr, registerTranslation } from 'react-native-paper-dates';
-import {NotificationIcon} from '@/components/my-ui/NotificationIcon';
-import { useMyStateUser } from '@/store';
+
 import { getUserByID } from '@/api/user';
+import { color } from '@/constants/colors';
+import { Role } from '@/constants/databaseEnum';
+import { isDev } from '@/constants/env';
+import { useAnalytics } from '@/lib/analytics';
+import { useI18n } from '@/lib/i18n';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
@@ -29,15 +41,12 @@ import {
   NotificationSubscription,
   persistUserDeviceToken,
   registerForPushNotificationsAsync,
+  reportPushTokenStage,
+  subscribeToPushTokenChanges,
 } from '@/lib/notifications';
-import * as Sentry from '@sentry/react-native';
-import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
-import * as Location from 'expo-location';
-import { isDev, isExpoGo } from '@/constants/env';
-import { Role } from '@/constants/databaseEnum';
-import { color } from '@/constants/colors';
-import { useAnalytics } from '@/lib/analytics';
-import { useI18n } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
+import { NAV_THEME } from '@/lib/theme';
+import { useMyStateUser, useUserStoreHydrated } from '@/store';
 
 const POSTHOG_API_KEY = 'phc_m8BC53KhbQB5qoynPaxb3PDRzqrv7Y9MSFkXcfu5UvYX';
 const POSTHOG_HOST = 'https://us.i.posthog.com';
@@ -66,7 +75,7 @@ Sentry.init({
   enabled: true,
   debug: __DEV__,
   sendDefaultPii: true,
-  enableLogs: true,
+  enableLogs: false,
   tracesSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
@@ -125,9 +134,13 @@ function RootLayoutInner() {
   const storedUser = useMyStateUser((state) => state.user);
   const setStoredUser = useMyStateUser((state) => state.setUser);
   const updateStoredUser = useMyStateUser((state) => state.updateUser);
+  const userStoreHydrated = useUserStoreHydrated();
   const syncedDeviceTokenRef = useRef<string | null>(null);
+  const pushTokenSyncInFlightRef = useRef(false);
+  const pushTokenListenerRef = useRef<NotificationSubscription | null>(null);
   const receivedListenerRef = useRef<NotificationSubscription | null>(null);
   const responseListenerRef = useRef<NotificationSubscription | null>(null);
+  const [pushSyncNonce, setPushSyncNonce] = useState(0);
 
   const showPushTokenSnackbar_ = (message: string | null | undefined) => {
     if (!message) {
@@ -138,7 +151,11 @@ function RootLayoutInner() {
     setPushTokenSnackbarVisible(true);
   };
 
-  const showPushTokenTrace_ = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
+  const showPushTokenTrace_ = (
+    source: 'manuel' | 'auto',
+    trace: string[],
+    detail?: string | null
+  ) => {
     const baseTrace = [`trace expo token (${source})`, ...trace].join(' -> ');
     const message = detail ? `${baseTrace} -> resultat: ${detail}` : baseTrace;
     showPushTokenSnackbar_(message);
@@ -151,6 +168,12 @@ function RootLayoutInner() {
       trace,
       stage,
     } = await registerForPushNotificationsAsync();
+
+    reportPushTokenStage(stage, {
+      userId,
+      currentDeviceToken: currentDeviceToken ?? null,
+      hasExpoPushToken: Boolean(expoPushToken),
+    });
 
     if (!expoPushToken) {
       return {
@@ -172,6 +195,10 @@ function RootLayoutInner() {
     }
 
     if (syncedDeviceTokenRef.current === expoPushToken) {
+      if (currentDeviceToken !== expoPushToken) {
+        updateStoredUser({ deviceToken: expoPushToken });
+      }
+
       return {
         expoPushToken,
         errorMessage: null,
@@ -189,6 +216,11 @@ function RootLayoutInner() {
         ? String(persistedUser.deviceToken ?? '')
         : '';
 
+    reportPushTokenStage('persisted', {
+      userId,
+      persistedBackendToken: persistedBackendToken || null,
+    });
+
     return {
       expoPushToken,
       errorMessage: null,
@@ -203,6 +235,57 @@ function RootLayoutInner() {
       ],
       stage: 'persisted',
     };
+  };
+
+  const runPushTokenSync = async (
+    source: 'auto' | 'manual' | 'foreground' | 'signed_in' | 'token_rotation'
+  ) => {
+    if (!authReady || !user || !userStoreHydrated) {
+      return;
+    }
+
+    if (pushTokenSyncInFlightRef.current) {
+      return;
+    }
+
+    pushTokenSyncInFlightRef.current = true;
+
+    try {
+      const cachedUser = useMyStateUser.getState().user;
+      const currentDeviceToken = cachedUser?.id === user.id ? cachedUser.deviceToken : null;
+
+      const { expoPushToken, errorMessage, trace, backendMessage, stage } = await syncExpoPushToken(
+        user.id,
+        currentDeviceToken
+      );
+
+      console.log('[push_token] sync', {
+        source,
+        stage,
+        expoPushToken,
+        currentDeviceToken,
+      });
+
+      if (!expoPushToken) {
+        if (__DEV__) {
+          showPushTokenTrace_('auto', [`source=${source}`, ...trace], errorMessage);
+        }
+        return;
+      }
+
+      if (__DEV__) {
+        showPushTokenTrace_(
+          source === 'manual' ? 'manuel' : 'auto',
+          [`source=${source}`, ...trace],
+          backendMessage ?? 'token disponible et synchronise'
+        );
+      }
+    } catch (error) {
+      reportStartupError('push_token_sync_failed', error);
+      console.log('push token sync failed', error);
+    } finally {
+      pushTokenSyncInFlightRef.current = false;
+    }
   };
 
   const syncStoredUser = async () => {
@@ -237,30 +320,10 @@ function RootLayoutInner() {
           return;
         }
 
-        if (refreshedUser.deviceToken) {
-        /*  showPushTokenTrace('manuel', [
-            'profil recharge',
-            'token deja present sur le compte',
-          ], 'aucune regeneration necessaire');*/
-          return;
-        }
-
-        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(authUser.id, refreshedUser.deviceToken);
-
-        if (!expoPushToken) {
-       //   showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
-          return;
-        }
-
-      /*  showPushTokenTrace(
-          'manuel',
-          ['profil recharge', 'aucun token sur le compte', ...trace],
-          backendMessage ?? 'token disponible et synchronise'
-        );*/
-       
+        syncedDeviceTokenRef.current = null;
+        await runPushTokenSync('manual');
       }
     } catch (error) {
-      //showPushTokenSnackbar('Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.');
       console.error('profile_manual_sync_failed', error);
     } finally {
       setIsSyncingUser(false);
@@ -322,7 +385,9 @@ function RootLayoutInner() {
 
         if (status !== 'granted') return;
 
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
         posthog?.capture('user_location_captured', {
           user_id: user.id,
           latitude: loc.coords.latitude,
@@ -372,10 +437,18 @@ function RootLayoutInner() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       // Garde le layout aligne sur les changements login/logout sans recharger l'app.
       setUser(session?.user ?? null);
-      //setAuthReady(true);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        syncedDeviceTokenRef.current = null;
+        setPushSyncNonce((current) => current + 1);
+      }
+
+      if (event === 'SIGNED_OUT') {
+        syncedDeviceTokenRef.current = null;
+      }
     });
 
     return () => {
@@ -405,61 +478,54 @@ function RootLayoutInner() {
   }, [authReady, pathname, router, user]);
 
   useEffect(() => {
-    let isMounted = true;
+    if (!authReady || !userStoreHydrated) {
+      return;
+    }
 
-    console.log( 'device token :', storedUser?.deviceToken);
+    if (!user) {
+      syncedDeviceTokenRef.current = null;
+      console.log('no user, skipping push token sync');
+      return;
+    }
 
-    const syncDeviceToken = async () => {
-      // Le token push n'est synchronise qu'une fois l'auth connue,
-      // puis seulement si le token local a change pour eviter les ecritures inutiles.
-      if (!authReady) {
-        console.log('auth not ready');
-        return;
+    console.log('device token :', useMyStateUser.getState().user?.deviceToken);
+    void runPushTokenSync('auto');
+  }, [authReady, pushSyncNonce, storedUser?.deviceToken, storedUser?.id, user, userStoreHydrated]);
+
+  useEffect(() => {
+    if (!authReady || !user || !userStoreHydrated) {
+      return;
+    }
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void runPushTokenSync('foreground');
       }
-
-      if (!user) {
-        syncedDeviceTokenRef.current = null;
-        console.log('no user, skipping push token sync');
-        return;
-      }
-
-      try {
-        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(
-          user.id,
-          storedUser?.id === user.id ? storedUser.deviceToken : null
-        );
-
-        console.log('push token received', expoPushToken);
-
-        if (!expoPushToken || !isMounted) {
-          console.log('push token not received');
-          if (isMounted) {
-          //  showPushTokenTrace('auto', ['effet de synchronisation demarre', ...trace], errorMessage);
-          }
-          return;
-        }
-        if (isMounted) {
-         /* showPushTokenTrace(
-            'auto',
-            ['effet de synchronisation demarre', ...trace],
-            backendMessage ?? 'token disponible et synchronise'
-          );*/
-        }
-        console.log('push token synced');
-
-
-      } catch (error) {
-        reportStartupError('push_token_sync_failed', error);
-        console.log('push token sync failed', error);
-      }
-    };
-
-    syncDeviceToken();
+    });
 
     return () => {
-      isMounted = false;
+      subscription.remove();
     };
-  }, [authReady, storedUser?.deviceToken, storedUser?.id, updateStoredUser, user]);
+  }, [authReady, user, userStoreHydrated]);
+
+  useEffect(() => {
+    if (!user) {
+      pushTokenListenerRef.current?.remove();
+      pushTokenListenerRef.current = null;
+      return;
+    }
+
+    pushTokenListenerRef.current = subscribeToPushTokenChanges((nextToken) => {
+      reportPushTokenStage('token-rotation', { userId: user.id, nextToken });
+      syncedDeviceTokenRef.current = null;
+      void runPushTokenSync('token_rotation');
+    });
+
+    return () => {
+      pushTokenListenerRef.current?.remove();
+      pushTokenListenerRef.current = null;
+    };
+  }, [user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -499,7 +565,6 @@ function RootLayoutInner() {
     };
   }, [pathname, router]);
 
-
   if (!authReady) {
     // Evite d'afficher une UI transitoire avant de savoir si une session existe.
     return null;
@@ -507,18 +572,20 @@ function RootLayoutInner() {
   return (
     // Arbre racine UI: gestures, bottom sheets, theming natif puis routing Expo Router.
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <BottomSheetModalProvider>
-    <PaperProvider theme={colorScheme === 'dark' ? paperDarkTheme : paperLightTheme}> 
-        <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <BottomSheetModalProvider>
+        <PaperProvider theme={colorScheme === 'dark' ? paperDarkTheme : paperLightTheme}>
+          <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
-          <Stack screenOptions={{ headerShown: false }}>
-                {/* Flow d'authentification: login et creation de compte. */}
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                {/* Flow principal apres connexion: navigation par onglets. */}
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                {/* Ecran hors tabs, pousse au-dessus du flow principal pour modifier le profil. */}
-                <Stack.Screen name="edit-profile" options={{
+            <Stack screenOptions={{ headerShown: false }}>
+              {/* Flow d'authentification: login et creation de compte. */}
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              {/* Flow principal apres connexion: navigation par onglets. */}
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              {/* Ecran hors tabs, pousse au-dessus du flow principal pour modifier le profil. */}
+              <Stack.Screen
+                name="edit-profile"
+                options={{
                   title: t('profile.editTitle'),
                   headerBackTitle: t('booking.back'),
                   headerShown: true,
@@ -527,57 +594,58 @@ function RootLayoutInner() {
                     <TouchableOpacity
                       onPress={syncStoredUser}
                       disabled={isSyncingUser}
-                      style={{ marginRight: 16, opacity: isSyncingUser ? 0.7 : 1 }}
-                    >
+                      style={{ marginRight: 16, opacity: isSyncingUser ? 0.7 : 1 }}>
                       {isSyncingUser ? (
                         <ActivityIndicator
                           size="small"
                           color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
                         />
                       ) : (
-                        <RefreshCw size={20} color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
+                        <RefreshCw
+                          size={20}
+                          color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                        />
                       )}
                     </TouchableOpacity>
                   ),
                 }}
-                />
+              />
 
-                <Stack.Screen
-                  name="update-app"
-                  options={{
-                    headerShown: false,
-                    gestureEnabled: false,
-                  }}
-                />
+              <Stack.Screen
+                name="update-app"
+                options={{
+                  headerShown: false,
+                  gestureEnabled: false,
+                }}
+              />
 
-                  {/* Route de secours pour les chemins inconnus. */}
-                <Stack.Screen name="+not-found" />
+              {/* Route de secours pour les chemins inconnus. */}
+              <Stack.Screen name="+not-found" />
 
-                {/* Flow detail de reservation, ouvert depuis les ecrans du parcours principal. */}
-                <Stack.Screen name="new_booking/[doc]" 
+              {/* Flow detail de reservation, ouvert depuis les ecrans du parcours principal. */}
+              <Stack.Screen
+                name="new_booking/[doc]"
                 options={{
                   headerShown: true,
                   headerTransparent: false,
-                 }} />
+                }}
+              />
+            </Stack>
 
-          </Stack>
-          
-          <PortalHost />
-                    <Snackbar
-                      visible={pushTokenSnackbarVisible}
-                      onDismiss={() => setPushTokenSnackbarVisible(false)}
-                      duration={4500}
-                      action={{
-                        label: t('common.close'),
-                        onPress: () => setPushTokenSnackbarVisible(false),
-                      }}
-                    >
-                      {pushTokenSnackbarMessage}
-                    </Snackbar>
-        </ThemeProvider>
-
-    </PaperProvider>
-    </BottomSheetModalProvider>
+            <PortalHost />
+            <Snackbar
+              visible={pushTokenSnackbarVisible}
+              onDismiss={() => setPushTokenSnackbarVisible(false)}
+              duration={4500}
+              action={{
+                label: t('common.close'),
+                onPress: () => setPushTokenSnackbarVisible(false),
+              }}>
+              {pushTokenSnackbarMessage}
+            </Snackbar>
+          </ThemeProvider>
+        </PaperProvider>
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }
