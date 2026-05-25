@@ -1,23 +1,24 @@
-
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
+  Alert,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   useColorScheme,
-  Alert,
+  View,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+
 import { DateField } from '@/components/my-ui/DateField';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
 import { Button } from '@/components/ui/button';
 import { Location } from '@/constants/constants';
-import { useRouter } from 'expo-router';
-import { LocationDocTA } from '@/constants/dataInterface';
 import { ResType } from '@/constants/databaseEnum';
+import { LocationDocTA } from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { useMyStateUser } from '@/store/user-state';
@@ -27,7 +28,7 @@ type TripType = 'one-way' | 'round-trip';
 const TripOption = ({
   label,
   value,
-isDark,
+  isDark,
   selected,
   onSelect,
 }: {
@@ -42,8 +43,7 @@ isDark,
     <TouchableOpacity
       style={styles.optionContainer}
       onPress={() => onSelect(value)}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       <View style={[styles.circle, isSelected && styles.circleSelected]}>
         {isSelected && <Text style={styles.check}>✓</Text>}
       </View>
@@ -53,8 +53,15 @@ isDark,
 };
 
 const AIRPORT_KEYWORDS = [
-  'aéroport', 'aeroport', 'airport', 'charles de gaulle', 'cdg',
-  'orly', 'roissy', 'beauvais', 'le bourget',
+  'aéroport',
+  'aeroport',
+  'airport',
+  'charles de gaulle',
+  'cdg',
+  'orly',
+  'roissy',
+  'beauvais',
+  'le bourget',
 ];
 
 function containsAirport(location: Location | null): boolean {
@@ -81,21 +88,17 @@ export function Airport() {
     if (!locationDepart || !locationDest || !dateStart) return;
 
     if (!userPhone) {
-      Alert.alert(
-        t('booking.phoneRequiredTitle'),
-        t('booking.phoneRequiredMessage'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('booking.addNow'),
-            onPress: () =>
-              router.push({
-                pathname: '/edit-profile',
-                params: { focusField: 'phone', returnToBooking: '1' },
-              }),
-          },
-        ]
-      );
+      Alert.alert(t('booking.phoneRequiredTitle'), t('booking.phoneRequiredMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('booking.addNow'),
+          onPress: () =>
+            router.push({
+              pathname: '/edit-profile',
+              params: { focusField: 'phone', returnToBooking: '1' },
+            }),
+        },
+      ]);
       return;
     }
 
@@ -144,19 +147,32 @@ export function Airport() {
 
   return (
     <View style={{ flex: 1, paddingTop: 8 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}>
         {/* Sélecteur Aller simple / Aller retour */}
         <View style={styles.selectorContainer}>
-          <TripOption label={t('booking.oneWay')} value="one-way" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
-          <TripOption label={t('booking.roundTrip')} value="round-trip" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
+          <TripOption
+            label={t('booking.oneWay')}
+            value="one-way"
+            selected={tripType}
+            onSelect={setTripType}
+            isDark={isDarkMode}
+          />
+          <TripOption
+            label={t('booking.roundTrip')}
+            value="round-trip"
+            selected={tripType}
+            onSelect={setTripType}
+            isDark={isDarkMode}
+          />
         </View>
 
         {/* Départ */}
         <View style={{ paddingTop: 4, paddingBottom: 10, paddingHorizontal: 20 }}>
           <TouchableOpacity onPress={() => setVisibleDepart(true)}>
             <ModuleReservation
-              icon={"location-outline"}
+              icon={'location-outline'}
               title={locationDepart ? locationDepart.description : t('booking.departure')}
               isDarkMode={isDarkMode}
             />
@@ -167,7 +183,7 @@ export function Airport() {
         <View style={{ paddingTop: 4, paddingBottom: 8, paddingHorizontal: 20 }}>
           <TouchableOpacity onPress={() => setVisibleDest(true)}>
             <ModuleReservation
-              icon={"navigate-outline"}
+              icon={'navigate-outline'}
               title={locationDest ? locationDest.description : t('booking.destination')}
               isDarkMode={isDarkMode}
             />
@@ -176,7 +192,14 @@ export function Airport() {
 
         {/* Message d'erreur aéroport */}
         {airportError && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingBottom: 8,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+            }}>
             <Ionicons name="warning-outline" size={16} color="#ef4444" />
             <Text style={{ color: '#ef4444', fontSize: 13, flex: 1 }}>{airportError}</Text>
           </View>
@@ -207,22 +230,14 @@ export function Airport() {
         )}
 
         {/* Bouton */}
-        <TouchableOpacity
-          style={{ padding: 20 }}
-          disabled={!isValid}
-        
-        >
+        <TouchableOpacity style={{ padding: 20 }} disabled={!isValid}>
           <Button
             disabled={!isValid}
-            className="bg-orange-500 h-12 rounded-lg mb-20"
-            onPress={handleSubmit}
-          >
-            <Text className="text-white font-bold text-base">
-              {t('booking.viewOffers')}
-            </Text>
+            className="mb-20 h-12 rounded-lg bg-orange-500"
+            onPress={handleSubmit}>
+            <Text className="text-base font-bold text-white">{t('booking.viewOffers')}</Text>
           </Button>
         </TouchableOpacity>
-
       </ScrollView>
 
       {/* Modal départ */}
@@ -244,7 +259,6 @@ export function Airport() {
           setVisibleDest(false);
         }}
       />
-
     </View>
   );
 }

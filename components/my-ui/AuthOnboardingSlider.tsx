@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import AppIntroSlider from 'react-native-app-intro-slider';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
 import { CarFront, MapPinned, Zap } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
+import AppIntroSlider from 'react-native-app-intro-slider';
 
 import { color } from '@/constants/colors';
 
@@ -57,14 +58,6 @@ function SlideIcon({ icon }: { icon: SlideItem['icon'] }) {
 export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<void> }) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const logoSource = useMemo(
-    () => (isDark
-      ? require('@/assets/images/aficab-app-logo-white.png')
-      : require('@/assets/images/aficab-app-logo-black.png')),
-    [isDark]
-  );
 
   return (
     <AppIntroSlider
@@ -75,11 +68,9 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       activeDotStyle={{ backgroundColor: '#FE5900', width: 28 }}
       dotStyle={{ backgroundColor: isDark ? '#3F3F46' : '#D4D4D8' }}
       renderSkipButton={() => (
-        activeIndex < slides.length - 1 ? (
-          <TouchableOpacity style={styles.skipButton}>
-            <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Ignorer</Text>
-          </TouchableOpacity>
-        ) : <View style={styles.skipPlaceholder} />
+        <View style={styles.skipButton}>
+          <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Ignorer</Text>
+        </View>
       )}
       renderNextButton={() => (
         <View style={[styles.nextButton, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
@@ -91,36 +82,61 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
           <Text style={styles.doneText}>Commencer</Text>
         </View>
       )}
-      onSlideChange={(index) => setActiveIndex(index)}
-      
       renderItem={({ item }) => (
-        <View style={[styles.slide, { backgroundColor: isDark ? color.appDarkBackground : '#FFF7ED' }]}>
+        <View
+          style={[styles.slide, { backgroundColor: isDark ? color.appDarkBackground : '#FFF7ED' }]}>
           <View style={[styles.glow, isDark ? styles.glowDark : styles.glowLight]} />
-          <View style={[styles.heroCard, { backgroundColor: isDark ? '#171A21' : '#FFFFFF' }]}> 
+          <View style={[styles.heroCard, { backgroundColor: isDark ? '#171A21' : '#FFFFFF' }]}>
             <View style={styles.topRow}>
               <View style={[styles.brandPill, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
                 <Text style={styles.brandPillText}>AFICAB</Text>
               </View>
-              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>Kinshasa</Text>
+              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>
+                Kinshasa
+              </Text>
             </View>
 
-             <View style={styles.visualArea}>
-              <View style={[styles.visualHalo, { backgroundColor: isDark ? 'rgba(254, 89, 0, 0.18)' : 'rgba(254, 89, 0, 0.12)' }]} />
+            <View style={styles.visualArea}>
+              <View
+                style={[
+                  styles.visualHalo,
+                  { backgroundColor: isDark ? 'rgba(254, 89, 0, 0.18)' : 'rgba(254, 89, 0, 0.12)' },
+                ]}
+              />
               <View style={[styles.iconWrap, { backgroundColor: isDark ? '#22252D' : '#FFF1E8' }]}>
                 <SlideIcon icon={item.icon} />
               </View>
-             
             </View>
 
-            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>{item.title}</Text>
-            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563' }]}>{item.text}</Text>
+            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563' }]}>
+              {item.text}
+            </Text>
 
             <View style={styles.footerRow}>
-              <View style={[styles.footerPill, { backgroundColor: isDark ? '#20150F' : '#FFF1E8', borderColor: isDark ? '#5F321B' : '#F3C4A8' }]}>
+              <View
+                style={[
+                  styles.footerPill,
+                  {
+                    backgroundColor: isDark ? '#20150F' : '#FFF1E8',
+                    borderColor: isDark ? '#5F321B' : '#F3C4A8',
+                  },
+                ]}>
                 <Text style={styles.footerPillText}>Mobilité premium</Text>
               </View>
-              <View style={[styles.footerPill, { backgroundColor: isDark ? '#1C212A' : '#F4F4F5', borderColor: isDark ? '#313744' : '#E4E4E7' }]}>
-                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Service 24/7</Text>
+              <View
+                style={[
+                  styles.footerPill,
+                  {
+                    backgroundColor: isDark ? '#1C212A' : '#F4F4F5',
+                    borderColor: isDark ? '#313744' : '#E4E4E7',
+                  },
+                ]}>
+                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827' }]}>
+                  Service 24/7
+                </Text>
               </View>
             </View>
           </View>
@@ -280,10 +296,6 @@ const styles = StyleSheet.create({
   skipButton: {
     paddingHorizontal: 8,
     paddingVertical: 10,
-  },
-  skipPlaceholder: {
-    width: 72,
-    height: 40,
   },
   skipText: {
     fontSize: 15,

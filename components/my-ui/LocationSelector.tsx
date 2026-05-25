@@ -1,16 +1,29 @@
 import React from 'react';
-import { ActivityIndicator, Alert, Keyboard, Platform, Text, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  Platform,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
+
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+
 import { Location } from '@/constants/constants';
-import { useMyStateLocation } from '@/store/location-state';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
+import { useMyStateLocation } from '@/store/location-state';
 
 const KINSHASA_KEYWORD = 'kinshasa';
 
 function isKinshasaLocation(details: any, description?: string) {
   const addressParts = Array.isArray(details?.address_components)
-    ? details.address_components.flatMap((component: any) => [component?.long_name, component?.short_name])
+    ? details.address_components.flatMap((component: any) => [
+        component?.long_name,
+        component?.short_name,
+      ])
     : [];
 
   const searchableParts = [
@@ -26,7 +39,7 @@ function isKinshasaLocation(details: any, description?: string) {
   return searchableParts.some((value) => value.includes(KINSHASA_KEYWORD));
 }
 
-export  function LocationSelector({
+export function LocationSelector({
   onSelect,
   onQueryChange,
 }: {
@@ -34,7 +47,7 @@ export  function LocationSelector({
   onQueryChange?: (query: string) => void;
 }) {
   const autocompleteRef = React.useRef<any>(null);
-  const {addLocation} = useMyStateLocation();
+  const { addLocation } = useMyStateLocation();
   const analytics = useAnalytics();
   const { placesLanguage, t } = useI18n();
   const isDark = useColorScheme() === 'dark';
@@ -55,8 +68,7 @@ export  function LocationSelector({
         position: 'relative',
         zIndex: 1000,
         ...(Platform.OS === 'android' ? { elevation: 1000 } : null),
-      }}
-    >
+      }}>
       <GooglePlacesAutocomplete
         ref={autocompleteRef}
         placeholder={t('booking.searchAddress')}
@@ -67,7 +79,7 @@ export  function LocationSelector({
         debounce={250}
         disableScroll={false}
         listViewDisplayed="auto"
-        keyboardShouldPersistTaps='always'
+        keyboardShouldPersistTaps="always"
         listLoaderComponent={
           <View
             style={{
@@ -77,18 +89,18 @@ export  function LocationSelector({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 10,
-            }}
-          >
+            }}>
             <ActivityIndicator size="small" color={loaderColor} />
             <Text style={{ color: listItemText }}>{t('booking.loading')}</Text>
           </View>
         }
         onFail={(error) => {
-          const errorMessage = error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error);
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : typeof error === 'string'
+                ? error
+                : JSON.stringify(error);
 
           analytics.trackGooglePlacesAutocompleteFailed({
             errorMessage,
@@ -97,7 +109,10 @@ export  function LocationSelector({
             queryType: 'autocomplete',
           });
 
-          Alert.alert(t('common.information'), 'Google Places a echoue sur Android. Verifiez la cle API, le reseau et la restriction Places.');
+          Alert.alert(
+            t('common.information'),
+            'Google Places a echoue sur Android. Verifiez la cle API, le reseau et la restriction Places.'
+          );
         }}
         onPress={(data, details = null) => {
           if (details) {
@@ -160,9 +175,8 @@ export  function LocationSelector({
             shadowOpacity: 0.12,
             shadowRadius: 10,
             shadowOffset: { width: 0, height: 6 },
-  
+
             elevation: 1001,
-             
           },
           row: {
             backgroundColor: listBg,
@@ -178,18 +192,16 @@ export  function LocationSelector({
           poweredContainer: {
             backgroundColor: listBg,
           },
-        
+
           separator: {
             backgroundColor: separatorBg,
           },
 
           loader: {
-           size:"small",
-           color:loaderColor
+            size: 'small',
+            color: loaderColor,
           },
-
         }}
-
         textInputProps={{
           placeholder: t('booking.searchAddress'),
           autoCapitalize: 'none',
@@ -206,7 +218,7 @@ export  function LocationSelector({
             onQueryChange?.(text);
           },
         }}
-         />
+      />
     </View>
   );
 }

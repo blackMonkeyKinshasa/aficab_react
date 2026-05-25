@@ -1,16 +1,16 @@
+import * as React from 'react';
+import { useEffect, useState } from 'react';
+import { Image, type ImageStyle, View } from 'react-native';
+
+import { Link, Stack, useRouter } from 'expo-router';
+import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
+import { useColorScheme } from 'nativewind';
+
+import { getUserByID } from '@/api/user';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { supabase } from '@/lib/supabase';
-import { Link, Redirect, Stack ,} from 'expo-router';
-import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
-import { useColorScheme } from 'nativewind';
-import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { Image, type ImageStyle, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import {getUserByID} from '@/api/user';
-
 
 const SCREEN_OPTIONS = {
   title: 'React Native Reusables',
@@ -22,7 +22,6 @@ const LOGO = {
   light: require('@/assets/images/react-native-reusables-light.png'),
   dark: require('@/assets/images/react-native-reusables-dark.png'),
 };
-
 
 const IMAGE_STYLE: ImageStyle = {
   height: 76,
@@ -37,34 +36,31 @@ export default function Screen() {
   const [gender, setGender] = useState('');
 
   useEffect(() => {
-  const loadUserData = async () => {
+    const loadUserData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         if (user) {
-          getUserByID(user.id).then((data) => {
-            if (data) {
-              setFullName(data.full_name || '');
-              setPhoneNumber(data.phone_number || '');
-              setGender(data.gender || '');
-             
-             
-            }
-          }).catch((err) => {
-            console.error('Erreur lors de la récupération du profil:', err);
-          });
-
-          
+          getUserByID(user.id)
+            .then((data) => {
+              if (data) {
+                setFullName(data.full_name || '');
+                setPhoneNumber(data.phone_number || '');
+                setGender(data.gender || '');
+              }
+            })
+            .catch((err) => {
+              console.error('Erreur lors de la récupération du profil:', err);
+            });
         }
       } catch (err) {
         console.error('Erreur lors du chargement du profil:', err);
       }
-   
     };
 
-    
     loadUserData();
-
   }, []);
 
   return (

@@ -37,11 +37,8 @@ export function PromoCodeField({
   feedbackMessage = null,
   feedbackTone = 'default',
 }: PromoCodeFieldProps) {
-  const feedbackColor = feedbackTone === 'success'
-    ? '#16a34a'
-    : feedbackTone === 'error'
-      ? '#dc2626'
-      : subTextColor;
+  const feedbackColor =
+    feedbackTone === 'success' ? '#16a34a' : feedbackTone === 'error' ? '#dc2626' : subTextColor;
 
   return (
     <View style={{ borderWidth: 1, borderColor, borderRadius: 12, padding: 12, marginBottom: 15 }}>
@@ -81,8 +78,7 @@ export function PromoCodeField({
           }}
           onPress={onApply}
           disabled={disabled || isApplying}
-          activeOpacity={0.8}
-        >
+          activeOpacity={0.8}>
           {isApplying ? (
             <ActivityIndicator size="small" color={textColor} />
           ) : (
@@ -92,9 +88,7 @@ export function PromoCodeField({
       </View>
 
       {feedbackMessage ? (
-        <Text style={{ color: feedbackColor, fontSize: 12, marginTop: 10 }}>
-          {feedbackMessage}
-        </Text>
+        <Text style={{ color: feedbackColor, fontSize: 12, marginTop: 10 }}>{feedbackMessage}</Text>
       ) : null}
     </View>
   );

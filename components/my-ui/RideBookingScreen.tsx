@@ -1,33 +1,17 @@
-import React, { useState, useCallback, ComponentProps } from 'react';
-import {useColorScheme} from 'nativewind';
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  Platform,
-  Dimensions,
-  Keyboard,
-  TouchableWithoutFeedback
-} from 'react-native';
-
-import { DateField } from '@/components/my-ui/DateField';
+import React, { ComponentProps, useCallback, useState } from 'react';
+import { Dimensions, Image, Platform, Text, TouchableOpacity, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import{Icon} from '@/components/ui/icon';
-import { Daily } from '@/components/my-ui/daily';
+import { useColorScheme } from 'nativewind';
+import Carousel from 'react-native-reanimated-carousel';
+
 import { Airport } from '@/components/my-ui/airport';
+import { Daily } from '@/components/my-ui/daily';
+import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
-import Carousel from "react-native-reanimated-carousel";
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { color } from '@/constants/colors';
 
-
-const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
 const data = [
   require('@/assets/carousele/kinvtc-hero-desktop-01.webp'),
@@ -52,12 +36,10 @@ interface FormData {
 }
 
 export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
-  
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
-  
   const [value, setValue] = useState('account');
   const [rideType, setRideType] = useState<RideType>('daily');
   const [formData, setFormData] = useState<FormData>({
@@ -68,29 +50,29 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
     showEndDatePicker: false,
   });
   const [date, setDate] = useState<Date | null>(null);
-  
+
   // Gérer le changement de localisation
   const handleLocationChange = useCallback((text: string) => {
-    setFormData(prev => ({ ...prev, location: text }));
+    setFormData((prev) => ({ ...prev, location: text }));
   }, []);
 
   // Gérer la date de début
   const handleStartDateChange = useCallback((event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      setFormData(prev => ({ ...prev, showStartDatePicker: false }));
+      setFormData((prev) => ({ ...prev, showStartDatePicker: false }));
     }
     if (selectedDate) {
-      setFormData(prev => ({ ...prev, startDate: selectedDate }));
+      setFormData((prev) => ({ ...prev, startDate: selectedDate }));
     }
   }, []);
 
   // Gérer la date/heure de fin
   const handleEndDateChange = useCallback((event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
-      setFormData(prev => ({ ...prev, showEndDatePicker: false }));
+      setFormData((prev) => ({ ...prev, showEndDatePicker: false }));
     }
     if (selectedDate) {
-      setFormData(prev => ({ ...prev, endDate: selectedDate }));
+      setFormData((prev) => ({ ...prev, endDate: selectedDate }));
     }
   }, []);
 
@@ -120,44 +102,46 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
     });
   };
 
-const TabHeader = ({
-   label,
+  const TabHeader = ({
+    label,
     iconName,
     onPress,
-    onSelect= false,
-   
+    onSelect = false,
   }: {
     label: string;
     iconName: ComponentProps<typeof Ionicons>['name'];
     onPress: () => void;
     onSelect: boolean;
   }) => (
-  <TouchableOpacity className='items-center justify-center flex-1' onPress={onPress}>
+    <TouchableOpacity className="flex-1 items-center justify-center" onPress={onPress}>
+      <View
+        className={`w-full flex-row items-center justify-center rounded-3xl px-4 py-2 ${onSelect ? 'border border-gray-400' : ''}`}>
+        {onSelect ? (
+          <Ionicons
+            name={iconName}
+            size={20}
+            color={isDark ? '#fff' : '#000'}
+            style={{ marginRight: 8 }}
+          />
+        ) : null}
 
-    <View className={`items-center  flex-row justify-center w-full py-2 px-4 rounded-3xl ${onSelect ? 'border-gray-400 border' : ''}`}>
-
-
-  { onSelect ?  <Ionicons name={iconName} size={20} color={isDark ? "#fff" : "#000"} style={{marginRight: 8}}/>
-        : null }
-                    
-        <Text className={cn(onSelect ? 'font-bold text-base dark:text-white text-black' :  'dark:text-gray-400 text-gray-600')}>
+        <Text
+          className={cn(
+            onSelect
+              ? 'text-base font-bold text-black dark:text-white'
+              : 'text-gray-600 dark:text-gray-400'
+          )}>
           {label}
-          </Text>
-
-    </View>
-
-  </TouchableOpacity>
-  )
-
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-
-    <View className='flex-1'>
-
-    <View className='relative flex-1 bg-black '>
-
+    <View className="flex-1">
+      <View className="relative flex-1 bg-black">
         {/* Carrousel */}
-       <Carousel
+        <Carousel
           width={width}
           height={200}
           data={data}
@@ -168,55 +152,45 @@ const TabHeader = ({
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#000",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-        >
-          <Image style={{ flex: 1, width: width, height: 200,  }} source={item} />
-        </View>
-      )}
-    />
+                backgroundColor: '#000',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Image style={{ flex: 1, width: width, height: 200 }} source={item} />
+            </View>
+          )}
+        />
 
         {/* TAB conatiner main */}
-          <View
-            className="absolute top-44 h-full w-full bg-white dark:bg-transparent rounded-t-lg"
-            style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
-          >
-
-            {/* Tabs container */}
-            <View className='flex-1 items-center  mt-4' >
-              
-                    {/*  container header tab*/}
-                    <View className='flex-row items-center justify-center mt-1 ml-4 mr-4'>
-
-                      <TabHeader label={t('booking.dailyTab')} iconName="car-sport-outline" onPress={() => setRideType('daily')} onSelect={rideType === 'daily'} />
-                        <View className='w-4' />
-                      <TabHeader label={t('booking.airportTab')} iconName="airplane-outline" onPress={() => setRideType('airport')} onSelect={rideType === 'airport'} />
-
-                    </View>
-
-                    {/*  container body tab*/}
-                    <View className='flex-1 w-full mt-4 ' >
-                        {rideType === 'daily' ? <Daily /> : <Airport />}
-                  
-                    </View>
-                    
-
-
-
-
+        <View
+          className="absolute top-44 h-full w-full rounded-t-lg bg-white dark:bg-transparent"
+          style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}>
+          {/* Tabs container */}
+          <View className="mt-4 flex-1 items-center">
+            {/*  container header tab*/}
+            <View className="ml-4 mr-4 mt-1 flex-row items-center justify-center">
+              <TabHeader
+                label={t('booking.dailyTab')}
+                iconName="car-sport-outline"
+                onPress={() => setRideType('daily')}
+                onSelect={rideType === 'daily'}
+              />
+              <View className="w-4" />
+              <TabHeader
+                label={t('booking.airportTab')}
+                iconName="airplane-outline"
+                onPress={() => setRideType('airport')}
+                onSelect={rideType === 'airport'}
+              />
             </View>
 
-
+            {/*  container body tab*/}
+            <View className="mt-4 w-full flex-1">
+              {rideType === 'daily' ? <Daily /> : <Airport />}
+            </View>
           </View>
-        
-
         </View>
-
-
-    
+      </View>
     </View>
   );
 };
-

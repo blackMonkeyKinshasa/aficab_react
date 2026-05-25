@@ -1,27 +1,44 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Switch, Alert,
-  TextInput, ScrollView , KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
-import { LocationDocLOC, Booking, Car } from "@/constants/dataInterface";
-import { Button } from '@/components/ui/button';
-import { Text as UIText } from '@/components/ui/text';
-import { useState, useEffect, useRef } from 'react';
-import { EtapeReservation, ResStatus, ResType } from "@/constants/databaseEnum";
-import { Ionicons } from "@expo/vector-icons";
-import { getLocCars } from "@/api/car";
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import {Input} from '@/components/ui/input';
+
 import { generateIDBooking, getAllBookings } from '@/api/booking';
+import { getLocCars } from '@/api/car';
+import { validateCoupon } from '@/api/coupon';
+import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
+import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Text as UIText } from '@/components/ui/text';
+import { color } from '@/constants/colors';
+import { EtapeReservation, ResStatus, ResType } from '@/constants/databaseEnum';
+import {
+  Booking,
+  Car,
+  CouponValidationValidResponse,
+  LocationDocLOC,
+} from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { color } from '@/constants/colors';
-import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
-import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
-import { validateCoupon } from '@/api/coupon';
-import { CouponValidationValidResponse } from '@/constants/dataInterface';
 import { supabase } from '@/lib/supabase';
 
 const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
-
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
@@ -42,7 +59,13 @@ function toDate(value: Date | string) {
   return value instanceof Date ? value : new Date(value);
 }
 
-function formatDailyRange(locationDoc: LocationDocLOC, locale: string, daySingular: string, dayPlural: string, unavailableLabel: string) {
+function formatDailyRange(
+  locationDoc: LocationDocLOC,
+  locale: string,
+  daySingular: string,
+  dayPlural: string,
+  unavailableLabel: string
+) {
   const startDate = toDate(locationDoc.dateStart);
   const endDate = toDate(locationDoc.dateEnd);
 
@@ -132,19 +155,19 @@ type CarItemProps = {
   onPress: (car: Car) => void;
 };
 
-function CarItem({ car, theme, isSelected, categoryUnavailableLabel, perDayLabel, onPress }: CarItemProps) {
+function CarItem({
+  car,
+  theme,
+  isSelected,
+  categoryUnavailableLabel,
+  perDayLabel,
+  onPress,
+}: CarItemProps) {
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(car)}>
       <View
-        style={[
-          styles.card,
-          { backgroundColor: theme.card },
-          isSelected && styles.selectedCard,
-        ]}
-      >
-        <Text style={[styles.carName, { color: theme.text }]}>
-          {car.name}
-        </Text>
+        style={[styles.card, { backgroundColor: theme.card }, isSelected && styles.selectedCard]}>
+        <Text style={[styles.carName, { color: theme.text }]}>{car.name}</Text>
 
         <Text style={{ color: theme.subText }}>
           {car.category?.name ?? categoryUnavailableLabel}
@@ -153,18 +176,19 @@ function CarItem({ car, theme, isSelected, categoryUnavailableLabel, perDayLabel
         <View style={styles.row}>
           <View style={styles.iconRow}>
             <Ionicons name="person" size={16} color={theme.text} />
-            <Text style={{ color: theme.text, marginLeft: 5 }}>
-              {car.seats}
-            </Text>
+            <Text style={{ color: theme.text, marginLeft: 5 }}>{car.seats}</Text>
           </View>
 
-          <View style={[styles.badge, { backgroundColor: "#f5d7a1" }]}>
+          <View style={[styles.badge, { backgroundColor: '#f5d7a1' }]}>
             <Ionicons name="briefcase" size={16} color="#000" />
             <Text style={{ marginLeft: 5 }}>{car.baggage}</Text>
           </View>
         </View>
 
-        <Image source={{ uri: car.images[0] ?? 'https://via.placeholder.com/400x240' }} style={styles.image} />
+        <Image
+          source={{ uri: car.images[0] ?? 'https://via.placeholder.com/400x240' }}
+          style={styles.image}
+        />
 
         <Text style={styles.price}>
           $ {car.priceLOC} {perDayLabel}
@@ -174,16 +198,13 @@ function CarItem({ car, theme, isSelected, categoryUnavailableLabel, perDayLabel
   );
 }
 
-
-
 type Props = {
-  locationDoc: LocationDocLOC
-  isDarkMode: boolean
-  onSubmit: (doc: Booking) => void
-  etape: EtapeReservation
-  setEtape: (etape: EtapeReservation) => void
+  locationDoc: LocationDocLOC;
+  isDarkMode: boolean;
+  onSubmit: (doc: Booking) => void;
+  etape: EtapeReservation;
+  setEtape: (etape: EtapeReservation) => void;
 };
-
 
 export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }: Props) {
   void isDarkMode;
@@ -213,8 +234,13 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const [premium, setPremium] = useState(false);
   const [code, setCode] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
-  const [promoFeedback, setPromoFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
-  const [validatedCoupon, setValidatedCoupon] = useState<CouponValidationValidResponse | null>(null);
+  const [promoFeedback, setPromoFeedback] = useState<{
+    tone: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const [validatedCoupon, setValidatedCoupon] = useState<CouponValidationValidResponse | null>(
+    null
+  );
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -242,17 +268,19 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
 
     if (!bookingIdRequestRef.current) {
-      bookingIdRequestRef.current = generateIDBooking(ResType.LOC).then((generatedBookingId) => {
-        if (typeof generatedBookingId !== 'string' || !generatedBookingId) {
-          throw new Error(t('booking.generationImpossible'));
-        }
+      bookingIdRequestRef.current = generateIDBooking(ResType.LOC)
+        .then((generatedBookingId) => {
+          if (typeof generatedBookingId !== 'string' || !generatedBookingId) {
+            throw new Error(t('booking.generationImpossible'));
+          }
 
-        setBookingId(generatedBookingId);
-        setBookingCreatedAt((currentValue) => currentValue ?? new Date().toISOString());
-        return generatedBookingId;
-      }).finally(() => {
-        bookingIdRequestRef.current = null;
-      });
+          setBookingId(generatedBookingId);
+          setBookingCreatedAt((currentValue) => currentValue ?? new Date().toISOString());
+          return generatedBookingId;
+        })
+        .finally(() => {
+          bookingIdRequestRef.current = null;
+        });
     }
 
     return bookingIdRequestRef.current;
@@ -267,9 +295,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     const resolvedBookingId = await getOrCreateBookingId();
 
     const selectedOptions = {
-      fuel: fuel ? fuelPrice ?? 0 : 0,
-      flex: flex ? flexPrice ?? 0 : 0,
-      premium: premium ? premiumPrice ?? 0 : 0,
+      fuel: fuel ? (fuelPrice ?? 0) : 0,
+      flex: flex ? (flexPrice ?? 0) : 0,
+      premium: premium ? (premiumPrice ?? 0) : 0,
       couponCode: appliedCouponCode,
       couponDiscountAmount: promoDiscountAmount,
       rentalDays,
@@ -294,12 +322,13 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       isPaid: false,
       total: finalTotalPrice,
       options: selectedOptions,
-      guest: trimmedGuestName || trimmedGuestPhone
-        ? {
-            fullName: trimmedGuestName || null,
-            phone: trimmedGuestPhone || null,
-          }
-        : null,
+      guest:
+        trimmedGuestName || trimmedGuestPhone
+          ? {
+              fullName: trimmedGuestName || null,
+              phone: trimmedGuestPhone || null,
+            }
+          : null,
       name: trimmedGuestName || null,
       reference: null,
       taVolNumber: null,
@@ -326,9 +355,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   useEffect(() => {
     const carBasePrice = selectedCar?.priceLOC ?? 0;
     const selectedOptionsTotal =
-      (fuel ? fuelPrice ?? 0 : 0) +
-      (flex ? flexPrice ?? 0 : 0) +
-      (premium ? premiumPrice ?? 0 : 0);
+      (fuel ? (fuelPrice ?? 0) : 0) +
+      (flex ? (flexPrice ?? 0) : 0) +
+      (premium ? (premiumPrice ?? 0) : 0);
 
     setTotalPrice((carBasePrice + selectedOptionsTotal) * rentalDays);
   }, [selectedCar, fuel, fuelPrice, flex, flexPrice, premium, premiumPrice, rentalDays]);
@@ -405,7 +434,10 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
 
         onSubmit(booking);
       } catch (error) {
-        Alert.alert(t('common.error'), error instanceof Error ? error.message : t('booking.generationImpossible'));
+        Alert.alert(
+          t('common.error'),
+          error instanceof Error ? error.message : t('booking.generationImpossible')
+        );
       }
 
       return;
@@ -426,7 +458,8 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
   };
 
-  const actionLabel = etape === EtapeReservation.RECAP ? t('booking.confirmAndPay') : t('booking.continue');
+  const actionLabel =
+    etape === EtapeReservation.RECAP ? t('booking.confirmAndPay') : t('booking.continue');
 
   const handleCarPress = (car: Car) => {
     setSelectedCar(car);
@@ -507,24 +540,28 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         setAppliedCouponCode(normalizedCode);
         setPromoFeedback({
           tone: 'success',
-          message: response.message ?? (
-            normalizedCode === FIRST_BOOKING_PROMO_CODE
+          message:
+            response.message ??
+            (normalizedCode === FIRST_BOOKING_PROMO_CODE
               ? t('booking.promoCodeWelcomeApplied')
-              : t('booking.promoCodeApplied')
-          ),
+              : t('booking.promoCodeApplied')),
         });
         return;
       }
 
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
-      setPromoFeedback({ tone: 'error', message: response.message || t('booking.promoCodeInvalid') });
+      setPromoFeedback({
+        tone: 'error',
+        message: response.message || t('booking.promoCodeInvalid'),
+      });
     } catch (error) {
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback({
         tone: 'error',
-        message: error instanceof Error && error.message ? error.message : t('booking.promoCodeInvalid'),
+        message:
+          error instanceof Error && error.message ? error.message : t('booking.promoCodeInvalid'),
       });
     } finally {
       setIsApplyingPromo(false);
@@ -532,7 +569,12 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   };
 
   useEffect(() => {
-    if (etape !== EtapeReservation.RECAP || !selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
+    if (
+      etape !== EtapeReservation.RECAP ||
+      !selectedCar?.id ||
+      totalPrice <= 0 ||
+      baseVehicleAmount <= 0
+    ) {
       return;
     }
 
@@ -582,223 +624,235 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
 
   const myButton = () => {
     return (
-     <View className="flex-row mt-4">        
-            <Button className="h-12 w-full items-center justify-center rounded-lg bg-orange-500" 
-            onPress={handleNextEtape}>
-            <UIText className="text-base  font-bold text-white">
-              {actionLabel}
-            </UIText>
-          </Button>
+      <View className="mt-4 flex-row">
+        <Button
+          className="h-12 w-full items-center justify-center rounded-lg bg-orange-500"
+          onPress={handleNextEtape}>
+          <UIText className="text-base font-bold text-white">{actionLabel}</UIText>
+        </Button>
       </View>
     );
   };
 
-const PriceRow = ({ label, value }: { label: string; value: string }) => (
-  <View style={styles.priceRow}>
-    <Text style={{ color: theme.text }}>{label}</Text>
-    <Text style={{ color: theme.text }}>{value}</Text>
-  </View>
-);
+  const PriceRow = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.priceRow}>
+      <Text style={{ color: theme.text }}>{label}</Text>
+      <Text style={{ color: theme.text }}>{value}</Text>
+    </View>
+  );
 
   const selectCarsPage = () => {
     return (
-     <View className="flex-1 ">        
-             {/* ADDRESS CARD */}
-      <View style={[styles.addressCard, { backgroundColor: theme.card }]}>
-        <View className="mr-2 flex-1">
-          <Text style={[styles.addressText, { color: theme.text }]} numberOfLines={1}>
-            {locationDoc.location.description ?? t('booking.departure')}
-          </Text>
-          <Text style={{ color: theme.subText, marginTop: 4 }} numberOfLines={1}>
-            {dateRangeLabel}
-          </Text>
-        </View>
-        <Ionicons className="mr-1" name="pencil" size={20} color={theme.text} onPress={() => router.back()} />
-      </View>
-
-      {/* LIST */}
-      <FlatList
-        data={cars}
-        keyExtractor={(car) => car.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.4}
-        refreshing={isRefreshing}
-        onRefresh={handleRefresh}
-        ListFooterComponent={isLoadingMore ? <Text style={[styles.listStateText, { color: theme.subText }]}>{t('booking.loading')}</Text> : null}
-        ListEmptyComponent={!isRefreshing && !isLoadingMore ? (
-          <ErrorEmpty
-            isDark={isDarkMode}
-            title={t(emptyCarsTitleKey)}
-            description={t(emptyCarsDescriptionKey)}
-          />
-        ) : null}
-        renderItem={({ item: car }) => (
-          <CarItem car={car} theme={theme} isSelected={selectedCar?.id === car.id} categoryUnavailableLabel={t('booking.categoryUnavailable')} perDayLabel={t('booking.perDay')} onPress={handleCarPress} />
-        )}
-      />
-      </View>
-    );
-  };
-
-  const selectOption = () =>{
-
-    return(
-
-     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}>
-      <TouchableWithoutFeedback onPress={()=>{
-        console.log("touched");
-      }}>
-       
-       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}
-       showsVerticalScrollIndicator={false}
-       >
-      
-      <View style={[styles.container]}>
-
-      {/* OPTIONS */}
-      {hasAnyOption ? (
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>{t('booking.optionsTitle')}</Text>
+      <View className="flex-1">
+        {/* ADDRESS CARD */}
+        <View style={[styles.addressCard, { backgroundColor: theme.card }]}>
+          <View className="mr-2 flex-1">
+            <Text style={[styles.addressText, { color: theme.text }]} numberOfLines={1}>
+              {locationDoc.location.description ?? t('booking.departure')}
+            </Text>
+            <Text style={{ color: theme.subText, marginTop: 4 }} numberOfLines={1}>
+              {dateRangeLabel}
+            </Text>
           </View>
-
-          {/* Fuel */}
-          {hasFuelOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <View style={styles.optionTitleRow}>
-                  <Text style={{ color: theme.text }}>{t('booking.fuelFees')}</Text>
-                  <TouchableOpacity onPress={handleFuelInfoPress} style={styles.infoButton}>
-                    <Ionicons name="information-circle-outline" size={18} color={theme.subText} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  {t('booking.fuelFeesDescription')}
-                </Text>
-              </View>
-
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{fuelPrice} $</Text>
-                <Switch value={fuel} onValueChange={setFuel} />
-              </View>
-            </View>
-          ) : null}
-
-          {/* Flex */}
-          {hasFlexOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <Text style={{ color: theme.text }}>{t('booking.flexExtraHours')}</Text>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  {t('booking.flexExtraHoursDescription')}
-                </Text>
-              </View>
-
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{flexPrice} $</Text>
-                <Switch value={flex} onValueChange={handleFlexChange} />
-              </View>
-            </View>
-          ) : null}
-
-          {/* Premium */}
-          {hasPremiumOption ? (
-            <View style={styles.optionRow}>
-              <View className="mr-3 flex-1">
-                <Text style={{ color: theme.text }}>
-                  {t('booking.premiumExtraHours')}
-                </Text>
-                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                  {t('booking.premiumExtraHoursDescription')}
-                </Text>
-              </View>
-
-              <View style={styles.optionRight}>
-                <Text style={{ color: theme.text }}>{premiumPrice} $</Text>
-                <Switch value={premium} onValueChange={handlePremiumChange} />
-              </View>
-            </View>
-          ) : null}
+          <Ionicons
+            className="mr-1"
+            name="pencil"
+            size={20}
+            color={theme.text}
+            onPress={() => router.back()}
+          />
         </View>
-      ) : null}
 
-      {/* COMMENT */}
-      <View style={[styles.section, { borderColor: theme.border }]}>
-        <View style={styles.sectionHeader}>
-          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>
-            {t('booking.commentOptional')}
-          </Text>
-         </View>
-
-        <Input
-          placeholder={t('booking.commentPlaceholder')}
-          placeholderTextColor={theme.subText}
-          multiline
-          value={comment}
-          onChangeText={setComment}
-          style={
-            styles.input
-         }
+        {/* LIST */}
+        <FlatList
+          data={cars}
+          keyExtractor={(car) => car.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <Text style={[styles.listStateText, { color: theme.subText }]}>
+                {t('booking.loading')}
+              </Text>
+            ) : null
+          }
+          ListEmptyComponent={
+            !isRefreshing && !isLoadingMore ? (
+              <ErrorEmpty
+                isDark={isDarkMode}
+                title={t(emptyCarsTitleKey)}
+                description={t(emptyCarsDescriptionKey)}
+              />
+            ) : null
+          }
+          renderItem={({ item: car }) => (
+            <CarItem
+              car={car}
+              theme={theme}
+              isSelected={selectedCar?.id === car.id}
+              categoryUnavailableLabel={t('booking.categoryUnavailable')}
+              perDayLabel={t('booking.perDay')}
+              onPress={handleCarPress}
+            />
+          )}
         />
       </View>
-
-      {/* BOOKING for friend */}
-      <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <CollapsibleTrigger asChild>
-            <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader}>
-              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>
-                {t('booking.bookForOtherPersonOptional')}
-              </Text>
-              <Ionicons
-                name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={theme.subText}
-              />
-            </TouchableOpacity>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            <Input
-              placeholder={t('booking.fullName')}
-              placeholderTextColor={theme.subText}
-              value={guestName}
-              onChangeText={setGuestName}
-              style={styles.input}
-            />
-
-            <Input
-              placeholder={t('booking.phoneNumber')}
-              placeholderTextColor={theme.subText}
-              value={guestPhone}
-              onChangeText={setGuestPhone}
-              style={styles.input}
-            />
-          </CollapsibleContent>
-        </View>
-      </Collapsible>
-
-      {/* BUTTON */}
-
-      {myButton()}
-     
-
-    </View>
-
-    </ScrollView>  
-    
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView> 
-    
-      
     );
   };
 
-  const recap = () =>{
+  const selectOption = () => {
+    return (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}>
+        <TouchableWithoutFeedback
+          onPress={() => {
+            console.log('touched');
+          }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}>
+            <View style={[styles.container]}>
+              {/* OPTIONS */}
+              {hasAnyOption ? (
+                <View style={[styles.section, { borderColor: theme.border }]}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>
+                      {t('booking.optionsTitle')}
+                    </Text>
+                  </View>
+
+                  {/* Fuel */}
+                  {hasFuelOption ? (
+                    <View style={styles.optionRow}>
+                      <View className="mr-3 flex-1">
+                        <View style={styles.optionTitleRow}>
+                          <Text style={{ color: theme.text }}>{t('booking.fuelFees')}</Text>
+                          <TouchableOpacity onPress={handleFuelInfoPress} style={styles.infoButton}>
+                            <Ionicons
+                              name="information-circle-outline"
+                              size={18}
+                              color={theme.subText}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={{ color: theme.subText, fontSize: 12 }}>
+                          {t('booking.fuelFeesDescription')}
+                        </Text>
+                      </View>
+
+                      <View style={styles.optionRight}>
+                        <Text style={{ color: theme.text }}>{fuelPrice} $</Text>
+                        <Switch value={fuel} onValueChange={setFuel} />
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Flex */}
+                  {hasFlexOption ? (
+                    <View style={styles.optionRow}>
+                      <View className="mr-3 flex-1">
+                        <Text style={{ color: theme.text }}>{t('booking.flexExtraHours')}</Text>
+                        <Text style={{ color: theme.subText, fontSize: 12 }}>
+                          {t('booking.flexExtraHoursDescription')}
+                        </Text>
+                      </View>
+
+                      <View style={styles.optionRight}>
+                        <Text style={{ color: theme.text }}>{flexPrice} $</Text>
+                        <Switch value={flex} onValueChange={handleFlexChange} />
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* Premium */}
+                  {hasPremiumOption ? (
+                    <View style={styles.optionRow}>
+                      <View className="mr-3 flex-1">
+                        <Text style={{ color: theme.text }}>{t('booking.premiumExtraHours')}</Text>
+                        <Text style={{ color: theme.subText, fontSize: 12 }}>
+                          {t('booking.premiumExtraHoursDescription')}
+                        </Text>
+                      </View>
+
+                      <View style={styles.optionRight}>
+                        <Text style={{ color: theme.text }}>{premiumPrice} $</Text>
+                        <Switch value={premium} onValueChange={handlePremiumChange} />
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* COMMENT */}
+              <View style={[styles.section, { borderColor: theme.border }]}>
+                <View style={styles.sectionHeader}>
+                  <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>
+                    {t('booking.commentOptional')}
+                  </Text>
+                </View>
+
+                <Input
+                  placeholder={t('booking.commentPlaceholder')}
+                  placeholderTextColor={theme.subText}
+                  multiline
+                  value={comment}
+                  onChangeText={setComment}
+                  style={styles.input}
+                />
+              </View>
+
+              {/* BOOKING for friend */}
+              <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
+                <View style={[styles.section, { borderColor: theme.border }]}>
+                  <CollapsibleTrigger asChild>
+                    <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader}>
+                      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>
+                        {t('booking.bookForOtherPersonOptional')}
+                      </Text>
+                      <Ionicons
+                        name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={theme.subText}
+                      />
+                    </TouchableOpacity>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <Input
+                      placeholder={t('booking.fullName')}
+                      placeholderTextColor={theme.subText}
+                      value={guestName}
+                      onChangeText={setGuestName}
+                      style={styles.input}
+                    />
+
+                    <Input
+                      placeholder={t('booking.phoneNumber')}
+                      placeholderTextColor={theme.subText}
+                      value={guestPhone}
+                      onChangeText={setGuestPhone}
+                      style={styles.input}
+                    />
+                  </CollapsibleContent>
+                </View>
+              </Collapsible>
+
+              {/* BUTTON */}
+
+              {myButton()}
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    );
+  };
+
+  const recap = () => {
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
@@ -818,175 +872,185 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
       ...selectedOptions,
     ];
 
-    return(
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}
-      showsVerticalScrollIndicator={false}
-      > 
-      
-      <View style={[styles.container, { paddingTop: 5, marginBottom: 20 }]}>
-   
-      {/* CAR CARD */}
-      <View style={styles.carRow}>
-        <Image
-          source={{
-            uri: recapImage,
-          }}
-          style={styles.carImage}
-        />
+    return (
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}>
+        <View style={[styles.container, { paddingTop: 5, marginBottom: 20 }]}>
+          {/* CAR CARD */}
+          <View style={styles.carRow}>
+            <Image
+              source={{
+                uri: recapImage,
+              }}
+              style={styles.carImage}
+            />
 
-        <View style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <Text style={[styles.carName, { color: theme.text }]}>
-            {selectedCar?.name ?? t('booking.noVehicle')}
-          </Text>
-          <Text style={{ color: theme.subText, textAlign: 'center' }}>{selectedCar?.category?.name ?? t('booking.categoryUnavailable')}</Text>
+            <View
+              style={{ marginLeft: 10, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+              <Text style={[styles.carName, { color: theme.text }]}>
+                {selectedCar?.name ?? t('booking.noVehicle')}
+              </Text>
+              <Text style={{ color: theme.subText, textAlign: 'center' }}>
+                {selectedCar?.category?.name ?? t('booking.categoryUnavailable')}
+              </Text>
 
-          <View style={styles.row}>
-          <View style={styles.iconRow}>
-            <Ionicons name="person" size={16} color={theme.text} />
-            <Text style={{ color: theme.text, marginLeft: 5 }}>
-              {selectedCar?.seats ?? '0'}
-            </Text>
+              <View style={styles.row}>
+                <View style={styles.iconRow}>
+                  <Ionicons name="person" size={16} color={theme.text} />
+                  <Text style={{ color: theme.text, marginLeft: 5 }}>
+                    {selectedCar?.seats ?? '0'}
+                  </Text>
+                </View>
+
+                <View style={[styles.badge, { backgroundColor: '#f5d7a1' }]}>
+                  <Ionicons name="briefcase" size={16} color="#000" />
+                  <Text style={{ marginLeft: 5 }}>{selectedCar?.baggage ?? '0'}</Text>
+                </View>
+              </View>
+            </View>
           </View>
 
-          <View style={[styles.badge, { backgroundColor: "#f5d7a1" }]}>
-            <Ionicons name="briefcase" size={16} color="#000" />
-            <Text style={{ marginLeft: 5 }}>{selectedCar?.baggage ?? '0'}</Text>
-          </View>
-        </View>
-        </View>
-      </View>
-
-      {/* ADDRESS */}
-      <View style={[styles.box, { borderColor: theme.border }]}>
-        <Text style={{ color: theme.text }}>{t('booking.address')} :</Text>
-        <Text style={{ color: theme.subText,marginTop :8 }} numberOfLines={2}>
-          {locationDoc.location.description ?? t('booking.addressUnavailable')}
-        </Text>
-        <Text style={{ color: theme.subText ,marginTop :8}}>
-          {dateRangeLabel}
-        </Text>
-      </View>
-
-      {/* DETAILS */}
-      <View style={[styles.box, { borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          {t('booking.detailsTitle')} :
-        </Text>
-
-        {details.map((item, index) => (
-          <View key={index} style={styles.listRow}>
-            <Ionicons name="checkmark" size={18} color="orange" />
-            <Text style={{ color: theme.text, marginLeft: 8, marginRight: 8 }}>
-              {item}
+          {/* ADDRESS */}
+          <View style={[styles.box, { borderColor: theme.border }]}>
+            <Text style={{ color: theme.text }}>{t('booking.address')} :</Text>
+            <Text style={{ color: theme.subText, marginTop: 8 }} numberOfLines={2}>
+              {locationDoc.location.description ?? t('booking.addressUnavailable')}
             </Text>
+            <Text style={{ color: theme.subText, marginTop: 8 }}>{dateRangeLabel}</Text>
           </View>
-        ))}
-      </View>
 
-      {/* COMMENT */}
-      {trimmedComment ? (
-        <View style={[styles.box, { borderColor: theme.border }]}>
-          <Text style={{ color: theme.text }}>{t('booking.comment')} :</Text>
-          <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
-            {trimmedComment}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* ORDERED FOR */}
-      {hasGuestInfo ? (
-        <View style={[styles.box, { borderColor: theme.border }]}>
-          <Text style={{ color: theme.text }}>{t('booking.bookingFor')} :</Text>
-          {trimmedGuestName ? (
-            <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
-              {trimmedGuestName}
+          {/* DETAILS */}
+          <View style={[styles.box, { borderColor: theme.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {t('booking.detailsTitle')} :
             </Text>
+
+            {details.map((item, index) => (
+              <View key={index} style={styles.listRow}>
+                <Ionicons name="checkmark" size={18} color="orange" />
+                <Text style={{ color: theme.text, marginLeft: 8, marginRight: 8 }}>{item}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* COMMENT */}
+          {trimmedComment ? (
+            <View style={[styles.box, { borderColor: theme.border }]}>
+              <Text style={{ color: theme.text }}>{t('booking.comment')} :</Text>
+              <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
+                {trimmedComment}
+              </Text>
+            </View>
           ) : null}
-          {trimmedGuestPhone ? (
-            <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
-              {trimmedGuestPhone}
-            </Text>
+
+          {/* ORDERED FOR */}
+          {hasGuestInfo ? (
+            <View style={[styles.box, { borderColor: theme.border }]}>
+              <Text style={{ color: theme.text }}>{t('booking.bookingFor')} :</Text>
+              {trimmedGuestName ? (
+                <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
+                  {trimmedGuestName}
+                </Text>
+              ) : null}
+              {trimmedGuestPhone ? (
+                <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
+                  {trimmedGuestPhone}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
-        </View>
-      ) : null}
 
-      <PromoCodeField
-        label={t('booking.promoCodeLabel')}
-        placeholder={t('booking.promoCodePlaceholder')}
-        actionLabel={t('booking.applyPromoCode')}
-        value={code}
-        onChangeText={setCode}
-        onApply={() => void handleApplyPromoCode()}
-        textColor={theme.text}
-        subTextColor={theme.subText}
-        borderColor={theme.border}
-        inputBackgroundColor={theme.input}
-        titleSize={16}
-        isApplying={isApplyingPromo}
-        feedbackMessage={promoFeedback?.message ?? null}
-        feedbackTone={promoFeedback?.tone ?? 'default'}
-      />
+          <PromoCodeField
+            label={t('booking.promoCodeLabel')}
+            placeholder={t('booking.promoCodePlaceholder')}
+            actionLabel={t('booking.applyPromoCode')}
+            value={code}
+            onChangeText={setCode}
+            onApply={() => void handleApplyPromoCode()}
+            textColor={theme.text}
+            subTextColor={theme.subText}
+            borderColor={theme.border}
+            inputBackgroundColor={theme.input}
+            titleSize={16}
+            isApplying={isApplyingPromo}
+            feedbackMessage={promoFeedback?.message ?? null}
+            feedbackTone={promoFeedback?.tone ?? 'default'}
+          />
 
-      {/* PRICE */}
-      <View style={[styles.box, { borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          {t('booking.totalTitle')} 
-        </Text>
+          {/* PRICE */}
+          <View style={[styles.box, { borderColor: theme.border }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {t('booking.totalTitle')}
+            </Text>
 
-        <PriceRow label={`${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')} ${t('booking.rentalDaysPrice')} x ${selectedCar?.priceLOC ?? 0} $ :`} value={` ${(selectedCar?.priceLOC && selectedCar.priceLOC * rentalDays) ?? 0} $`} />
-        {fuel && fuelPrice !== null ? <PriceRow label={`${t('booking.fuelFees')} :`} value={`${(fuelPrice * rentalDays)} $`} /> : null}
-        {flex && flexPrice !== null ? <PriceRow label={`${t('booking.flexExtraHours')} :`} value={`${(flexPrice * rentalDays)} $`} /> : null}
-        {premium && premiumPrice !== null ? <PriceRow label={`${t('booking.premiumExtraHours')} :`} value={`${(premiumPrice * rentalDays)} $`} /> : null}
-        {promoDiscountAmount > 0 ? <PriceRow label={`${t('booking.discount')} :`} value={`- ${promoDiscountAmount} $`} /> : null}
-       
-         <View style={styles.priceRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('booking.total')} :</Text>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>{finalTotalPrice} $</Text>
+            <PriceRow
+              label={`${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')} ${t('booking.rentalDaysPrice')} x ${selectedCar?.priceLOC ?? 0} $ :`}
+              value={` ${(selectedCar?.priceLOC && selectedCar.priceLOC * rentalDays) ?? 0} $`}
+            />
+            {fuel && fuelPrice !== null ? (
+              <PriceRow
+                label={`${t('booking.fuelFees')} :`}
+                value={`${fuelPrice * rentalDays} $`}
+              />
+            ) : null}
+            {flex && flexPrice !== null ? (
+              <PriceRow
+                label={`${t('booking.flexExtraHours')} :`}
+                value={`${flexPrice * rentalDays} $`}
+              />
+            ) : null}
+            {premium && premiumPrice !== null ? (
+              <PriceRow
+                label={`${t('booking.premiumExtraHours')} :`}
+                value={`${premiumPrice * rentalDays} $`}
+              />
+            ) : null}
+            {promoDiscountAmount > 0 ? (
+              <PriceRow label={`${t('booking.discount')} :`} value={`- ${promoDiscountAmount} $`} />
+            ) : null}
+
+            <View style={styles.priceRow}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                {t('booking.total')} :
+              </Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{finalTotalPrice} $</Text>
+            </View>
           </View>
-      </View>
-      
-      {/* BUTTON */}
-      {myButton()}
-    </View>
-      
-       </ScrollView>
+
+          {/* BUTTON */}
+          {myButton()}
+        </View>
+      </ScrollView>
     );
   };
 
-
   return (
-
     <View className="flex-1 px-5 pt-4">
+      {etape === EtapeReservation.SELECTION && selectCarsPage()}
 
-      {etape === EtapeReservation.SELECTION &&
-        selectCarsPage()}
-
-      {etape === EtapeReservation.OPTION &&
-       selectOption()}
-      {etape === EtapeReservation.RECAP &&
-        recap()}
-
+      {etape === EtapeReservation.OPTION && selectOption()}
+      {etape === EtapeReservation.RECAP && recap()}
     </View>
-    
   );
 }
 
 const light = {
-  bg: "#F1F4F8",
-  card: "#f3f4f6",
-  text: "#14181B",
-  subText: "#6b6b6b",
-  border: "#d1d5db",
-  input: "#ffffff",
+  bg: '#F1F4F8',
+  card: '#f3f4f6',
+  text: '#14181B',
+  subText: '#6b6b6b',
+  border: '#d1d5db',
+  input: '#ffffff',
 };
 
 const dark = {
   bg: color.appDarkBackground,
-  card: "#1E2226",
-  text: "#FFFFFF",
-  subText: "#A0A0A0",
-  border: "#374151",
-  input: "#111827",
+  card: '#1E2226',
+  text: '#FFFFFF',
+  subText: '#A0A0A0',
+  border: '#374151',
+  input: '#111827',
 };
 
 const styles = StyleSheet.create({
@@ -995,9 +1059,9 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingBottom: 10,
     borderBottomWidth: 1,
     marginBottom: 15,
@@ -1005,7 +1069,7 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   section: {
@@ -1016,26 +1080,26 @@ const styles = StyleSheet.create({
   },
 
   sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
 
   optionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginVertical: 10,
   },
 
   optionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
 
   optionRight: {
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   infoButton: {
@@ -1049,30 +1113,30 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#ff5a00",
+    backgroundColor: '#ff5a00',
     padding: 15,
     borderRadius: 10,
-    alignItems: "center",
-    marginTop: "auto",
+    alignItems: 'center',
+    marginTop: 'auto',
   },
 
   buttonText: {
-    color: "#fff",
-    fontWeight: "600",
+    color: '#fff',
+    fontWeight: '600',
   },
 
   addressCard: {
     padding: 15,
     borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
 
   addressText: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: '500',
   },
 
   card: {
@@ -1082,7 +1146,7 @@ const styles = StyleSheet.create({
   },
 
   carRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginBottom: 15,
   },
 
@@ -1102,7 +1166,7 @@ const styles = StyleSheet.create({
   },
 
   listStateText: {
-    textAlign: "center",
+    textAlign: 'center',
     paddingVertical: 16,
   },
 
@@ -1119,54 +1183,54 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 10,
   },
 
   listRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 6,
   },
 
   priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
 
   totalPriceText: {
     marginTop: 12,
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 
   carName: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
   },
 
   row: {
-    flexDirection: "row",
+    flexDirection: 'row',
     marginTop: 10,
-    alignItems: "center",
+    alignItems: 'center',
     gap: 15,
   },
 
   iconRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   badge: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 6,
     borderRadius: 8,
   },
 
   image: {
-    width: "100%",
+    width: '100%',
     height: 180,
     borderRadius: 12,
     marginTop: 10,
@@ -1174,8 +1238,8 @@ const styles = StyleSheet.create({
 
   price: {
     marginTop: 10,
-    color: "orange",
-    fontWeight: "bold",
+    color: 'orange',
+    fontWeight: 'bold',
     fontSize: 16,
   },
 });

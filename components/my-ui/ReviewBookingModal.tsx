@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet,StatusBar, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { color } from '@/constants/colors';
 import { Booking } from '@/constants/dataInterface';
 import { TranslationKey } from '@/lib/i18n';
-import { color } from '@/constants/colors';
 
 type ReviewValues = {
   ratingDriving: number;
@@ -54,7 +63,11 @@ function RatingField({
           const active = star <= value;
 
           return (
-            <TouchableOpacity key={star} onPress={() => onChange(star)} style={styles.starButton} activeOpacity={0.8}>
+            <TouchableOpacity
+              key={star}
+              onPress={() => onChange(star)}
+              style={styles.starButton}
+              activeOpacity={0.8}>
               <Ionicons
                 name={active ? 'star' : 'star-outline'}
                 size={26}
@@ -68,7 +81,16 @@ function RatingField({
   );
 }
 
-export function ReviewBookingModal({ visible, booking, isDark, submitting, disableStatusBar = false, onClose, onSubmit, t }: ReviewBookingModalProps) {
+export function ReviewBookingModal({
+  visible,
+  booking,
+  isDark,
+  submitting,
+  disableStatusBar = false,
+  onClose,
+  onSubmit,
+  t,
+}: ReviewBookingModalProps) {
   const [values, setValues] = useState<ReviewValues>(INITIAL_VALUES);
 
   useEffect(() => {
@@ -98,20 +120,25 @@ export function ReviewBookingModal({ visible, booking, isDark, submitting, disab
       transparent={false}
       onRequestClose={onClose}
       presentationStyle="formSheet"
-      statusBarTranslucent={!disableStatusBar}
-    >
+      statusBarTranslucent={!disableStatusBar}>
       <View style={[styles.modalContainer, { backgroundColor: bg }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.headerButton}>
             <Text style={{ color: isDark ? '#ffffff' : '#111827', fontSize: 24 }}>←</Text>
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: isDark ? '#ffffff' : '#111827' }]}>{t('reservations.reviewForm.title')}</Text>
+          <Text style={[styles.headerTitle, { color: isDark ? '#ffffff' : '#111827' }]}>
+            {t('reservations.reviewForm.title')}
+          </Text>
           <View style={styles.headerButton} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={[styles.card, { backgroundColor: cardBg }]}> 
-            <Text style={[styles.bookingTitle, { color: isDark ? '#ffffff' : '#111827' }]} numberOfLines={1}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}>
+          <View style={[styles.card, { backgroundColor: cardBg }]}>
+            <Text
+              style={[styles.bookingTitle, { color: isDark ? '#ffffff' : '#111827' }]}
+              numberOfLines={1}>
               {booking?.car?.name ?? t('booking.noVehicle')}
             </Text>
             <Text style={[styles.bookingSubtitle, { color: sub }]} numberOfLines={2}>
@@ -119,7 +146,7 @@ export function ReviewBookingModal({ visible, booking, isDark, submitting, disab
             </Text>
           </View>
 
-          <View style={[styles.card, { backgroundColor: cardBg }]}> 
+          <View style={[styles.card, { backgroundColor: cardBg }]}>
             <RatingField
               label={t('reservations.field.driving')}
               value={values.ratingDriving}
@@ -129,7 +156,9 @@ export function ReviewBookingModal({ visible, booking, isDark, submitting, disab
             <RatingField
               label={t('reservations.field.punctuality')}
               value={values.ratingPunctuality}
-              onChange={(ratingPunctuality) => setValues((current) => ({ ...current, ratingPunctuality }))}
+              onChange={(ratingPunctuality) =>
+                setValues((current) => ({ ...current, ratingPunctuality }))
+              }
               isDark={isDark}
             />
             <RatingField
@@ -146,8 +175,10 @@ export function ReviewBookingModal({ visible, booking, isDark, submitting, disab
             />
           </View>
 
-          <View style={[styles.card, { backgroundColor: cardBg }]}> 
-            <Text style={[styles.commentLabel, { color: isDark ? '#ffffff' : '#111827' }]}>{t('reservations.reviewForm.commentLabel')}</Text>
+          <View style={[styles.card, { backgroundColor: cardBg }]}>
+            <Text style={[styles.commentLabel, { color: isDark ? '#ffffff' : '#111827' }]}>
+              {t('reservations.reviewForm.commentLabel')}
+            </Text>
             <Textarea
               value={values.comment}
               onChangeText={(comment) => setValues((current) => ({ ...current, comment }))}
@@ -166,14 +197,25 @@ export function ReviewBookingModal({ visible, booking, isDark, submitting, disab
         </ScrollView>
 
         <View style={styles.footer}>
-          <Button variant="outline" className="flex-1 h-12 rounded-xl" onPress={onClose} disabled={submitting}>
-            <Text style={{ color: isDark ? '#ffffff' : '#111827', fontWeight: '600' }}>{t('common.cancel')}</Text>
+          <Button
+            variant="outline"
+            className="h-12 flex-1 rounded-xl"
+            onPress={onClose}
+            disabled={submitting}>
+            <Text style={{ color: isDark ? '#ffffff' : '#111827', fontWeight: '600' }}>
+              {t('common.cancel')}
+            </Text>
           </Button>
-          <Button className="flex-1 h-12 rounded-xl bg-orange-500" onPress={handleSubmit} disabled={submitting}>
+          <Button
+            className="h-12 flex-1 rounded-xl bg-orange-500"
+            onPress={handleSubmit}
+            disabled={submitting}>
             {submitting ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={{ color: '#ffffff', fontWeight: '700' }}>{t('reservations.reviewForm.submit')}</Text>
+              <Text style={{ color: '#ffffff', fontWeight: '700' }}>
+                {t('reservations.reviewForm.submit')}
+              </Text>
             )}
           </Button>
         </View>

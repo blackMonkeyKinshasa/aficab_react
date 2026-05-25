@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import { TouchableOpacity, useColorScheme, View } from "react-native";
-import { TextInput, Text } from "react-native-paper";
-import { DatePickerModal, TimePickerModal } from "react-native-paper-dates";
-import { ModuleReservation } from "./ModuleReservation";
+import React, { useState } from 'react';
+import { TouchableOpacity, useColorScheme, View } from 'react-native';
+
+import { DatePickerModal, TimePickerModal } from 'react-native-paper-dates';
+
 import { useI18n } from '@/lib/i18n';
+
+import { ModuleReservation } from './ModuleReservation';
 
 type Props = {
   label?: string;
@@ -15,7 +17,7 @@ type Props = {
 };
 
 export function DateField({
-departureHour,
+  departureHour,
   label,
   value = null,
   minDate,
@@ -24,21 +26,20 @@ departureHour,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<Date | null>(value);
-  const [visible, setVisible] = React.useState(false)
+  const [visible, setVisible] = React.useState(false);
   const isDarkMode = useColorScheme() === 'dark';
   const { appLocale, paperDateLocale, t } = useI18n();
   const resolvedLabel = label ?? t('booking.chooseDate');
-  const myDepartureHour =8;
-  const myDepartureMinutes =0;
+  const myDepartureHour = 8;
+  const myDepartureMinutes = 0;
 
-  const onConfirm = ({ date }: { date: Date | undefined }, ) => {
+  const onConfirm = ({ date }: { date: Date | undefined }) => {
     setOpen(false);
 
     if (date) {
       setDate(date);
     }
     setVisible(true);
-  
   };
 
   const onDateChange = ({ date: selectedDate }: { date: Date | undefined }) => {
@@ -49,64 +50,60 @@ departureHour,
     }
   };
   const onDismiss = React.useCallback(() => {
-    setVisible(false)
-  }, [setVisible])
+    setVisible(false);
+  }, [setVisible]);
 
   const onConfirmTime = React.useCallback(
-  ({ hours, minutes }: { hours: number; minutes: number }) => {
-    setVisible(false);
+    ({ hours, minutes }: { hours: number; minutes: number }) => {
+      setVisible(false);
 
-    if (!date) return;
+      if (!date) return;
 
-    const newDate = new Date(date);
+      const newDate = new Date(date);
 
-    newDate.setHours(hours);
-    newDate.setMinutes(minutes);
-    newDate.setSeconds(0);
+      newDate.setHours(hours);
+      newDate.setMinutes(minutes);
+      newDate.setSeconds(0);
 
-    setDate(newDate);
-    onChange?.(newDate);
+      setDate(newDate);
+      onChange?.(newDate);
 
-    console.log("Date complète :", newDate);
-  },
-  [date, onChange]
-);
+      console.log('Date complète :', newDate);
+    },
+    [date, onChange]
+  );
 
   const formatDate = (d: Date | null) => {
-    if (!d) return "";
+    if (!d) return '';
     return d.toLocaleDateString(appLocale, {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   return (
-    <View >
+    <View>
+      <TouchableOpacity onPress={() => setOpen(true)}>
+        <ModuleReservation
+          icon={'calendar-outline'}
+          title={value ? formatDate(value) : resolvedLabel}
+          isDarkMode={isDarkMode}
+        />
+      </TouchableOpacity>
 
-        <TouchableOpacity  onPress={() => setOpen(true)}>
-
-              <ModuleReservation 
-              icon={"calendar-outline"}
-              title={value ? formatDate(value) : resolvedLabel}
-              isDarkMode={isDarkMode}
-              />
-
-        </TouchableOpacity>
-      
-     
-        <TimePickerModal
-         visible={visible}
-          onDismiss={onDismiss}
-          onConfirm={onConfirmTime}
-          hours={isStartTime ? myDepartureHour : value?.getHours()}
-          minutes={isStartTime ? myDepartureMinutes : value?.getMinutes()}
-          locale={paperDateLocale}
-          label={t('booking.selectTime')}
-        /> 
-         <DatePickerModal
+      <TimePickerModal
+        visible={visible}
+        onDismiss={onDismiss}
+        onConfirm={onConfirmTime}
+        hours={isStartTime ? myDepartureHour : value?.getHours()}
+        minutes={isStartTime ? myDepartureMinutes : value?.getMinutes()}
+        locale={paperDateLocale}
+        label={t('booking.selectTime')}
+      />
+      <DatePickerModal
         locale={paperDateLocale}
         mode="single"
         visible={open}
@@ -117,7 +114,6 @@ departureHour,
         onConfirm={onConfirm}
         onChange={onDateChange}
       />
-     
     </View>
   );
 }
