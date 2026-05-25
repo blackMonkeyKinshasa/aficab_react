@@ -273,13 +273,14 @@ export default function SettingsScreen() {
 
                   {/** full_name &  email*/}
 
-                  <View className="flex-1">
+                  <View className="flex-1 justify-center">
                     <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                       {displayName}
                     </Text>
-                    <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <Text className={`text-base font-medium line-clamp-1 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                       {displayEmail}
                     </Text>
+                    
                   </View>
                   
                   <ChevronRight size={24} color={isDark ? '#ffffff' : '#000000'} />

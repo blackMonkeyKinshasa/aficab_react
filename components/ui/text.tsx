@@ -78,6 +78,7 @@ function Text({
   return (
     <Component
       className={cn(textVariants({ variant }), textClass, className)}
+       style={props.style} //style={[{ fontFamily: 'Montserrat-Regular' }, props.style]}
       role={variant ? ROLE[variant] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant] : undefined}
       {...props}

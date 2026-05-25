@@ -50,7 +50,11 @@ export interface User {
 }
 
 export interface LocationPoint {
-  label?: string;
+  label: string;
+  address?: string | null;
+  lat?: number;
+  lng?: number;
+  placeId?: string | null;
   /** API expects 'x' for longitude */
   x?: number;
   /** API expects 'y' for latitude */
@@ -60,6 +64,37 @@ export interface LocationPoint {
 import { PaymentMethod } from './databaseEnum';
 export { PaymentMethod };
 
+export interface BookingGuest {
+  email?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+}
+
+export interface BookingExtraTimeOption {
+  name?: string | null;
+  price?: number | null;
+}
+
+export interface BookingSelectedOption {
+  name: string;
+  number: number;
+  price: number;
+  required?: boolean;
+}
+
+export interface BookingOptionsPayload {
+  extraTime?: BookingExtraTimeOption | null;
+  options?: BookingSelectedOption[];
+  fuel?: number;
+  flex?: number;
+  premium?: number;
+  rentalDays?: number;
+  tripType?: 'one-way' | 'round-trip';
+  distanceKm?: number | null;
+  priceTA?: CarPriceTA | null;
+  couponDiscountAmount?: number;
+}
+
 /** Body sent to POST /booking */
 export interface CreateBookingInput {
   /** required — client-generated unique ID */
@@ -68,6 +103,8 @@ export interface CreateBookingInput {
   carId: string;
   /** required */
   clientId: string;
+  /** required */
+  clientPhone: string;
   /** required */
   currency: string;
   /** required — ISO8601 */
@@ -83,17 +120,19 @@ export interface CreateBookingInput {
   // optional
   arrival?: LocationPoint;
   arrivalAt?: string;
+  commentaire?: string;
+  couponCode?: string;
+  couponVehicleAmount?: number;
+  guest?: BookingGuest;
+  options?: BookingOptionsPayload;
+  originalTotal?: number;
+  paymentNumber?: string;
+  reference?: string;
   type?: ResType;
   status?: string;
-  clientPhone?: string;
-  guest?: Record<string, unknown>;
-  commentaire?: string;
-  reference?: string;
+  taReturn?: boolean;
+  taReturnAt?: string;
   taVolNumber?: string;
-  options?: Record<string, unknown>;
-  /** ID of the return booking (TA round-trip) */
-  taReturnId?: string;
-  paymentNumber?: string;
 }
 
 export interface PawapayPaymentInput {
@@ -277,20 +316,25 @@ export interface Booking {
   carId: string | null;
   clientId: string | null;
   clientPhone: string | null;
+  currency?: string | null;
   driverId: string | null;
   departureAt: string;
   arrivalAt: string | null;
   departure: LocationPoint;
   arrival: LocationPoint | null;
   commentaire: string | null;
+  couponCode?: string | null;
+  couponVehicleAmount?: number | null;
   isPaid: boolean;
+  originalTotal?: number | null;
   total: number | null;
-  options: Record<string, unknown> | null;
-  guest: Record<string, unknown> | null;
+  options: BookingOptionsPayload | null;
+  guest: BookingGuest | null;
   name: string | null;
   reference: string | null;
+  taReturn: boolean | null;
+  taReturnAt: string | null;
   taVolNumber: string | null;
-  taReturnId: string | null;
   rideStartAt: string | null;
   rideEndAt: string | null;
   cancelAt: string | null;

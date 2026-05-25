@@ -6,11 +6,12 @@ import { ThemeProvider } from '@react-navigation/native';
 import { PortalHost } from '@rn-primitives/portal';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useFonts } from 'expo-font';
 import { supabase } from '@/lib/supabase';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'nativewind';
-import { ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
@@ -22,6 +23,7 @@ import { getUserByID } from '@/api/user';
 import {
   addNotificationReceivedListener,
   addNotificationResponseReceivedListener,
+  clearNotificationBadgeAsync,
   ensureNotificationsReady,
   getLastNotificationResponseAsync,
   getNotificationTargetRoute,
@@ -102,6 +104,18 @@ const BackButton = ({ onPress, isDark }: { onPress: () => void; isDark: boolean 
 
 export default Sentry.wrap(function RootLayout() {
   const { colorScheme } = useColorScheme();
+ /* const [fontsLoaded] = useFonts({
+    'Montserrat-Regular': require('../assets/fonts/Montserrat-Regular.ttf'),
+    'Montserrat-Bold': require('../assets/fonts/Montserrat-Bold.ttf'),
+    'Montserrat-Italic': require('../assets/fonts/Montserrat-Italic.ttf'),
+    'Montserrat-SemiBold': require('../assets/fonts/Montserrat-SemiBold.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+    */
+
   return (
     // Point d'entree global: tous les ecrans heritent ici des providers analytics/telemetrie.
     <PostHogProvider client={posthogClient}>
@@ -128,8 +142,10 @@ function RootLayoutInner() {
   const syncedDeviceTokenRef = useRef<string | null>(null);
   const receivedListenerRef = useRef<NotificationSubscription | null>(null);
   const responseListenerRef = useRef<NotificationSubscription | null>(null);
+  const pathnameRef = useRef(pathname);
+  const handledInitialNotificationRef = useRef(false);
 
-  const showPushTokenSnackbar_ = (message: string | null | undefined) => {
+  const showPushTokenSnackbar = (message: string | null | undefined) => {
     if (!message) {
       return;
     }
@@ -138,10 +154,10 @@ function RootLayoutInner() {
     setPushTokenSnackbarVisible(true);
   };
 
-  const showPushTokenTrace_ = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
+  const showPushTokenTrace = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
     const baseTrace = [`trace expo token (${source})`, ...trace].join(' -> ');
     const message = detail ? `${baseTrace} -> resultat: ${detail}` : baseTrace;
-    showPushTokenSnackbar_(message);
+    showPushTokenSnackbar(message);
   };
 
   const syncExpoPushToken = async (userId: string, currentDeviceToken?: string | null) => {
@@ -238,29 +254,29 @@ function RootLayoutInner() {
         }
 
         if (refreshedUser.deviceToken) {
-        /*  showPushTokenTrace('manuel', [
+          showPushTokenTrace('manuel', [
             'profil recharge',
             'token deja present sur le compte',
-          ], 'aucune regeneration necessaire');*/
+          ], 'aucune regeneration necessaire');
           return;
         }
 
         const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(authUser.id, refreshedUser.deviceToken);
 
         if (!expoPushToken) {
-       //   showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
+          showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
           return;
         }
 
-      /*  showPushTokenTrace(
+        showPushTokenTrace(
           'manuel',
           ['profil recharge', 'aucun token sur le compte', ...trace],
           backendMessage ?? 'token disponible et synchronise'
-        );*/
+        );
        
       }
     } catch (error) {
-      //showPushTokenSnackbar('Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.');
+      showPushTokenSnackbar('Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.');
       console.error('profile_manual_sync_failed', error);
     } finally {
       setIsSyncingUser(false);
@@ -269,20 +285,40 @@ function RootLayoutInner() {
 
   // Centralise l'ouverture de l'ecran cible depuis une notification,
   // en evitant une navigation inutile si l'utilisateur est deja sur la bonne route.
-  const openNotificationRoute = (notification: NotificationLike) => {
+  const openNotificationRoute = (notification: NotificationLike, options?: { seedHistory?: boolean }) => {
     const targetRoute = getNotificationTargetRoute(notification);
 
-    if (pathname === targetRoute) {
+    if (pathnameRef.current === targetRoute) {
       return;
     }
 
+    if (options?.seedHistory && targetRoute !== '/') {
+      pathnameRef.current = '/';
+      router.replace('/');
+
+      requestAnimationFrame(() => {
+        pathnameRef.current = targetRoute;
+        router.push(targetRoute as never);
+      });
+      return;
+    }
+
+    pathnameRef.current = targetRoute;
     router.push(targetRoute as never);
   };
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     if (!authReady) {
       return;
     }
+
+    clearNotificationBadgeAsync().catch((error) => {
+      reportStartupError('notification_badge_clear_failed', error);
+    });
 
     SplashScreen.hideAsync().catch((error) => {
       reportStartupError('splash_hide_failed', error);
@@ -468,10 +504,19 @@ function RootLayoutInner() {
       // Au redemarrage, si l'app a ete ouverte depuis une notification,
       // on rejoue la navigation vers l'ecran cible.
       ensureNotificationsReady();
+
+      if (handledInitialNotificationRef.current) {
+        return;
+      }
+
       const lastResponse = await getLastNotificationResponseAsync();
+      handledInitialNotificationRef.current = true;
 
       if (lastResponse?.notification && isMounted) {
-        openNotificationRoute(lastResponse.notification);
+        await clearNotificationBadgeAsync().catch((error) => {
+          reportStartupError('notification_badge_clear_on_boot_failed', error);
+        });
+        openNotificationRoute(lastResponse.notification, { seedHistory: true });
       }
     };
 
@@ -483,6 +528,9 @@ function RootLayoutInner() {
 
     // Listener d'action: quand l'utilisateur touche la notification, on ouvre l'ecran associe.
     responseListenerRef.current = addNotificationResponseReceivedListener((response) => {
+      clearNotificationBadgeAsync().catch((error) => {
+        reportStartupError('notification_badge_clear_on_open_failed', error);
+      });
       openNotificationRoute(response.notification);
     });
 
@@ -497,7 +545,7 @@ function RootLayoutInner() {
       receivedListenerRef.current = null;
       responseListenerRef.current = null;
     };
-  }, [pathname, router]);
+  }, [router]);
 
 
   if (!authReady) {
@@ -509,6 +557,7 @@ function RootLayoutInner() {
     <GestureHandlerRootView style={{ flex: 1 }}>
     <BottomSheetModalProvider>
     <PaperProvider theme={colorScheme === 'dark' ? paperDarkTheme : paperLightTheme}> 
+      {/* La police Montserrat est chargée globalement. Utilisez <AppText> pour tous les textes. */}
         <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
           <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
@@ -547,6 +596,7 @@ function RootLayoutInner() {
                   options={{
                     headerShown: false,
                     gestureEnabled: false,
+                  
                   }}
                 />
 
@@ -557,7 +607,8 @@ function RootLayoutInner() {
                 <Stack.Screen name="new_booking/[doc]" 
                 options={{
                   headerShown: true,
-                  headerTransparent: false,
+                  headerTransparent: false,  
+                 
                  }} />
 
           </Stack>

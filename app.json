@@ -7,16 +7,6 @@
     "icon": "./assets/images/aficab-app-logo-white.png",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/aficab-app-logo-white.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "image": "./assets/images/aficab-app-logo-white.png",
-        "backgroundColor": "#ffffff",
-        "resizeMode": "contain"
-      }
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -27,7 +17,7 @@
         "applinks:www.aficab.com"
       ],
       "supportsTablet": true,
-      "buildNumber": "126",
+      "buildNumber": "128",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
@@ -105,7 +95,7 @@
           ]
         }
       ],
-      "versionCode": 122,
+      "versionCode": 123,
       "package": "io.kinvtc.mapstracking",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -133,11 +123,7 @@
           "backgroundColor": "#ffffff",
           "image": "./assets/images/aficab-app-logo-white.png",
           "imageWidth": 150,
-          "resizeMode": "contain",
-          "dark": {
-            "backgroundColor": "#000000",
-            "image": "./assets/images/aficab-app-logo-white.png"
-          }
+          "resizeMode": "contain"
         }
       ],
       [
@@ -145,6 +131,12 @@
         {
           "cameraPermission": "Autoriser l'accès à la caméra",
           "photosPermission": "Autoriser l'accès aux photos"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Autoriser l'accès aux contacts pour ajouter rapidement un passager."
         }
       ],
       [

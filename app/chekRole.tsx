@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking,ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking,ScrollView } from 'react-native';
+import { Text } from '@/components/ui/text';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Inclus par défaut dans Expo

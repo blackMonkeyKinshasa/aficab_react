@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Switch, Alert, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
+import { View, Text, TextInput, StyleSheet, Image, TouchableOpacity, FlatList, Switch, Alert, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from "react-native";
 import { LocationDocTA, Booking, Car } from "@/constants/dataInterface";
 import { Button } from '@/components/ui/button';
 import { Text as UIText } from '@/components/ui/text';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import {defautColor} from '@/constants/constants'
 import { color } from '@/constants/colors';
 import { TranslationKey, useI18n } from '@/lib/i18n';
+import * as Contacts from 'expo-contacts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
@@ -48,6 +49,8 @@ type Theme = {
   border: string;
   input: string;
 };
+
+type OptionFocusTarget = 'flyNumber' | 'comment' | 'guestName' | 'guestEmail' | 'guestPhone';
 
 function toDate(value: Date | string | undefined) {
   if (!value) {
@@ -95,8 +98,11 @@ function formatAirportSchedule(locationDoc: LocationDocTA, locale: string, unava
 function toLocationPoint(location: LocationDocTA['locationDepart'] | LocationDocTA['locationDest']) {
   return {
     label: location.description,
+    address: location.description,
     lat: location.lat,
     lng: location.lng,
+    x: location.lng,
+    y: location.lat,
   };
 }
 
@@ -150,6 +156,32 @@ function getCouponFinalTotal(coupon: CouponValidationValidResponse | null, order
   }
 
   return Math.max(0, orderTotal - getCouponDiscountAmount(coupon, orderTotal));
+}
+
+function normalizeGuestPhone(phoneNumber: string | null | undefined) {
+  if (!phoneNumber) {
+    return '';
+  }
+
+  const digits = phoneNumber.replace(/\D/g, '');
+
+  if (!digits) {
+    return '';
+  }
+
+  if (digits.startsWith('243') && digits.length >= 12) {
+    return digits.slice(3, 12);
+  }
+
+  if (digits.startsWith('0') && digits.length >= 10) {
+    return digits.slice(1, 10);
+  }
+
+  if (digits.length > 9) {
+    return digits.slice(-9);
+  }
+
+  return digits;
 }
 
 type CarItemProps = {
@@ -231,6 +263,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [comment, setComment] = useState('');
   const [flyNumber, setFlyNumber] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [isGuestSectionOpen, setIsGuestSectionOpen] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -238,6 +271,12 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [isPositionAller, setPositionAller] = useState(true);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
   const autoPromoAttemptedRef = useRef(false);
+  const pendingFocusTargetRef = useRef<OptionFocusTarget | null>(null);
+  const flyNumberInputRef = useRef<TextInput>(null);
+  const commentInputRef = useRef<TextInput>(null);
+  const guestNameInputRef = useRef<TextInput>(null);
+  const guestPhoneInputRef = useRef<TextInput>(null);
+  const guestEmailInputRef = useRef<TextInput>(null);
   const tripPrice = getAirportTripPrice(selectedCar, distanceKm);
   const totalPrice = tripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
   const baseVehicleAmount = totalPrice;
@@ -275,6 +314,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
     const trimmedFlyNumber = flyNumber.trim();
+    const trimmedGuestEmail = guestEmail.trim();
     const trimmedGuestPhone = guestPhone.trim();
     const resolvedTripPrice = getAirportTripPrice(resolvedCar, distanceKm);
     const resolvedTotalPrice = resolvedTripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
@@ -294,25 +334,24 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       departure: toLocationPoint(locationDoc.locationDepart),
       arrival: toLocationPoint(locationDoc.locationDest),
       commentaire: comment || null,
+      couponCode: appliedCouponCode,
+      couponVehicleAmount: baseVehicleAmount,
       isPaid: false,
+      originalTotal: resolvedTotalPrice,
       total: resolvedFinalTotal,
-      options: {
-        tripType: locationDoc.tripType,
-        priceTA: resolvedCar.priceTA,
-        distanceKm,
-        couponCode: appliedCouponCode,
-        couponDiscountAmount: resolvedDiscountAmount,
-      },
-      guest: guestName || trimmedGuestPhone
+      options:null,
+      guest: guestName || trimmedGuestEmail || trimmedGuestPhone
         ? {
+            email: trimmedGuestEmail || null,
             fullName: guestName || null,
             phone: trimmedGuestPhone || null,
           }
         : null,
       name: guestName || null,
       reference: null,
+      taReturn: locationDoc.tripType === 'round-trip',
+      taReturnAt: toDate(locationDoc.dateReturn)?.toISOString() ?? null,
       taVolNumber: trimmedFlyNumber || null,
-      taReturnId: null,
       rideStartAt: null,
       rideEndAt: null,
       cancelAt: null,
@@ -422,6 +461,45 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     autoPromoAttemptedRef.current = false;
   }, [etape, selectedCar?.id, distanceKm, locationDoc.tripType]);
 
+  useEffect(() => {
+    if (etape !== EtapeReservation.OPTION) {
+      return;
+    }
+
+    const target = pendingFocusTargetRef.current;
+
+    if (!target) {
+      return;
+    }
+
+    const isGuestTarget = target === 'guestName' || target === 'guestPhone' || target === 'guestEmail';
+
+    if (isGuestTarget && !isGuestSectionOpen) {
+      setIsGuestSectionOpen(true);
+      return;
+    }
+
+    const targetRef = {
+      flyNumber: flyNumberInputRef,
+      comment: commentInputRef,
+      guestName: guestNameInputRef,
+      guestPhone: guestPhoneInputRef,
+      guestEmail: guestEmailInputRef,
+    }[target];
+
+    if (!targetRef) {
+      pendingFocusTargetRef.current = null;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      targetRef.current?.focus();
+      pendingFocusTargetRef.current = null;
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [etape, isGuestSectionOpen]);
+
 
 
   const handleNextEtape = async (car?: Car) => {
@@ -469,6 +547,51 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     setIsRefreshing(true);
     setHasMore(true);
     void loadCars(1, true);
+  };
+
+  const handlePickGuestFromContacts = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(t('common.information'), t('booking.contactImportUnsupported'));
+      return;
+    }
+
+    try {
+      const { status: existingStatus } = await Contacts.getPermissionsAsync();
+      const finalStatus = existingStatus === 'granted'
+        ? existingStatus
+        : (await Contacts.requestPermissionsAsync()).status;
+
+      if (finalStatus !== 'granted') {
+        Alert.alert(t('common.error'), t('booking.contactImportPermissionDenied'));
+        return;
+      }
+
+      const selectedContact = await Contacts.presentContactPickerAsync();
+
+      if (!selectedContact) {
+        return;
+      }
+
+      const contactName = selectedContact.name?.trim()
+        || [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ').trim();
+      const phoneValue = normalizeGuestPhone(selectedContact.phoneNumbers?.[0]?.number);
+
+      if (contactName) {
+        setGuestName(contactName);
+      }
+
+      if (phoneValue) {
+        setGuestPhone(phoneValue);
+        return;
+      }
+
+      Alert.alert(t('common.information'), t('booking.contactImportPhoneMissing'));
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        error instanceof Error && error.message ? error.message : t('booking.contactImportFailed')
+      );
+    }
   };
 
   const handleApplyPromoCode = async (promoCodeOverride?: string) => {
@@ -585,6 +708,11 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     router.back();
   };
 
+  const openOptionRecapEdit = (target?: OptionFocusTarget) => {
+    pendingFocusTargetRef.current = target ?? null;
+    setEtape(EtapeReservation.OPTION);
+  };
+
     const myButton = () => {
       return (
        <View className="mt-4 flex-row gap-3">       
@@ -688,6 +816,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         <Input
           placeholder={t('booking.flightNumberPlaceholder')}
           placeholderTextColor={theme.subText}
+          ref={flyNumberInputRef}
           value={flyNumber}
           onChangeText={setFlyNumber}
           style={
@@ -711,6 +840,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         <Input
           placeholder={t('booking.commentPlaceholder')}
           placeholderTextColor={theme.subText}
+          ref={commentInputRef}
           multiline
           value={comment}
           onChangeText={setComment}
@@ -737,9 +867,21 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           </CollapsibleTrigger>
 
           <CollapsibleContent>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => void handlePickGuestFromContacts()}
+              style={[styles.contactButton, { borderColor: theme.border, backgroundColor: theme.card }]}
+            >
+              <Ionicons name="people-outline" size={18} color={theme.text} />
+              <Text style={[styles.contactButtonText, { color: theme.text }]}>
+                {t('booking.importFromContacts')}
+              </Text>
+            </TouchableOpacity>
+
             <Input
               placeholder={t('booking.fullName')}
               placeholderTextColor={theme.subText}
+              ref={guestNameInputRef}
               value={guestName}
               onChangeText={setGuestName}
               style={styles.input}
@@ -748,10 +890,25 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
             <Input
               placeholder={t('booking.phoneNumber')}
               placeholderTextColor={theme.subText}
+              ref={guestPhoneInputRef}
               value={guestPhone}
               onChangeText={setGuestPhone}
               style={styles.input}
+              keyboardType="phone-pad"
             />
+
+            <Input
+              placeholder={t('booking.email')}
+              placeholderTextColor={theme.subText}
+              ref={guestEmailInputRef}
+              value={guestEmail}
+              onChangeText={setGuestEmail}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+          
           </CollapsibleContent>
         </View>
       </Collapsible>
@@ -812,6 +969,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     const trimmedFlyNumber = flyNumber.trim();
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
+    const trimmedGuestEmail = guestEmail.trim();
     const trimmedGuestPhone = guestPhone.trim();
 
     return(
@@ -949,29 +1107,34 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
 
         {flyNumber ? (
+                  <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('flyNumber')}>
                   <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-                    <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.flightNumber')}</Text>
-                    <Text style={[styles.recapDescription, { color: theme.subText }]}>{flyNumber}</Text>
+                    <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.flightNumber')} :</Text>
+                    <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border }]}>{flyNumber}</Text>
                   </View>
+                  </TouchableOpacity>
                 ) : null}
         
        {comment ? (
+         <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('comment')}>
           <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.comment')}</Text>
-            <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedComment}</Text>
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.comment')} :</Text>
+            <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border }]}>{trimmedComment}</Text>
           </View>
+          </TouchableOpacity>
         ) : null}
 
-        {guestName || guestPhone ? (
+        {guestName || guestEmail || guestPhone ? (
           <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.reservationFor')}</Text>
-            {guestName ? <Text style={[styles.recapDescription, { color: theme.subText }]}>{trimmedGuestName}</Text> : null}
-            {guestPhone ? <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>{trimmedGuestPhone}</Text> : null}
+            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>{t('booking.reservationFor')} :</Text>
+            {guestName ? <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestName')}><Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border }]}>{trimmedGuestName}</Text></TouchableOpacity> : null}
+            {guestEmail ? <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestEmail')}><Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border, marginTop: 4 }]}>{trimmedGuestEmail}</Text></TouchableOpacity> : null}
+            {guestPhone ? <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestPhone')}><Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border, marginTop: 4 }]}>{trimmedGuestPhone}</Text></TouchableOpacity> : null}
           </View>
         ) : null}
 
         <PromoCodeField
-          label={t('booking.promoCodeLabel')}
+          label={t('booking.promoCodeLabel')+' :'}
           placeholder={t('booking.promoCodePlaceholder')}
           actionLabel={t('booking.applyPromoCode')}
           value={code}
@@ -981,7 +1144,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           subTextColor={theme.subText}
           borderColor={theme.border}
           inputBackgroundColor={theme.input}
-          titleSize={16}
+          titleSize={14}
           isApplying={isApplyingPromo}
           feedbackMessage={promoFeedback?.message ?? null}
           feedbackTone={promoFeedback?.tone ?? 'default'}
@@ -1128,6 +1291,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     marginTop: 10,
+  },
+
+  contactButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  contactButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   button: {

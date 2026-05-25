@@ -154,7 +154,7 @@ const TabHeader = ({
 
     <View className='flex-1'>
 
-    <View className='relative flex-1 bg-black '>
+    <View className='relative flex-1 dark:bg-black  bg-white'>
 
         {/* Carrousel */}
        <Carousel

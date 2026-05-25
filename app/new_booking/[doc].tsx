@@ -1,5 +1,6 @@
 
-import { View, Text, Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text } from '@/components/ui/text';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { HeaderBackButton } from '@react-navigation/elements';
 import {
@@ -222,7 +223,7 @@ export default function NewBooking() {
           id: bookingDoc.id,
           carId: bookingDoc.carId ?? '',
           clientId: clientId ?? '',
-          clientPhone: resolvedClientPhone,
+          clientPhone: resolvedClientPhone ?? '',
           currency: 'USD',
           departure: bookingDoc.departure,
           departureAt: bookingDoc.departureAt,
@@ -230,10 +231,15 @@ export default function NewBooking() {
           arrivalAt: bookingDoc.arrivalAt ?? undefined,
           type: bookingDoc.type,
           status: bookingDoc.status,
+          originalTotal: bookingDoc.originalTotal ?? undefined,
           total: bookingDoc.total ?? 0,
           reference: bookingDoc.reference ?? undefined,
           taVolNumber: bookingDoc.taVolNumber ?? undefined,
+          taReturn: bookingDoc.taReturn ?? undefined,
+          taReturnAt: bookingDoc.taReturnAt ?? undefined,
           commentaire: bookingDoc.commentaire ?? undefined,
+          couponCode: bookingDoc.couponCode ?? undefined,
+          couponVehicleAmount: bookingDoc.couponVehicleAmount ?? undefined,
           guest: bookingDoc.guest ?? undefined,
           options: bookingDoc.options ?? undefined,
           paymentMethod: paymentMethod,

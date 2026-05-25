@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import {Ionicons} from '@expo/vector-icons';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useColorScheme } from 'nativewind';
@@ -198,6 +199,43 @@ function BookingDetailModal({
   const driverAvatar = driverUser?.avatar_url ?? null;
   const driverName   = driverUser?.full_name  ?? '—';
   const driverPhone  = driverUser?.phone ?? null;
+  const guestName = typeof booking.guest?.fullName === 'string' && booking.guest.fullName.trim()
+    ? booking.guest.fullName.trim()
+    : null;
+  const guestPhone = typeof booking.guest?.phone === 'string' && booking.guest.phone.trim()
+    ? booking.guest.phone.trim()
+    : null;
+  const guestEmail = typeof booking.guest?.email === 'string' && booking.guest.email.trim()
+    ? booking.guest.email.trim()
+    : null;
+  const hasGuestBooking = Boolean(guestName || guestPhone || guestEmail);
+  const bookingOptions = booking.options ?? {};
+  const optionItems = Array.isArray(bookingOptions.options) ? bookingOptions.options : [];
+  const extraTimeName = bookingOptions.extraTime?.name?.trim().toLowerCase() ?? '';
+  const fuelOptionAmount = typeof bookingOptions.fuel === 'number'
+    ? bookingOptions.fuel
+    : optionItems.find((option) => option.name.toLowerCase().includes('fuel') || option.name.toLowerCase().includes('carburant'))?.price ?? 0;
+  const flexOptionAmount = typeof bookingOptions.flex === 'number'
+    ? bookingOptions.flex
+    : extraTimeName === 'flex'
+      ? bookingOptions.extraTime?.price ?? 0
+      : 0;
+  const premiumOptionAmount = typeof bookingOptions.premium === 'number'
+    ? bookingOptions.premium
+    : extraTimeName === 'premium'
+      ? bookingOptions.extraTime?.price ?? 0
+      : 0;
+  const dailyDetails = booking.type === ResType.LOC
+    ? [
+        t('booking.driverIncluded'),
+        t('booking.serviceHoursSummary'),
+        `${t('booking.city')}: ${t('booking.kinshasa')}`,
+        t('booking.dailyCancellationSummary'),
+        fuelOptionAmount > 0 ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense'),
+        flexOptionAmount > 0 ? t('booking.flexHoursSummary') : null,
+        premiumOptionAmount > 0 ? t('booking.premiumHoursSummary') : null,
+      ].filter(Boolean) as string[]
+    : [];
   const isStandardClient = booking.client?.clientType !== ClientType.PREMIUM;
   const canPayBooking = isStandardClient && !booking.isPaid;
   const canCancelBooking = canClientCancelBooking(booking);
@@ -262,6 +300,18 @@ function BookingDetailModal({
             {booking.taVolNumber && <Row label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />}
           </View>
 
+          {dailyDetails.length > 0 ? (
+            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop :10 }]}>
+              <Text style={[styles.sectionTitle, { color: fg }]}>{t('booking.detailsTitle')}</Text>
+              {dailyDetails.map((detail, index) => (
+                <View key={`${booking.id}-detail-${index}`} style={styles.listRow}>
+                 <Ionicons name="checkmark" size={18} color="orange" />
+                  <Text style={{ color: fg, flex: 1, marginLeft: 10 }}>{detail}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {/* Chauffeur */}
           {(booking.driver && (booking.status === ResStatus.CONFIRMED || booking.status === ResStatus.STARTED)) && (
             <View style={[styles.card, { backgroundColor: bg, padding: 10 , marginTop :10}]}>
@@ -310,9 +360,18 @@ function BookingDetailModal({
               <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.client')}</Text>
               <Row label={t('reservations.field.name')}      value={booking.client.full_name ?? '—'} />
               <Row label={t('reservations.field.email')}    value={booking.client.email} />
-              <Row label={t('reservations.field.phone')}      value={booking.clientPhone ?? booking.client.phone ?? '—'} />
+              <Row label={t('reservations.field.phone')}      value={ booking.client.phone ?? '—'} />
             </View>
           )}
+
+          {hasGuestBooking ? (
+            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop :10 }]}>
+              <Text style={[styles.sectionTitle, { color: fg }]}>{t('booking.reservationFor')}</Text>
+              {guestName ? <Row label={t('reservations.field.name')} value={guestName} /> : null}
+              {guestPhone ? <Row label={t('reservations.field.phone')} value={guestPhone} /> : null}
+              {guestEmail ? <Row label={t('reservations.field.email')} value={guestEmail} /> : null}
+            </View>
+          ) : null}
 
           {/* Avis */}
           {booking.review && (
@@ -824,15 +883,18 @@ export default function Reservation() {
         ? paymentTarget.arrival
         : undefined;
 
+      const resolvedClientPhone = normalizePhone(phoneNumber)
+        ?? normalizePhone(paymentTarget.clientPhone)
+        ?? normalizePhone(storedUser?.phone)
+        ?? normalizePhone(session?.user?.phone)
+        ?? normalizePhone(session?.user?.user_metadata?.phone)
+        ?? '';
+
       const createBookingPayload: CreateBookingInput = {
         id: paymentTarget.id,
         carId: paymentTarget.carId ?? '',
         clientId,
-        clientPhone: normalizePhone(phoneNumber)
-          ?? normalizePhone(paymentTarget.clientPhone)
-          ?? normalizePhone(storedUser?.phone)
-          ?? normalizePhone(session?.user?.phone)
-          ?? normalizePhone(session?.user?.user_metadata?.phone),
+        clientPhone: resolvedClientPhone,
         currency: 'USD',
         departure: paymentTarget.departure,
         departureAt: paymentTarget.departureAt,
@@ -840,26 +902,30 @@ export default function Reservation() {
         arrivalAt: paymentTarget.arrivalAt ?? undefined,
         type: paymentTarget.type,
         status: paymentTarget.status,
+        originalTotal: paymentTarget.originalTotal ?? undefined,
         total: paymentTarget.total ?? 0,
         reference: paymentTarget.reference ?? undefined,
         taVolNumber: paymentTarget.taVolNumber ?? undefined,
+        taReturn: paymentTarget.taReturn ?? undefined,
+        taReturnAt: paymentTarget.taReturnAt ?? undefined,
         commentaire: paymentTarget.commentaire ?? undefined,
+        couponCode: paymentTarget.couponCode ?? undefined,
+        couponVehicleAmount: paymentTarget.couponVehicleAmount ?? undefined,
         guest: paymentTarget.guest ?? undefined,
         options: paymentTarget.options ?? undefined,
-        taReturnId: paymentTarget.taReturnId ?? undefined,
         paymentMethod,
         paymentProvider,
         paymentNumber: normalizePhone(phoneNumber),
       };
 
       const bookingDetails = await createNewBooking(createBookingPayload) as CreateBookingResponse;
-      const resolvedClientPhone = normalizePhone(phoneNumber)
+      const resolvedBookingClientPhone = normalizePhone(phoneNumber)
         ?? normalizePhone(paymentTarget.clientPhone)
         ?? normalizePhone(storedUser?.phone)
         ?? normalizePhone(bookingDetails.clientPhone)
         ?? normalizePhone(bookingDetails.client?.phone);
 
-      if (isMobileMoneyPayment(paymentMethod) && !resolvedClientPhone) {
+      if (isMobileMoneyPayment(paymentMethod) && !resolvedBookingClientPhone) {
         analytics.trackPaymentValidationFailed({
           bookingId: paymentTarget.id,
           reservationType: paymentTarget.type,
@@ -923,7 +989,7 @@ export default function Reservation() {
     setActiveHighlightId(autoHighlightBookingId);
     const timeoutId = setTimeout(() => {
       setActiveHighlightId((currentId) => currentId === autoHighlightBookingId ? null : currentId);
-    }, 5000);
+    }, 15000);
 
     return () => clearTimeout(timeoutId);
   }, [autoHighlightBookingId]);
@@ -1273,6 +1339,7 @@ const styles = StyleSheet.create({
   modalScroll:       { padding: 16, paddingBottom: 40 },
   detailCarImage:    { width: '100%', height: 200, borderRadius: 14, marginBottom: 4 },
   sectionTitle:      { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  listRow:           { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
   detailRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   detailLabel:       { fontSize: 13, flex: 1 },
   detailValue:       { fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },

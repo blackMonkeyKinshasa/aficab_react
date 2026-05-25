@@ -1,4 +1,5 @@
-import { View, Text, SectionList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, SectionList, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from '@/components/ui/text';
 import { Stack, useRouter } from 'expo-router';
 import { usePreventRemove } from '@react-navigation/native';
 import { useColorScheme } from 'nativewind';
@@ -13,6 +14,7 @@ import { color } from '@/constants/colors';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import {ErrorEmpty} from '@/components/my-ui/errorEmpty';
 import {useMyStateNotif} from '@/store/notification-state'
+import { clearNotificationBadgeAsync } from '@/lib/notifications';
 
 function formatDate(iso: string, locale: string) {
   const d = new Date(iso);
@@ -348,6 +350,13 @@ export default function Notifications() {
 
   const navigation = useNavigation();
   const isMarkingAsReadRef = useRef(false);
+
+  useEffect(() => {
+    clearNotificationBadgeAsync().catch(() => {
+      // Le reset du badge reste silencieux si la plateforme ne le prend pas en charge.
+    });
+  }, []);
+
   const sections = useMemo(() => {
     const ordered = [...activities].sort((left, right) => {
       return new Date(right.createAt).getTime() - new Date(left.createAt).getTime();

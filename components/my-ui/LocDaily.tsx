@@ -12,6 +12,7 @@ import {Input} from '@/components/ui/input';
 import { generateIDBooking, getAllBookings } from '@/api/booking';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
+import * as Contacts from 'expo-contacts';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { color } from '@/constants/colors';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
@@ -37,6 +38,7 @@ type Theme = {
   border: string;
   input: string;
 };
+type OptionFocusTarget = 'comment' | 'guestName' | 'guestEmail' | 'guestPhone';
 
 function toDate(value: Date | string) {
   return value instanceof Date ? value : new Date(value);
@@ -59,11 +61,33 @@ function formatDailyRange(locationDoc: LocationDocLOC, locale: string, daySingul
     month: 'short',
     year: '2-digit',
   });
+  const formattedStartWithYear = startDate.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  });
+  const formattedStartTime = startDate.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const formattedEndTime = endDate.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
   const diffInMs = endDate.getTime() - startDate.getTime();
   const diffInDays = Math.max(1, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)));
   const dayLabel = diffInDays > 1 ? dayPlural : daySingular;
 
-  return `${formattedStart} - ${formattedEnd} (${diffInDays} ${dayLabel})`;
+  const isSameCalendarDay =
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+
+  if (isSameCalendarDay) {
+    return `${formattedStartWithYear}, ${formattedStartTime} - ${formattedEndTime}`;
+  }
+
+  return `${formattedStartWithYear}, ${formattedStartTime} - ${formattedEnd} (${diffInDays} ${dayLabel})`;
 }
 
 function getRentalDays(locationDoc: LocationDocLOC) {
@@ -94,9 +118,38 @@ function getExtraTimePrice(value: unknown) {
 function toLocationPoint(locationDoc: LocationDocLOC) {
   return {
     label: locationDoc.location.description,
+    address: locationDoc.location.description,
     lat: locationDoc.location.lat,
     lng: locationDoc.location.lng,
+    x: locationDoc.location.lng,
+    y: locationDoc.location.lat,
   };
+}
+
+function normalizeGuestPhone(phoneNumber: string | null | undefined) {
+  if (!phoneNumber) {
+    return '';
+  }
+
+  const digits = phoneNumber.replace(/\D/g, '');
+
+  if (!digits) {
+    return '';
+  }
+
+  if (digits.startsWith('243') && digits.length >= 12) {
+    return digits.slice(3, 12);
+  }
+
+  if (digits.startsWith('0') && digits.length >= 10) {
+    return digits.slice(1, 10);
+  }
+
+  if (digits.length > 9) {
+    return digits.slice(-9);
+  }
+
+  return digits;
 }
 
 function getCouponDiscountAmount(coupon: CouponValidationValidResponse | null, orderTotal: number) {
@@ -218,6 +271,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [comment, setComment] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [isGuestSectionOpen, setIsGuestSectionOpen] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
@@ -225,6 +279,11 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
   const bookingIdRequestRef = useRef<Promise<string> | null>(null);
   const autoPromoAttemptedRef = useRef(false);
+  const pendingFocusTargetRef = useRef<OptionFocusTarget | null>(null);
+  const commentInputRef = useRef<TextInput>(null);
+  const guestNameInputRef = useRef<TextInput>(null);
+  const guestPhoneInputRef = useRef<TextInput>(null);
+  const guestEmailInputRef = useRef<TextInput>(null);
   const fuelPrice = getFuelOptionPrice(selectedCar);
   const flexPrice = getExtraTimePrice(selectedCar?.extraTime?.flex);
   const premiumPrice = getExtraTimePrice(selectedCar?.extraTime?.premium);
@@ -266,16 +325,29 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
 
+    const extraTime = flex
+      ? { name: 'flex', price: flexPrice ?? 0 }
+      : premium
+        ? { name: 'premium', price: premiumPrice ?? 0 }
+        : null;
+
     const selectedOptions = {
+      ...(extraTime ? { extraTime } : {}),
+      options: fuel
+        ? [{ name: 'Frais de carburant', number: 1, price: fuelPrice ?? 0, required: false }]
+        : [],
       fuel: fuel ? fuelPrice ?? 0 : 0,
       flex: flex ? flexPrice ?? 0 : 0,
       premium: premium ? premiumPrice ?? 0 : 0,
-      couponCode: appliedCouponCode,
       couponDiscountAmount: promoDiscountAmount,
       rentalDays,
     };
+
+    console.log('selected options :', selectedOptions);
+    
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
+    const trimmedGuestEmail = guestEmail.trim();
     const trimmedGuestPhone = guestPhone.trim();
 
     return {
@@ -284,26 +356,31 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       status: ResStatus.PENDING,
       carId: selectedCar.id,
       clientId: null,
-      clientPhone: trimmedGuestPhone || null,
+      clientPhone: null,
       driverId: selectedCar.defaultDriverId,
       departureAt: toDate(locationDoc.dateStart).toISOString(),
       arrivalAt: toDate(locationDoc.dateEnd).toISOString(),
       departure: toLocationPoint(locationDoc),
       arrival: null,
       commentaire: trimmedComment || null,
+      couponCode: appliedCouponCode,
+      couponVehicleAmount: baseVehicleAmount,
       isPaid: false,
+      originalTotal: totalPrice,
       total: finalTotalPrice,
       options: selectedOptions,
-      guest: trimmedGuestName || trimmedGuestPhone
+      guest: trimmedGuestName || trimmedGuestEmail || trimmedGuestPhone
         ? {
+        email: trimmedGuestEmail || null,
             fullName: trimmedGuestName || null,
             phone: trimmedGuestPhone || null,
           }
         : null,
       name: trimmedGuestName || null,
       reference: null,
+      taReturn: false,
+      taReturnAt: null,
       taVolNumber: null,
-      taReturnId: null,
       rideStartAt: null,
       rideEndAt: null,
       cancelAt: null,
@@ -352,6 +429,44 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   useEffect(() => {
     autoPromoAttemptedRef.current = false;
   }, [etape, selectedCar?.id, fuel, flex, premium, rentalDays]);
+
+  useEffect(() => {
+    if (etape !== EtapeReservation.OPTION) {
+      return;
+    }
+
+    const target = pendingFocusTargetRef.current;
+
+    if (!target) {
+      return;
+    }
+
+    const isGuestTarget = target !== 'comment';
+
+    if (isGuestTarget && !isGuestSectionOpen) {
+      setIsGuestSectionOpen(true);
+      return;
+    }
+
+    const targetRef = {
+      comment: commentInputRef,
+      guestName: guestNameInputRef,
+      guestPhone: guestPhoneInputRef,
+      guestEmail: guestEmailInputRef,
+    }[target];
+
+    if (!targetRef) {
+      pendingFocusTargetRef.current = null;
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      targetRef.current?.focus();
+      pendingFocusTargetRef.current = null;
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [etape, isGuestSectionOpen]);
 
   const loadCars = async (nextPage: number, replace = false) => {
     if (isLoadingMore) {
@@ -477,6 +592,51 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
   };
 
+  const handlePickGuestFromContacts = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(t('common.information'), t('booking.contactImportUnsupported'));
+      return;
+    }
+
+    try {
+      const { status: existingStatus } = await Contacts.getPermissionsAsync();
+      const finalStatus = existingStatus === 'granted'
+        ? existingStatus
+        : (await Contacts.requestPermissionsAsync()).status;
+
+      if (finalStatus !== 'granted') {
+        Alert.alert(t('common.error'), t('booking.contactImportPermissionDenied'));
+        return;
+      }
+
+      const selectedContact = await Contacts.presentContactPickerAsync();
+
+      if (!selectedContact) {
+        return;
+      }
+
+      const contactName = selectedContact.name?.trim()
+        || [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ').trim();
+      const phoneValue = normalizeGuestPhone(selectedContact.phoneNumbers?.[0]?.number);
+
+      if (contactName) {
+        setGuestName(contactName);
+      }
+
+      if (phoneValue) {
+        setGuestPhone(phoneValue);
+        return;
+      }
+
+      Alert.alert(t('common.information'), t('booking.contactImportPhoneMissing'));
+    } catch (error) {
+      Alert.alert(
+        t('common.error'),
+        error instanceof Error && error.message ? error.message : t('booking.contactImportFailed')
+      );
+    }
+  };
+
   const handleApplyPromoCode = async (promoCodeOverride?: string) => {
     const normalizedCode = (promoCodeOverride ?? code).trim();
 
@@ -593,6 +753,11 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     );
   };
 
+  const openOptionRecapEdit = (target?: OptionFocusTarget) => {
+    pendingFocusTargetRef.current = target ?? null;
+    setEtape(EtapeReservation.OPTION);
+  };
+
 const PriceRow = ({ label, value }: { label: string; value: string }) => (
   <View style={styles.priceRow}>
     <Text style={{ color: theme.text }}>{label}</Text>
@@ -659,11 +824,16 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
       
       <View style={[styles.container]}>
 
+         {/* TITLE */}
+          <View style={[styles.sectionHeader,{ marginBottom : 20 }]}>
+            <Text style={{ color: theme.subText, }}>Complétez votre réservation avec des options supplémentaires</Text>
+          </View>
+
       {/* OPTIONS */}
       {hasAnyOption ? (
         <View style={[styles.section, { borderColor: theme.border }]}>
           <View style={styles.sectionHeader}>
-            <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>{t('booking.optionsTitle')}</Text>
+            <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>{t('booking.optionsTitle')}</Text>
           </View>
 
           {/* Fuel */}
@@ -729,7 +899,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
       {/* COMMENT */}
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.sectionHeader}>
-          <Text style={{ color: theme.text, fontSize: 18, fontWeight: "600" }}>
+          <Text style={{ color: theme.text, fontSize: 16, fontWeight: "600" }}>
             {t('booking.commentOptional')}
           </Text>
          </View>
@@ -737,12 +907,14 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
         <Input
           placeholder={t('booking.commentPlaceholder')}
           placeholderTextColor={theme.subText}
+          ref={commentInputRef}
           multiline
           value={comment}
           onChangeText={setComment}
-          style={
-            styles.input
-         }
+          style={[
+            styles.input,
+            { color: theme.subText },
+         ]}
         />
       </View>
 
@@ -751,7 +923,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
         <View style={[styles.section, { borderColor: theme.border }]}>
           <CollapsibleTrigger asChild>
             <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader}>
-              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>
+              <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600', flex: 1 }}>
                 {t('booking.bookForOtherPersonOptional')}
               </Text>
               <Ionicons
@@ -763,21 +935,48 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
           </CollapsibleTrigger>
 
           <CollapsibleContent>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => void handlePickGuestFromContacts()}
+              style={[styles.contactButton, { borderColor: theme.border, backgroundColor: theme.card }]}
+            >
+              <Ionicons name="people-outline" size={18} color={theme.text} />
+              <Text style={[styles.contactButtonText, { color: theme.text }]}>
+                {t('booking.importFromContacts')}
+              </Text>
+            </TouchableOpacity>
+
             <Input
               placeholder={t('booking.fullName')}
               placeholderTextColor={theme.subText}
+              ref={guestNameInputRef}
               value={guestName}
               onChangeText={setGuestName}
-              style={styles.input}
+              style={[styles.input, { color: theme.subText }]}
+            />
+
+               <Input
+              placeholder={t('booking.phoneNumber')}
+              placeholderTextColor={theme.subText}
+              ref={guestPhoneInputRef}
+              value={guestPhone}
+              onChangeText={setGuestPhone}
+              style={[styles.input, { color: theme.subText }]}
+              keyboardType="phone-pad"
             />
 
             <Input
-              placeholder={t('booking.phoneNumber')}
+              placeholder={t('booking.email')}
               placeholderTextColor={theme.subText}
-              value={guestPhone}
-              onChangeText={setGuestPhone}
-              style={styles.input}
+              ref={guestEmailInputRef}
+              value={guestEmail}
+              onChangeText={setGuestEmail}
+              style={[styles.input, { color: theme.subText }]}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
+
+         
           </CollapsibleContent>
         </View>
       </Collapsible>
@@ -802,8 +1001,9 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
+    const trimmedGuestEmail = guestEmail.trim();
     const trimmedGuestPhone = guestPhone.trim();
-    const hasGuestInfo = Boolean(trimmedGuestName || trimmedGuestPhone);
+    const hasGuestInfo = Boolean(trimmedGuestName || trimmedGuestEmail || trimmedGuestPhone);
     const selectedOptions = [
       fuel && fuelPrice !== null ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense'),
       flex && flexPrice !== null ? t('booking.flexHoursSummary') : null,
@@ -858,7 +1058,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
 
       {/* ADDRESS */}
       <View style={[styles.box, { borderColor: theme.border }]}>
-        <Text style={{ color: theme.text }}>{t('booking.address')} :</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('booking.address')} :</Text>
         <Text style={{ color: theme.subText,marginTop :8 }} numberOfLines={2}>
           {locationDoc.location.description ?? t('booking.addressUnavailable')}
         </Text>
@@ -868,7 +1068,8 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
       </View>
 
       {/* DETAILS */}
-      <View style={[styles.box, { borderColor: theme.border }]}>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit()}>
+      <View style={[styles.box, { borderColor: theme.border }]}> 
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           {t('booking.detailsTitle')} :
         </Text>
@@ -882,36 +1083,50 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
           </View>
         ))}
       </View>
+      </TouchableOpacity>
 
       {/* COMMENT */}
       {trimmedComment ? (
-        <View style={[styles.box, { borderColor: theme.border }]}>
-          <Text style={{ color: theme.text }}>{t('booking.comment')} :</Text>
-          <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('comment')}>
+        <View style={[styles.box, { borderColor: theme.border }]}> 
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('booking.comment')} :</Text>
+          <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border }]}>
             {trimmedComment}
           </Text>
         </View>
+        </TouchableOpacity>
       ) : null}
 
       {/* ORDERED FOR */}
       {hasGuestInfo ? (
-        <View style={[styles.box, { borderColor: theme.border }]}>
-          <Text style={{ color: theme.text }}>{t('booking.bookingFor')} :</Text>
+        <View style={[styles.box, { borderColor: theme.border }]}> 
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('booking.bookingFor')} :</Text>
           {trimmedGuestName ? (
-            <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
-              {trimmedGuestName}
-            </Text>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestName')}>
+              <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border  }]}>
+                {trimmedGuestName}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {trimmedGuestEmail ? (
+            <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestEmail')}>
+              <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border  }]}>
+                {trimmedGuestEmail}
+              </Text>
+            </TouchableOpacity>
           ) : null}
           {trimmedGuestPhone ? (
-            <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input }]}>
-              {trimmedGuestPhone}
-            </Text>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => openOptionRecapEdit('guestPhone')}>
+              <Text style={[styles.input, { color: theme.text, backgroundColor: theme.input, borderWidth: 1, borderColor: theme.border  }]}>
+                {trimmedGuestPhone}
+              </Text>
+            </TouchableOpacity>
           ) : null}
         </View>
       ) : null}
 
       <PromoCodeField
-        label={t('booking.promoCodeLabel')}
+        label={t('booking.promoCodeLabel') +' :'}
         placeholder={t('booking.promoCodePlaceholder')}
         actionLabel={t('booking.applyPromoCode')}
         value={code}
@@ -921,7 +1136,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
         subTextColor={theme.subText}
         borderColor={theme.border}
         inputBackgroundColor={theme.input}
-        titleSize={16}
+        titleSize={14}
         isApplying={isApplyingPromo}
         feedbackMessage={promoFeedback?.message ?? null}
         feedbackTone={promoFeedback?.tone ?? 'default'}
@@ -930,7 +1145,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
       {/* PRICE */}
       <View style={[styles.box, { borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          {t('booking.totalTitle')} 
+          {t('booking.totalTitle')}  :
         </Text>
 
         <PriceRow label={`${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')} ${t('booking.rentalDaysPrice')} x ${selectedCar?.priceLOC ?? 0} $ :`} value={` ${(selectedCar?.priceLOC && selectedCar.priceLOC * rentalDays) ?? 0} $`} />
@@ -1046,6 +1261,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     marginTop: 10,
+  },
+
+  contactButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  contactButtonText: {
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   button: {

@@ -116,12 +116,17 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   }
 
   if (Platform.OS === 'android') {
-    trace.push('configuration du canal android');
-    await notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: notifications.AndroidImportance.MAX,
-    });
-  }
+  trace.push('configuration du canal android');
+
+  await notifications.setNotificationChannelAsync('default', {
+    name: 'Aficab Notifications',
+    importance: notifications.AndroidImportance.MAX,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
+    lockscreenVisibility:
+      notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
 
   trace.push('verification appareil physique');
   if (!Device.isDevice) {
@@ -194,6 +199,17 @@ export async function getLastNotificationResponseAsync(): Promise<NotificationRe
 
   const response = await notifications.getLastNotificationResponseAsync();
   return response as NotificationResponseLike | null;
+}
+
+export async function clearNotificationBadgeAsync() {
+  const notifications = ensureNotificationsReady();
+
+  if (!notifications) {
+    return false;
+  }
+
+  await notifications.setBadgeCountAsync(0);
+  return true;
 }
 
 export function addNotificationReceivedListener(

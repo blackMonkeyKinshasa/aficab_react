@@ -86,8 +86,11 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
 
   const [selected, setSelected] = useState<PaymentMethod>(PaymentMethod.mpesa);
   const [phone, setPhone] = useState("");
+  const [showPhoneValidation, setShowPhoneValidation] = useState(false);
   const analytics = useAnalytics();
   const showPhoneField = selected !== PaymentMethod.cash && selected !== PaymentMethod.card;
+  const isPhoneValid = /^\d{9}$/.test(phone);
+  const showPhoneError = showPhoneField && showPhoneValidation && !isPhoneValid;
   const paymentLabel = selected === PaymentMethod.mpesa
     ? t('payment.mpesa')
     : selected === PaymentMethod.orange
@@ -112,6 +115,7 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
     if (!visible) {
       setSelected(PaymentMethod.mpesa);
       setPhone('');
+      setShowPhoneValidation(false);
     }
   }, [visible]);
 
@@ -151,14 +155,25 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
                   {t('payment.phoneInfoFor')} ({paymentLabel}) :
                 </Text>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                  <Text style={{ color: subTextColor, marginRight: 10 }}>+243</Text>
+                {showPhoneError && (
+                  <Text style={styles.phoneErrorText}>
+                    Format attendu : 9 chiffres apres +243 (ex : 826685235)
+                  </Text>
+                )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15, backgroundColor: inputBg, borderColor: showPhoneError ? '#dc2626' : inputBorder, borderWidth: 1, borderRadius: 10, padding: 10 }}>
+                  <Text style={{ color: subTextColor, marginRight: 5, fontSize: 15,  }}>+243</Text>
+                   <View style={{ backgroundColor: subTextColor, height: 16, width: 1,  marginRight: 5, }}></View>
+                 
                   <TextInput
                     placeholder={t('payment.phonePlaceholder')}
                     placeholderTextColor={subTextColor}
                     value={phone}
-                    onChangeText={setPhone}
-                    style={[styles.input, { borderColor: inputBorder, backgroundColor: inputBg, color: inputText }]}
+                    onChangeText={(value) => {
+                      const sanitizedValue = value.replace(/\D/g, '').slice(0, 9);
+                      setPhone(sanitizedValue);
+                    }}
+                    style={ { borderColor: inputBorder, backgroundColor: inputBg, color: inputText, flex: 1, }}
                     keyboardType="phone-pad"
                     editable={!submitting}
                   />
@@ -167,6 +182,11 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
             )}
 
             <TouchableOpacity style={[styles.button, submitting && styles.buttonDisabled]} disabled={submitting} onPress={() => {
+              if (showPhoneField && !isPhoneValid) {
+                setShowPhoneValidation(true);
+                return;
+              }
+
               analytics.trackPaymentMethodSelected(selected, phone);
               analytics.trackPaymentSubmitted(selected);
               onSubmit(selected, phone);
@@ -257,6 +277,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     marginBottom: 15,
+  },
+  phoneErrorText: {
+    color: '#dc2626',
+    fontSize: 12,
+    marginBottom: 8,
   },
   button: {
     backgroundColor: "#ff6600",
