@@ -1,27 +1,18 @@
-import { Text } from '@/components/ui/text';
-import { Button } from '@/components/ui/button';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  View,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  KeyboardTypeOptions,
-  ActivityIndicator,  
-  Alert,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
+
+import { usePreventRemove } from '@react-navigation/native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { Camera } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import { Camera, ChevronDown, ArrowLeft, HelpCircle } from 'lucide-react-native';
-import { useState, useEffect, useRef } from 'react';
-import { supabase, } from '@/lib/supabase';
-import {Avatar} from '@/components/my-ui/Avatar';  
-import { InfoIcon } from '@/components/my-ui/InfoIcon';
-import {getUserByID} from '@/api/user';
-import { genderOptions } from '@/constants/constants';
-import { Input } from '@/components/ui/input';
+
+import { uploadAvatar } from '@/api/uploadFiles';
+import { getUserByID, updateUserByID } from '@/api/user';
+import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
-import {LoadingView} from '@/components/my-ui/LoadingView';
+import { InfoIcon } from '@/components/my-ui/InfoIcon';
+import { LoadingView } from '@/components/my-ui/LoadingView';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -29,21 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { takePhoto,pickImageToGallery } from '@/constants/image-manager';
-import { uploadAvatar } from '@/api/uploadFiles';
-import { uriToBlob } from '@/constants/image-manager';
-import {updateUserByID} from '@/api/user';
-import {User} from '@/constants/dataInterface';
-import { useMyStateUser } from '@/store/user-state';
-import { useNavigation } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
-import {getUserLocationDetails} from '@/lib/my-location';
+import { Text } from '@/components/ui/text';
+import { genderOptions } from '@/constants/constants';
+import { User } from '@/constants/dataInterface';
+import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
-
-
-
-
-
+import { getUserLocationDetails } from '@/lib/my-location';
+import { supabase } from '@/lib/supabase';
+import { useMyStateUser } from '@/store/user-state';
 
 export default function EditProfile() {
   const { colorScheme } = useColorScheme();
@@ -56,7 +40,6 @@ export default function EditProfile() {
   const loc = getUserLocationDetails();
   const scrollViewRef = useRef<ScrollView>(null);
 
- 
   const [userID, setUserID] = useState('');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -65,7 +48,7 @@ export default function EditProfile() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('STANDARD');
   const [initialData, setInitialData] = useState(null);
-  const [update,setUpdate]=useState(false)
+  const [update, setUpdate] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
@@ -81,30 +64,26 @@ export default function EditProfile() {
     ...option,
     label: option.value === 'male' ? t('profile.genderMale') : t('profile.genderFemale'),
   }));
-  const localizedStatus = status === 'PREMIUM' ? t('profile.statusPremium') : t('profile.statusStandard');
+  const localizedStatus =
+    status === 'PREMIUM' ? t('profile.statusPremium') : t('profile.statusStandard');
 
   const navigation = useNavigation();
-  
- usePreventRemove(update, ({ data }) => {
-    Alert.alert(
-      t('profile.unsavedTitle'),
-      t('profile.unsavedMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('profile.leave'),
-          style: 'destructive',
-          onPress: () => navigation.dispatch(data.action),
-        },
-      ]
-    );
-  });
 
+  usePreventRemove(update, ({ data }) => {
+    Alert.alert(t('profile.unsavedTitle'), t('profile.unsavedMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('profile.leave'),
+        style: 'destructive',
+        onPress: () => navigation.dispatch(data.action),
+      },
+    ]);
+  });
 
   const hydrateForm = (data: User) => {
     setUserID(data.id);
     setFullName(data.full_name || '');
-    setPhoneNumber(data.phone ||  '');
+    setPhoneNumber(data.phone || '');
     setGender(data.genre || '');
     setStatus(data.clientType || 'STANDARD');
     setEmail(data.email || '');
@@ -114,32 +93,29 @@ export default function EditProfile() {
   };
 
   useEffect(() => {
- 
     if (storedUser) {
       hydrateForm(storedUser);
       return;
     }
 
     const loadLocation = async () => {
-    
-    const locationDetails = await getUserLocationDetails();
-    const thisCity = locationDetails.city ?? null;
-    const thisCountry = locationDetails.country ??  null;
-    const thisCode = locationDetails.countryCode ?? null;
-    setCity(thisCity);
-    setCountry(thisCountry);
-    setCountryCode(thisCode);
-    setIndicatif(locationDetails.indicatif ?? null);
-    }
-  
-
- 
+      const locationDetails = await getUserLocationDetails();
+      const thisCity = locationDetails.city ?? null;
+      const thisCountry = locationDetails.country ?? null;
+      const thisCode = locationDetails.countryCode ?? null;
+      setCity(thisCity);
+      setCountry(thisCountry);
+      setCountryCode(thisCode);
+      setIndicatif(locationDetails.indicatif ?? null);
+    };
 
     const loadUserData = async () => {
       try {
         setLoading(true);
 
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
         if (!user) {
           return;
@@ -159,29 +135,18 @@ export default function EditProfile() {
       }
     };
 
- 
-   loadLocation();
+    loadLocation();
 
     loadUserData();
 
-   
-  
-
-    
-
     return () => {
-
-    if(update){ 
-      Alert.alert(
-        t('profile.unsavedTitle'),
-        t('profile.unsavedMessage'),
-        [
+      if (update) {
+        Alert.alert(t('profile.unsavedTitle'), t('profile.unsavedMessage'), [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('profile.leave'), style: 'destructive', onPress: () => router.back() }
-        ]
-      );
+          { text: t('profile.leave'), style: 'destructive', onPress: () => router.back() },
+        ]);
+      }
     };
-  }
   }, [setStoredUser, storedUser]);
 
   useEffect(() => {
@@ -199,105 +164,101 @@ export default function EditProfile() {
     return () => clearTimeout(timeoutId);
   }, [phoneFieldY, shouldHighlightPhone]);
 
+  const chooseImage = () => {
+    Alert.alert(t('profile.selectImageTitle'), t('profile.selectImageMessage'), [
+      {
+        text: t('profile.camera'),
+        onPress: async () => {
+          let image = await takePhoto();
+          if (image) {
+            setImage(image);
+            update || setUpdate(true);
+          }
+        },
+      },
+      {
+        text: t('profile.gallery'),
+        onPress: async () => {
+          let image = await pickImageToGallery();
+          if (image) {
+            setImage(image);
+            update || setUpdate(true);
+          }
+        },
+      },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
- 
+  const handleSaveProfile = async () => {
+    if (!fullName.trim()) {
+      Alert.alert(t('profile.requiredTitle'), t('profile.fullNameRequired'));
+      return;
+    }
+    if (!userID) return;
 
-const chooseImage = () => {
-  Alert.alert(t('profile.selectImageTitle'), t('profile.selectImageMessage'), [
-    { text: t('profile.camera'), onPress: async () => {
-      let image = await takePhoto();
-      if (image) {
-        setImage(image);
-        update || setUpdate(true);
-      }
-   
-    } },
-    { text: t('profile.gallery'), onPress: async () => {
-      let image = await pickImageToGallery();
-      if (image) {
-        setImage(image);
-        update || setUpdate(true);
-      }
-    } },
-    { text: t('common.cancel'), style: 'cancel' }
-  ]);
+    setLoading(true);
 
-};
+    try {
+      let avatarUrl = image;
 
- const handleSaveProfile = async () => {
-     if (!fullName.trim()) {
-       Alert.alert(t('profile.requiredTitle'), t('profile.fullNameRequired'));
-       return;
-     }
-     if (!userID) return;
- 
-     setLoading(true);
- 
-     try {
-       let avatarUrl = image;
- 
-       if (image && !image.startsWith('http')) {
+      if (image && !image.startsWith('http')) {
         const res = await uploadAvatar(await uriToBlob(image));
-         avatarUrl = res.url;
-         console.log('Avatar uploadé avec succès:', res);
-         supabase.auth.updateUser({ data: { avatar_url: res.url } });
-         setImage(avatarUrl);
-       }
- 
-       await updateUserByID(userID, {
-         full_name: fullName,
-         phone: phoneNumber.trim() || null,
-         genre: gender || null,
-         avatar_url: avatarUrl || null,
-         country: country || null,
-         city: city || null,
-       } as User);
+        avatarUrl = res.url;
+        console.log('Avatar uploadé avec succès:', res);
+        supabase.auth.updateUser({ data: { avatar_url: res.url } });
+        setImage(avatarUrl);
+      }
 
-       const refreshedUser = await getUserByID(userID);
+      await updateUserByID(userID, {
+        full_name: fullName,
+        phone: phoneNumber.trim() || null,
+        genre: gender || null,
+        avatar_url: avatarUrl || null,
+        country: country || null,
+        city: city || null,
+      } as User);
 
-       if (refreshedUser) {
-         setStoredUser(refreshedUser);
-         hydrateForm(refreshedUser);
-       }
- 
-       setLoading(false);
+      const refreshedUser = await getUserByID(userID);
 
-       if (shouldReturnToBooking) {
-         router.back();
-       }
-     } catch (err: any) {
-       console.error(err);
-       Alert.alert(t('common.error'), err?.message ?? t('profile.genericErrorMessage'));
-     } finally {
-       setLoading(false);
-     }
-   };
+      if (refreshedUser) {
+        setStoredUser(refreshedUser);
+        hydrateForm(refreshedUser);
+      }
+
+      setLoading(false);
+
+      if (shouldReturnToBooking) {
+        router.back();
+      }
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert(t('common.error'), err?.message ?? t('profile.genericErrorMessage'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <View className={`flex-1 `}>
-     
+    <View className={`flex-1`}>
       <ScrollView
         ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 20 }}
-      >
+        contentContainerStyle={{ paddingBottom: 20 }}>
         {/* Avatar Section */}
-        <View className="items-center mb-8 mt-8">
-          
+        <View className="mb-8 mt-8 items-center">
           <View
-            className={`w-24 h-24 rounded-full items-center justify-center relative ${
+            className={`relative h-24 w-24 items-center justify-center rounded-full ${
               isDark ? 'bg-gray-800' : 'bg-gray-100'
-            }`}
-          >
+            }`}>
             {/* User Icon */}
-          <Avatar uri={image || ''} size={96} borderRadius={48} isDark={isDark} />
+            <Avatar uri={image || ''} size={96} borderRadius={48} isDark={isDark} />
 
             {/* Camera Icon Button */}
             <TouchableOpacity
-              className={`absolute bottom-0 right-0 w-10 h-10 rounded-full items-center justify-center shadow-lg bg-orange-500`}
-              onPress={chooseImage}
-            >
+              className={`absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-orange-500 shadow-lg`}
+              onPress={chooseImage}>
               <Camera size={18} color="white" />
             </TouchableOpacity>
           </View>
@@ -306,8 +267,7 @@ const chooseImage = () => {
           <Text
             className={`mt-4 text-sm font-bold tracking-wide ${
               isDark ? 'text-gray-400' : 'text-gray-600'
-            }`}
-          >
+            }`}>
             {localizedStatus}
           </Text>
         </View>
@@ -341,8 +301,7 @@ const chooseImage = () => {
                     backgroundColor: isDark ? '#262626' : '#fff7ed',
                   }
                 : undefined
-            }
-          >
+            }>
             <FormField
               label={t('profile.phoneNumber')}
               value={phoneNumber}
@@ -356,15 +315,13 @@ const chooseImage = () => {
               isDark={isDark}
             />
             {shouldHighlightPhone ? (
-              <Text className="mb-2 text-sm text-orange-500">
-                {t('profile.phoneHintBooking')}
-              </Text>
+              <Text className="mb-2 text-sm text-orange-500">{t('profile.phoneHintBooking')}</Text>
             ) : null}
           </View>
 
           {/* Gender */}
           <View className="mb-6">
-            <View className="flex-row items-center mb-2">
+            <View className="mb-2 flex-row items-center">
               <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 {t('profile.gender')}
               </Text>
@@ -374,12 +331,16 @@ const chooseImage = () => {
             </View>
 
             <Select
-              value={{ value: gender, label: localizedGenderOptions.find((option) => option.value === gender)?.label ?? t('common.select') }}
+              value={{
+                value: gender,
+                label:
+                  localizedGenderOptions.find((option) => option.value === gender)?.label ??
+                  t('common.select'),
+              }}
               onValueChange={(option) => {
                 setGender(option?.value ?? '');
                 update || setUpdate(true);
-              }}
-            >
+              }}>
               <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
                 <SelectValue
                   className={isDark ? 'text-white' : 'text-gray-900'}
@@ -408,24 +369,19 @@ const chooseImage = () => {
 
           {/* Save Button */}
 
-          {update && ( <Button
-            onPress={handleSaveProfile}
-            disabled={loading}
-            className="bg-orange-500 h-12 rounded-lg mt-8 mb-4"
-          >
-            <Text className="text-white font-bold text-base">
-              {loading ? t('profile.saving') : t('profile.saveChanges')}
-            </Text>
-          </Button>)}
-         
- 
-
+          {update && (
+            <Button
+              onPress={handleSaveProfile}
+              disabled={loading}
+              className="mb-4 mt-8 h-12 rounded-lg bg-orange-500">
+              <Text className="text-base font-bold text-white">
+                {loading ? t('profile.saving') : t('profile.saveChanges')}
+              </Text>
+            </Button>
+          )}
         </View>
-        
       </ScrollView>
-      {loading && (
-        <LoadingView />
-      )}
+      {loading && <LoadingView />}
     </View>
   );
 }

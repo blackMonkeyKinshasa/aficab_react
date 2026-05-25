@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking,ScrollView } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Inclus par défaut dans Expo
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useColorScheme } from 'nativewind';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { getUserByID } from '@/api/user';
+import { Button } from '@/components/ui/button';
+import { color } from '@/constants/colors';
+import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
+import { User } from '@/constants/dataInterface';
+import { useAnalytics } from '@/lib/analytics';
+import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { resetUserSessionState, useMyStateUser } from '@/store';
-import { useColorScheme } from 'nativewind';
-import { getUserByID } from '@/api/user';
-import { User } from '@/constants/dataInterface';
-import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
-import { useAnalytics } from '@/lib/analytics';
-import { color } from '@/constants/colors';
-import { useI18n } from '@/lib/i18n';
-import { Button } from '@/components/ui/button';
 
 export default function ChekRole() {
   const router = useRouter();
@@ -58,15 +61,16 @@ export default function ChekRole() {
   }, [setStoredUser]);
 
   const currentUser = remoteUser ?? storedUser;
-  const accountLabel = currentUser?.role === 'ADMIN'
-    ? t('role.admin')
-    : currentUser?.role === 'MANAGER'
-    ? t('role.manager')
-    : currentUser?.role === 'DRIVER'
-    ? t('role.driver')
-    : currentUser?.role === 'CLIENT'
-    ? t('role.client')
-    : t('role.partner');
+  const accountLabel =
+    currentUser?.role === 'ADMIN'
+      ? t('role.admin')
+      : currentUser?.role === 'MANAGER'
+        ? t('role.manager')
+        : currentUser?.role === 'DRIVER'
+          ? t('role.driver')
+          : currentUser?.role === 'CLIENT'
+            ? t('role.client')
+            : t('role.partner');
 
   useEffect(() => {
     if (!currentUser?.id) {
@@ -105,16 +109,15 @@ export default function ChekRole() {
       });
     }
 
-    Alert.alert(
-      t('settings.contactUs'),
-      t('auth.supportMessage'),
-      [
-        { text: t('settings.whatsapp'), onPress: () => handleOpenLink(SUPPORT_WHATSAPP_URL, 'whatsapp') },
-        { text: t('settings.call'), onPress: () => handleOpenLink(`tel:${SUPPORT_PHONE}`, 'phone') },
-        { text: t('settings.email'), onPress: () => handleOpenLink(SUPPORT_EMAIL_URL, 'email') },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]
-    );
+    Alert.alert(t('settings.contactUs'), t('auth.supportMessage'), [
+      {
+        text: t('settings.whatsapp'),
+        onPress: () => handleOpenLink(SUPPORT_WHATSAPP_URL, 'whatsapp'),
+      },
+      { text: t('settings.call'), onPress: () => handleOpenLink(`tel:${SUPPORT_PHONE}`, 'phone') },
+      { text: t('settings.email'), onPress: () => handleOpenLink(SUPPORT_EMAIL_URL, 'email') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   const handleLogout = async () => {
@@ -124,75 +127,90 @@ export default function ChekRole() {
 
     await supabase.auth.signOut();
     resetUserSessionState();
-   // router.replace('/(auth)/login');
+    // router.replace('/(auth)/login');
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
-        <ScrollView
-              showsVerticalScrollIndicator={false}
-              className="flex-1"
-              contentContainerStyle={{ paddingBottom: 40 }}
-            >
-      
-      <View style={styles.content}>
-        <View style={[styles.heroCard, { backgroundColor: isDark ? '#111111' : '#FFF4EB', borderColor: isDark ? '#27272A' : '#FED7AA' }]}>
-          <View style={[styles.iconBadge, { backgroundColor: isDark ? '#2A160A' : '#FFE6D5' }]}>
-            <MaterialCommunityIcons name="shield-alert-outline" size={28} color="#FF5C00" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={styles.content}>
+          <View
+            style={[
+              styles.heroCard,
+              {
+                backgroundColor: isDark ? '#111111' : '#FFF4EB',
+                borderColor: isDark ? '#27272A' : '#FED7AA',
+              },
+            ]}>
+            <View style={[styles.iconBadge, { backgroundColor: isDark ? '#2A160A' : '#FFE6D5' }]}>
+              <MaterialCommunityIcons name="shield-alert-outline" size={28} color="#FF5C00" />
+            </View>
+
+            <Text style={[styles.eyebrow, { color: '#FF5C00' }]}>{t('role.accountCheck')}</Text>
+            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#1A1A1A' }]}>
+              {t('role.notClientTitle')}
+            </Text>
+            <Text
+              style={[
+                styles.description,
+                styles.heroDescription,
+                { color: isDark ? '#A3A3A3' : '#666666' },
+              ]}>
+              {tf('role.notClientDescription', { accountLabel })}
+            </Text>
+
+            <View style={[styles.infoRow, { marginTop: 24 }]}>
+              <Text style={[styles.infoLabel, { color: isDark ? '#A3A3A3' : '#6B7280' }]}>
+                {t('role.emailLabel')}
+              </Text>
+              <Text style={[styles.infoValue, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+                {currentUser?.email ?? t('role.emailMissing')}
+              </Text>
+            </View>
           </View>
 
-          <Text style={[styles.eyebrow, { color: '#FF5C00' }]}>{t('role.accountCheck')}</Text>
-          <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#1A1A1A' }]}>{t('role.notClientTitle')}</Text>
-          <Text style={[styles.description, styles.heroDescription, { color: isDark ? '#A3A3A3' : '#666666' }]}>
-            {tf('role.notClientDescription', { accountLabel })}
-          </Text>
+          <View style={styles.textContainer}>
+            <Text style={[styles.description, { color: isDark ? '#A3A3A3' : '#666666' }]}>
+              {t('role.incorrectInfo')}
+            </Text>
 
-          <View style={[styles.infoRow, { marginTop: 24 }]}>
-            <Text style={[styles.infoLabel, { color: isDark ? '#A3A3A3' : '#6B7280' }]}>{t('role.emailLabel')}</Text>
-            <Text style={[styles.infoValue, { color: isDark ? '#FFFFFF' : '#111827' }]}>{currentUser?.email ?? t('role.emailMissing')}</Text>
+            <Text style={[styles.description, { color: isDark ? '#A3A3A3' : '#666666' }]}>
+              {t('role.useAnotherEmail')}
+            </Text>
           </View>
 
+          <Button
+            className="my-3 h-14 flex-row items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: color.primary,
+              width: '100%',
+              minHeight: 56,
+              paddingVertical: 16,
+            }}
+            onPress={handleContactSupport}>
+            <View className="flex-row items-center justify-center">
+              <MaterialCommunityIcons name="headset" size={18} color="#FFFFFF" />
+              <Text style={styles.buttonText}>{t('settings.contactUs')}</Text>
+            </View>
+          </Button>
+
+          <Button
+            className="my-3 h-14 flex-row items-center justify-center rounded-2xl border"
+            variant="outline"
+            style={{ width: '100%', minHeight: 56, paddingVertical: 16 }}
+            onPress={handleLogout}>
+            <View className="flex-row items-center justify-center">
+              <MaterialCommunityIcons name="logout-variant" size={20} color="#FF5C00" />
+              <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+            </View>
+          </Button>
         </View>
-
-        <View style={styles.textContainer}>
-          <Text style={[styles.description, { color: isDark ? '#A3A3A3' : '#666666' }]}>
-            {t('role.incorrectInfo')}
-          </Text>
-
-          <Text style={[styles.description, { color: isDark ? '#A3A3A3' : '#666666' }]}>
-            {t('role.useAnotherEmail')}
-          </Text>
-        </View>
-
-        <Button
-             className="h-14 flex-row items-center justify-center rounded-2xl my-3"
-             style={{ backgroundColor: color.primary, width: "100%", minHeight:56, paddingVertical:16}}
-             onPress={handleContactSupport}
-           >
-              <View className="flex-row items-center justify-center">
-                      <MaterialCommunityIcons name="headset" size={18} color="#FFFFFF" />
-                      <Text style={styles.buttonText}>{t('settings.contactUs')}</Text>
-              </View>
-            
-        </Button>
-
-        <Button 
-        className="h-14 flex-row items-center justify-center rounded-2xl border my-3 "
-        variant="outline"
-        style={{ width: "100%", minHeight:56, paddingVertical:16,}}
-           
-        onPress={handleLogout}
-         
-        >
-           <View className="flex-row items-center justify-center">
-          <MaterialCommunityIcons name="logout-variant" size={20} color="#FF5C00" />
-          <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-          </View>
-        </Button>
-
-      </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -204,8 +222,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent : 'center',
-    alignItems : 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
   },

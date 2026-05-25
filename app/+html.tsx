@@ -1,5 +1,6 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
+
+import { ScrollViewStyleReset } from 'expo-router/html';
 
 import {
   APP_DEEP_LINK_HOST,
@@ -237,7 +238,10 @@ export default function Root({ children }: PropsWithChildren) {
             <p>Redirection vers l'emplacement approprie...</p>
             <div className="spinner" />
             <div className="manual-link">
-              Pas de redirection ? <a href="https://aficab.com" id="manual-redirect">Cliquez ici</a>
+              Pas de redirection ?{' '}
+              <a href="https://aficab.com" id="manual-redirect">
+                Cliquez ici
+              </a>
             </div>
           </div>
         </div>

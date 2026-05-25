@@ -1,5 +1,7 @@
-import { Link, Stack } from 'expo-router';
 import { View } from 'react-native';
+
+import { Link, Stack } from 'expo-router';
+
 import { Text } from '@/components/ui/text';
 import { useI18n } from '@/lib/i18n';
 

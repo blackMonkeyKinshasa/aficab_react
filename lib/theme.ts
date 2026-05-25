@@ -80,5 +80,3 @@ export const NAV_THEME: Record<'light' | 'dark', Theme> = {
     },
   },
 };
-
-

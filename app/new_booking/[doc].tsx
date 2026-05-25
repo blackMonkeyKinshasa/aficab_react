@@ -1,7 +1,30 @@
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
 
-import { View, Text, Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { HeaderBackButton } from '@react-navigation/elements';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+
+import { createNewBooking, maxicashVISA, pawapayPay } from '@/api/booking';
+import { LocAirport } from '@/components/my-ui/LocAirport';
+import { LocDaily } from '@/components/my-ui/LocDaily';
+import { PaymentModal } from '@/components/my-ui/PaymentModal';
+import { ReservationConfirmedScreen } from '@/components/my-ui/ReservationConfirmed';
+import {
+  ClientType,
+  EtapeReservation,
+  PaymentMethod,
+  PaymentProvider,
+  ResType,
+} from '@/constants/databaseEnum';
 import {
   Booking,
   CreateBookingResponse,
@@ -10,21 +33,10 @@ import {
   LocationDocTA,
   PawapayPaymentResponse,
 } from '@/constants/dataInterface';
-import { EtapeReservation, PaymentMethod, ResType, PaymentProvider } from '@/constants/databaseEnum';
-import { useEffect, useState } from 'react';
-import { LocAirport } from '@/components/my-ui/LocAirport';
-import { LocDaily } from '@/components/my-ui/LocDaily';
-import { useColorScheme } from 'react-native';
-import {PaymentModal} from '@/components/my-ui/PaymentModal';
-import { createNewBooking, maxicashVISA, pawapayPay } from '@/api/booking';
-import { supabase } from '@/lib/supabase';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
-import { ReservationConfirmedScreen } from '@/components/my-ui/ReservationConfirmed';
+import { supabase } from '@/lib/supabase';
 import { useMyStateUser } from '@/store/user-state';
-import {ClientType} from '@/constants/databaseEnum';
-
- 
 
 const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.SELECTION,
@@ -33,9 +45,11 @@ const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
 };
 
 const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
- title,
+  title,
   headerTransparent: false,
-  headerLeft: () => <HeaderBackButton tintColor={isDark ? '#FFFFFF' : '#000000'} onPress={onPress} />,
+  headerLeft: () => (
+    <HeaderBackButton tintColor={isDark ? '#FFFFFF' : '#000000'} onPress={onPress} />
+  ),
   headerBackTitle: 'Retour',
 });
 
@@ -44,9 +58,11 @@ function getPawapayFailureMessage(failureCode?: string | null) {
 }
 
 function isMobileMoneyPayment(paymentMethod: PaymentMethod) {
-  return paymentMethod === PaymentMethod.mpesa
-    || paymentMethod === PaymentMethod.orange
-    || paymentMethod === PaymentMethod.airtel;
+  return (
+    paymentMethod === PaymentMethod.mpesa ||
+    paymentMethod === PaymentMethod.orange ||
+    paymentMethod === PaymentMethod.airtel
+  );
 }
 
 function toIsoDateOrUndefined(value: unknown) {
@@ -69,9 +85,7 @@ type ConfirmationState = {
   client?: Record<string, unknown>;
 };
 
-
 export default function NewBooking() {
-
   const { t } = useI18n();
   const router = useRouter();
   const { doc: docParam } = useLocalSearchParams() as { doc?: string };
@@ -98,9 +112,10 @@ export default function NewBooking() {
     }
 
     const dateStart = toIsoDateOrUndefined(doc.dateStart);
-    const dateEnd = doc.type === ResType.LOC
-      ? toIsoDateOrUndefined(doc.dateEnd)
-      : toIsoDateOrUndefined(doc.dateReturn);
+    const dateEnd =
+      doc.type === ResType.LOC
+        ? toIsoDateOrUndefined(doc.dateEnd)
+        : toIsoDateOrUndefined(doc.dateReturn);
 
     analytics.trackBookingStarted(doc.type, {
       origin: doc.type === ResType.LOC ? doc.location.description : doc.locationDepart.description,
@@ -157,20 +172,24 @@ export default function NewBooking() {
 
     closePaymentModal('completion');
     setSubmitting(true);
-    const paymentProvider = paymentMethod === PaymentMethod.card
-      ? PaymentProvider.card
-      : paymentMethod === PaymentMethod.cash
-        ? PaymentProvider.cash
-        : PaymentProvider.mobileMoney;
-    
+    const paymentProvider =
+      paymentMethod === PaymentMethod.card
+        ? PaymentProvider.card
+        : paymentMethod === PaymentMethod.cash
+          ? PaymentProvider.cash
+          : PaymentProvider.mobileMoney;
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const clientId = session?.user?.id;
-      const resolvedClientPhone = normalizePhone(bookingDoc.clientPhone)
-        ?? normalizePhone(phoneNumber)
-        ?? normalizePhone(storedUser?.phone)
-        ?? normalizePhone(session?.user?.phone)
-        ?? normalizePhone(session?.user?.user_metadata?.phone);
+      const resolvedClientPhone =
+        normalizePhone(bookingDoc.clientPhone) ??
+        normalizePhone(phoneNumber) ??
+        normalizePhone(storedUser?.phone) ??
+        normalizePhone(session?.user?.phone) ??
+        normalizePhone(session?.user?.user_metadata?.phone);
 
       if (!resolvedClientPhone) {
         analytics.trackPaymentValidationFailed({
@@ -217,30 +236,28 @@ export default function NewBooking() {
         hasComment: Boolean(bookingDoc.commentaire?.trim()),
       });
 
-      const response = await createNewBooking(
-        {
-          id: bookingDoc.id,
-          carId: bookingDoc.carId ?? '',
-          clientId: clientId ?? '',
-          clientPhone: resolvedClientPhone,
-          currency: 'USD',
-          departure: bookingDoc.departure,
-          departureAt: bookingDoc.departureAt,
-          arrival: bookingDoc.arrival ?? undefined,
-          arrivalAt: bookingDoc.arrivalAt ?? undefined,
-          type: bookingDoc.type,
-          status: bookingDoc.status,
-          total: bookingDoc.total ?? 0,
-          reference: bookingDoc.reference ?? undefined,
-          taVolNumber: bookingDoc.taVolNumber ?? undefined,
-          commentaire: bookingDoc.commentaire ?? undefined,
-          guest: bookingDoc.guest ?? undefined,
-          options: bookingDoc.options ?? undefined,
-          paymentMethod: paymentMethod,
-          paymentProvider,
-          paymentNumber: phoneNumber,
-        }
-      );
+      const response = await createNewBooking({
+        id: bookingDoc.id,
+        carId: bookingDoc.carId ?? '',
+        clientId: clientId ?? '',
+        clientPhone: resolvedClientPhone,
+        currency: 'USD',
+        departure: bookingDoc.departure,
+        departureAt: bookingDoc.departureAt,
+        arrival: bookingDoc.arrival ?? undefined,
+        arrivalAt: bookingDoc.arrivalAt ?? undefined,
+        type: bookingDoc.type,
+        status: bookingDoc.status,
+        total: bookingDoc.total ?? 0,
+        reference: bookingDoc.reference ?? undefined,
+        taVolNumber: bookingDoc.taVolNumber ?? undefined,
+        commentaire: bookingDoc.commentaire ?? undefined,
+        guest: bookingDoc.guest ?? undefined,
+        options: bookingDoc.options ?? undefined,
+        paymentMethod: paymentMethod,
+        paymentProvider,
+        paymentNumber: phoneNumber,
+      });
 
       console.log('Réservation créée :', response);
       confirmationDetails.bookingId = response.id ?? bookingDoc.id;
@@ -267,8 +284,8 @@ export default function NewBooking() {
         setConfirmationState(confirmationDetails);
       }
 
-     // setPaymentModalVisible(false);
-    //  router.replace('/(tabs)/reservation');
+      // setPaymentModalVisible(false);
+      //  router.replace('/(tabs)/reservation');
     } catch (err: any) {
       analytics.trackBookingCreationFailed({
         bookingId: bookingDoc.id,
@@ -284,7 +301,7 @@ export default function NewBooking() {
     }
   };
 
-   const processPayment = async (
+  const processPayment = async (
     booking: CreateBookingResponse,
     paymentMethod: PaymentMethod,
     confirmationDetails: ConfirmationState
@@ -309,15 +326,13 @@ export default function NewBooking() {
       let response: PawapayPaymentResponse;
 
       try {
-        response = await pawapayPay(
-          {
-            transaction_id: paiement.transaction_id,
-            amount: String(paiement.amount),
-            currency: paiement.currency,
-            paymentMethod: paiement.paymentMethod,
-            paymentNumber: paiement.paymentNumber,
-          }
-        );
+        response = await pawapayPay({
+          transaction_id: paiement.transaction_id,
+          amount: String(paiement.amount),
+          currency: paiement.currency,
+          paymentMethod: paiement.paymentMethod,
+          paymentNumber: paiement.paymentNumber,
+        });
       } catch (error: any) {
         analytics.trackPaymentNetworkFailed({
           bookingId: booking.id,
@@ -365,9 +380,7 @@ export default function NewBooking() {
       return;
     }
 
-    if ( paymentMethod === PaymentMethod.cash) {
-
-
+    if (paymentMethod === PaymentMethod.cash) {
       analytics.trackPaymentNetworkResponded({
         bookingId: booking.id,
         paymentMethod,
@@ -379,13 +392,9 @@ export default function NewBooking() {
       });
       setConfirmationState(confirmationDetails);
       return;
-
-
-
-
     }
 
-  if (paymentMethod === PaymentMethod.card ) {
+    if (paymentMethod === PaymentMethod.card) {
       analytics.trackPaymentNetworkRequested({
         bookingId: booking.id,
         paymentMethod,
@@ -396,16 +405,11 @@ export default function NewBooking() {
       });
 
       try {
-        await maxicashVISA(
-          paiement.transaction_id,
-          String(paiement.amount),
-          paiement.currency,
-          { 
-           name: storedUser?.full_name ?? undefined,
-            email: storedUser?.email ?? undefined,
-            phone: storedUser?.phone ?? undefined,
-          }
-        );
+        await maxicashVISA(paiement.transaction_id, String(paiement.amount), paiement.currency, {
+          name: storedUser?.full_name ?? undefined,
+          email: storedUser?.email ?? undefined,
+          phone: storedUser?.phone ?? undefined,
+        });
       } catch (error: any) {
         analytics.trackPaymentNetworkFailed({
           bookingId: booking.id,
@@ -420,19 +424,15 @@ export default function NewBooking() {
       analytics.trackPaymentNetworkResponded({
         bookingId: booking.id,
         paymentMethod,
-        provider:  'card',
+        provider: 'card',
         transactionId: paiement.transaction_id,
         status: 'NOT_REQUIRED',
         failureCode: null,
         providerReference: null,
       });
-      
+
       setConfirmationState(confirmationDetails);
       return;
-
-
-
-      
     }
   };
 
@@ -464,15 +464,17 @@ export default function NewBooking() {
         <ReservationConfirmedScreen
           userName={confirmationState.userName}
           email={confirmationState.email}
-          onPressMyBookings={() => router.replace({
-            pathname: '/(tabs)/reservation',
-            params: confirmationState.bookingId
-              ? { 
-                highlightBookingId: confirmationState.bookingId, 
-                showBadgeId: confirmationState.bookingId
-              }
-              : undefined,
-          })}
+          onPressMyBookings={() =>
+            router.replace({
+              pathname: '/(tabs)/reservation',
+              params: confirmationState.bookingId
+                ? {
+                    highlightBookingId: confirmationState.bookingId,
+                    showBadgeId: confirmationState.bookingId,
+                  }
+                : undefined,
+            })
+          }
           onPressContact={() => router.replace('/(tabs)/settings')}
         />
       </>
@@ -481,19 +483,36 @@ export default function NewBooking() {
 
   return (
     <>
-      <Stack.Screen options={{ ...SCREEN_OPTIONS(title, isDarkMode, handleHeaderBackPress), headerShown: true, headerBackTitle: t('booking.back') }} />
+      <Stack.Screen
+        options={{
+          ...SCREEN_OPTIONS(title, isDarkMode, handleHeaderBackPress),
+          headerShown: true,
+          headerBackTitle: t('booking.back'),
+        }}
+      />
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.container}>
           {doc.type === ResType.LOC ? (
             <>
-              <LocDaily locationDoc={doc as LocationDocLOC} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
+              <LocDaily
+                locationDoc={doc as LocationDocLOC}
+                isDarkMode={isDarkMode}
+                onSubmit={onSubmitDocBooking}
+                etape={etape}
+                setEtape={setEtape}
+              />
             </>
           ) : (
             <>
-              <LocAirport locationDoc={doc as LocationDocTA} isDarkMode={isDarkMode} onSubmit={onSubmitDocBooking} etape={etape} setEtape={setEtape} />
+              <LocAirport
+                locationDoc={doc as LocationDocTA}
+                isDarkMode={isDarkMode}
+                onSubmit={onSubmitDocBooking}
+                etape={etape}
+                setEtape={setEtape}
+              />
             </>
           )}
         </View>
@@ -508,7 +527,12 @@ export default function NewBooking() {
           </View>
         ) : null}
 
-        <PaymentModal visible={paymentModalVisible} isPremium={storedUser?.clientType===ClientType.PREMIUM} onClose={() => closePaymentModal('backdrop')} onSubmit={onSubmitPayement} />
+        <PaymentModal
+          visible={paymentModalVisible}
+          isPremium={storedUser?.clientType === ClientType.PREMIUM}
+          onClose={() => closePaymentModal('backdrop')}
+          onSubmit={onSubmitPayement}
+        />
       </KeyboardAvoidingView>
     </>
   );
