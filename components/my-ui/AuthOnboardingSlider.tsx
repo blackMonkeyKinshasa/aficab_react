@@ -76,7 +76,7 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       dotStyle={{ backgroundColor: isDark ? '#3F3F46' : '#D4D4D8' }}
       renderSkipButton={() => (
         activeIndex < slides.length - 1 ? (
-          <TouchableOpacity style={styles.skipButton}>
+          <TouchableOpacity style={styles.skipButton} onPress={onDone}>
             <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Ignorer</Text>
           </TouchableOpacity>
         ) : <View style={styles.skipPlaceholder} />
