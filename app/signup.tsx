@@ -31,12 +31,7 @@ export default function Signup(){
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const { t } = useI18n();
 
-  const statusOptions = [
-    { label: t('signup.passenger'), value: 'passenger' },
-    { label: t('signup.driver'), value: 'driver' },
-    { label: t('signup.admin'), value: 'admin' },
-  ];
-
+ 
   const handleSave = async () => {
     if (!fullName || !phoneNumber || !status) {
       Alert.alert(t('common.error'), t('signup.requiredFields'));
@@ -181,75 +176,7 @@ export default function Signup(){
             />
           </View>
 
-          {/* Status Dropdown */}
-          <View>
-            <Text
-              className={`text-sm mb-2 ${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}
-            >
-              {t('signup.status')}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowStatusDropdown(!showStatusDropdown)}
-              className={`flex-row items-center justify-between px-4 py-4 rounded-lg ${
-                isDark ? 'bg-gray-800' : 'bg-gray-100'
-              }`}
-            >
-              <Text
-                className={`text-base ${
-                  status
-                    ? isDark
-                      ? 'text-white'
-                      : 'text-gray-900'
-                    : isDark
-                    ? 'text-gray-400'
-                    : 'text-gray-600'
-                }`}
-              >
-                {status
-                  ? statusOptions.find((opt) => opt.value === status)?.label
-                  : t('signup.statusPlaceholder')}
-              </Text>
-              <ChevronDown
-                size={24}
-                color={isDark ? '#666666' : '#999999'}
-              />
-            </TouchableOpacity>
-
-            {/* Dropdown Menu */}
-            {showStatusDropdown && (
-              <View
-                className={`mt-2 rounded-lg overflow-hidden border ${
-                  isDark
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-white border-gray-200'
-                }`}
-              >
-                {statusOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => {
-                      setStatus(option.value);
-                      setShowStatusDropdown(false);
-                    }}
-                    className={`px-4 py-3 border-b ${
-                      isDark ? 'border-gray-700' : 'border-gray-200'
-                    }`}
-                  >
-                    <Text
-                      className={`text-base ${
-                        isDark ? 'text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
+       
           {/* Save Button */}
           <Button
             onPress={handleSave}

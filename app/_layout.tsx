@@ -154,7 +154,7 @@ function RootLayoutInner() {
     setPushTokenSnackbarVisible(true);
   };
 
-  const showPushTokenTrace = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
+  const showPushTokenTrace_ = (source: 'manuel' | 'auto', trace: string[], detail?: string | null) => {
     const baseTrace = [`trace expo token (${source})`, ...trace].join(' -> ');
     const message = detail ? `${baseTrace} -> resultat: ${detail}` : baseTrace;
     showPushTokenSnackbar(message);
@@ -254,28 +254,31 @@ function RootLayoutInner() {
         }
 
         if (refreshedUser.deviceToken) {
-          showPushTokenTrace('manuel', [
+         /* showPushTokenTrace('manuel', [
             'profil recharge',
             'token deja present sur le compte',
           ], 'aucune regeneration necessaire');
+          */
           return;
         }
 
         const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(authUser.id, refreshedUser.deviceToken);
 
         if (!expoPushToken) {
-          showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
+        //  showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
           return;
         }
 
-        showPushTokenTrace(
+      /*  showPushTokenTrace(
           'manuel',
           ['profil recharge', 'aucun token sur le compte', ...trace],
           backendMessage ?? 'token disponible et synchronise'
         );
+        */
        
       }
     } catch (error) {
+
       showPushTokenSnackbar('Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.');
       console.error('profile_manual_sync_failed', error);
     } finally {
@@ -359,12 +362,7 @@ function RootLayoutInner() {
         if (status !== 'granted') return;
 
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        posthog?.capture('user_location_captured', {
-          user_id: user.id,
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          platform: Platform.OS,
-        });
+       
       } catch (error) {
         reportStartupError('location_bootstrap_failed', error);
       }

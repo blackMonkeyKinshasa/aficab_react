@@ -31,6 +31,7 @@
         "foregroundImage": "./assets/images/aficab-app-logo-white.png",
         "backgroundColor": "#ffffff"
       },
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -95,7 +96,7 @@
           ]
         }
       ],
-      "versionCode": 123,
+      "versionCode": 124,
       "package": "io.kinvtc.mapstracking",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -148,7 +149,8 @@
         }
       ],
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      "@react-native-firebase/app"
     ],
     "experiments": {
       "typedRoutes": true

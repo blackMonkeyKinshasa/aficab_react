@@ -76,13 +76,15 @@ type NotificationData = {
 export function getNotificationTargetRoute(notification: NotificationLike) {
   const data = notification.request.content.data as NotificationData;
   const route = data.route ?? data.screen ?? data.link ?? data.url ?? data.pathname;
+  const bookingId = typeof data.bookingId === 'string' ? data.bookingId.trim() : '';
+
+  if (bookingId) {
+    const encodedBookingId = encodeURIComponent(bookingId);
+    return `/(tabs)/reservation?highlightBookingId=${encodedBookingId}&openBookingId=${encodedBookingId}`;
+  }
 
   if (typeof route === 'string' && route.trim()) {
     return route;
-  }
-
-  if (typeof data.bookingId === 'string' && data.bookingId.trim()) {
-    return '/(tabs)/reservation';
   }
 
   return '/notificationsPage';

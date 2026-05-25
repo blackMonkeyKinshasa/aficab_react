@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "6227575008",
+    "project_id": "maps-tracking-cuq2vl",
+    "storage_bucket": "maps-tracking-cuq2vl.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:6227575008:android:9a014e74a5aeb9d0a75085",
+        "android_client_info": {
+          "package_name": "io.kinvtc.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxn-0LDDbNWwqzZ5xb-69QNlcgA6pWNoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:6227575008:android:b2656ce2ecf8e6a0a75085",
+        "android_client_info": {
+          "package_name": "io.kinvtc.mapstracking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxn-0LDDbNWwqzZ5xb-69QNlcgA6pWNoo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
