@@ -1,18 +1,29 @@
-import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/icon';
-import { Text } from '@/components/ui/text';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  Linking,
+  NativeModules,
+  Platform,
+  ScrollView,
+  View,
+} from 'react-native';
+
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthOnboardingSlider } from '@/components/my-ui/AuthOnboardingSlider';
-import { Link, Stack, useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as ExpoLinking from 'expo-linking';
+import { Link, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
-import * as React from 'react';
-import { ActivityIndicator, Alert, Image, Keyboard, Linking, NativeModules, type ImageStyle, View, Platform } from 'react-native';
-import { TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import {  SafeAreaView } from 'react-native-safe-area-context'
+import { Snackbar } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AuthOnboardingSlider } from '@/components/my-ui/AuthOnboardingSlider';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -21,31 +32,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import AntDesign from '@expo/vector-icons/AntDesign';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { supabase } from '@/lib/supabase';
-import { googleIosClientId, googleWebClientId } from '@/constants/env';
-import { useEffect, useState } from 'react';
-import { useAnalytics } from '@/lib/analytics';
-import { Snackbar } from 'react-native-paper';
-import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
+import { Text } from '@/components/ui/text';
 import { color } from '@/constants/colors';
+import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
+import { googleIosClientId, googleWebClientId } from '@/constants/env';
+import { useAnalytics } from '@/lib/analytics';
+import { getAuthErrorMessage } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase';
 
 type GoogleSigninModule = {
   GoogleSignin: {
@@ -74,8 +70,17 @@ type OAuthCallbackParams = {
 };
 
 const NATIVE_AUTH_CALLBACK_URL = 'mobile://aficab.com/auth/callback';
+const OTP_COOLDOWN_SECONDS = 120;
 
-function formatAppleFullName(fullName: AppleAuthentication.AppleAuthenticationFullName | null | undefined) {
+type OtpRequestResult = {
+  ok: boolean;
+  blocked?: boolean;
+  retryAfterSeconds?: number;
+};
+
+function formatAppleFullName(
+  fullName: AppleAuthentication.AppleAuthenticationFullName | null | undefined
+) {
   if (!fullName) {
     return '';
   }
@@ -89,7 +94,8 @@ function formatAppleFullName(fullName: AppleAuthentication.AppleAuthenticationFu
 WebBrowser.maybeCompleteAuthSession();
 
 function hasNativeGoogleSigninModule() {
-  const turboModuleRegistry = require('react-native/Libraries/TurboModule/TurboModuleRegistry').default;
+  const turboModuleRegistry =
+    require('react-native/Libraries/TurboModule/TurboModuleRegistry').default;
 
   return Boolean(NativeModules?.RNGoogleSignin || turboModuleRegistry?.get?.('RNGoogleSignin'));
 }
@@ -108,9 +114,10 @@ function getOAuthCallbackParams(url: string): OAuthCallbackParams {
   const parsedUrl = ExpoLinking.parse(url);
   const queryParams = (parsedUrl.queryParams ?? {}) as Record<string, string | undefined>;
   const hashIndex = url.indexOf('#');
-  const hashParams = hashIndex >= 0
-    ? Object.fromEntries(new URLSearchParams(url.slice(hashIndex + 1)).entries())
-    : {};
+  const hashParams =
+    hashIndex >= 0
+      ? Object.fromEntries(new URLSearchParams(url.slice(hashIndex + 1)).entries())
+      : {};
 
   return {
     ...queryParams,
@@ -146,7 +153,6 @@ async function signInWithNativeGoogleIdToken(nativeGoogleSigninModule: GoogleSig
 }
 
 export default function LoginScreen() {
- 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -159,10 +165,18 @@ export default function LoginScreen() {
   const [token, setToken] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [otpCountdown, setOtpCountdown] = useState(120);
+  const [otpCountdown, setOtpCountdown] = useState(0);
   const [otpTimerCycle, setOtpTimerCycle] = useState(0);
-  const analytics = useAnalytics(); 
-  const { t } = useI18n();
+  const [isResending, setIsResending] = useState(false);
+  const analytics = useAnalytics();
+  const { t, tf } = useI18n();
+
+  const isOtpCooldownActive = dialogOpen && otpCountdown > 0;
+
+  const startOtpCountdown = (seconds = OTP_COOLDOWN_SECONDS) => {
+    setOtpCountdown(seconds);
+    setOtpTimerCycle((currentValue) => currentValue + 1);
+  };
 
   const isDark = colorScheme === 'dark';
 
@@ -200,11 +214,9 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    if (!dialogOpen) {
+    if (otpTimerCycle === 0) {
       return;
     }
-
-    setOtpCountdown(120);
 
     const intervalId = setInterval(() => {
       setOtpCountdown((currentValue) => {
@@ -218,7 +230,7 @@ export default function LoginScreen() {
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [dialogOpen, otpTimerCycle]);
+  }, [otpTimerCycle]);
 
   const handleOpenLink = async (url: string) => {
     try {
@@ -229,23 +241,18 @@ export default function LoginScreen() {
   };
 
   const handleContactSupport = () => {
-    Alert.alert(
-      t('settings.contactUs'),
-      t('auth.supportMessage'),
-      [
-        { text: t('settings.whatsapp'), onPress: () => handleOpenLink(SUPPORT_WHATSAPP_URL) },
-        { text: t('settings.call'), onPress: () => handleOpenLink(`tel:${SUPPORT_PHONE}`) },
-        { text: t('settings.email'), onPress: () => handleOpenLink(SUPPORT_EMAIL_URL) },
-        { text: t('common.cancel'), style: 'cancel' },
-      ]
-    );
+    Alert.alert(t('settings.contactUs'), t('auth.supportMessage'), [
+      { text: t('settings.whatsapp'), onPress: () => handleOpenLink(SUPPORT_WHATSAPP_URL) },
+      { text: t('settings.call'), onPress: () => handleOpenLink(`tel:${SUPPORT_PHONE}`) },
+      { text: t('settings.email'), onPress: () => handleOpenLink(SUPPORT_EMAIL_URL) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   const handleFinishOnboarding = async () => {
     await AsyncStorage.setItem('onboarding', 'done');
     setShowOnboarding(false);
   };
-
 
   const handleEmailLogin = async () => {
     setLoading(true);
@@ -288,32 +295,57 @@ export default function LoginScreen() {
     }
   };
 
-  const signInWithOTP = async () => {
+  const signInWithOTP = async (): Promise<OtpRequestResult> => {
+    Keyboard.dismiss();
+
+    const canRequestOtp = !dialogOpen || otpCountdown === 0;
+
+    if (!canRequestOtp || loading) {
+      return { ok: false, blocked: true };
+    }
+
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithOtp({
+
+    const { error } = await supabase.auth.signInWithOtp({
       email: email,
       options: {
-        // set this to false if you do not want the user to be automatically signed up
         shouldCreateUser: true,
         emailRedirectTo: 'mobile://aficab.com/',
       },
     });
 
-    if (error){
-      setDialogOpen(false);
-      Alert.alert(error.message);
-      console.log(error);
+    if (error) {
+      const { message, retryAfterSeconds } = getAuthErrorMessage(error, t, tf);
+
+      setSnackbarMessage(message);
+      setSnackbarVisible(true);
+
+      if (retryAfterSeconds) {
+        startOtpCountdown(retryAfterSeconds);
+      }
+
+      setLoading(false);
+      return { ok: false, retryAfterSeconds };
     }
+
+    setDialogOpen(true);
+    startOtpCountdown();
     setLoading(false);
-  }
+    return { ok: true };
+  };
 
   const handleResendOTP = async () => {
-    setOtpCountdown(120);
-    setOtpTimerCycle((currentValue) => currentValue + 1);
+    if (otpCountdown > 0 || loading) {
+      return;
+    }
+
+    setIsResending(true);
     await signInWithOTP();
+    setIsResending(false);
   };
 
   const handleGoogleLogin = async () => {
+    Keyboard.dismiss();
     const nativeGoogleSigninModule = googleSigninModule;
 
     if (!googleWebClientId) {
@@ -326,7 +358,8 @@ export default function LoginScreen() {
 
     try {
       if (nativeGoogleSigninModule) {
-        const { user, errorMessage } = await signInWithNativeGoogleIdToken(nativeGoogleSigninModule);
+        const { user, errorMessage } =
+          await signInWithNativeGoogleIdToken(nativeGoogleSigninModule);
 
         if (errorMessage === 'missing-id-token') {
           setError(t('auth.googleInvalidToken'));
@@ -385,7 +418,8 @@ export default function LoginScreen() {
         let sessionUser = null;
 
         if (callbackParams.code) {
-          const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(callbackParams.code);
+          const { data: exchangeData, error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(callbackParams.code);
 
           if (exchangeError) {
             setError(exchangeError.message);
@@ -417,7 +451,9 @@ export default function LoginScreen() {
     } catch (error: any) {
       if (error?.code === nativeGoogleSigninModule?.statusCodes.IN_PROGRESS) {
         setError(t('auth.googleInProgress'));
-      } else if (error?.code === nativeGoogleSigninModule?.statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      } else if (
+        error?.code === nativeGoogleSigninModule?.statusCodes.PLAY_SERVICES_NOT_AVAILABLE
+      ) {
         setError(t('auth.googlePlayServicesUnavailable'));
       } else {
         setError(error?.message ?? t('auth.googleImpossible'));
@@ -428,6 +464,7 @@ export default function LoginScreen() {
   };
 
   const handleAppleLogin = async () => {
+    Keyboard.dismiss();
     setLoading(true);
     setError('');
 
@@ -513,7 +550,8 @@ export default function LoginScreen() {
       let sessionUser = null;
 
       if (callbackParams.code) {
-        const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(callbackParams.code);
+        const { data: exchangeData, error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(callbackParams.code);
 
         if (exchangeError) {
           setError(exchangeError.message);
@@ -551,41 +589,39 @@ export default function LoginScreen() {
     }
   };
 
-  const verifyOTP = async ( _token: string) => {
-  
+  const verifyOTP = async (_token: string) => {
+    setLoading(true);
 
-    const {data: { session },error,} = await supabase.auth.verifyOtp({
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.verifyOtp({
       email: email,
       token: _token,
       type: 'email',
     });
 
-    
     if (error) {
-      setSnackbarMessage(error.message);
+      const { message } = getAuthErrorMessage(error, t, tf);
+
+      setSnackbarMessage(message);
       setSnackbarVisible(true);
       setLoading(false);
       console.log('error:', error);
-
     }
 
     if (session) {
-    //  Alert.alert('Success', 'You have been signed in successfully!');
-    //router.push('../index');
-        setDialogOpen(false);
+      setDialogOpen(false);
       console.log('Session:', session);
       setLoading(false);
-     
     }
-
-  }
+  };
 
   if (showOnboarding === null) {
     return (
       <SafeAreaView
         className="flex-1 bg-white dark:bg-transparent"
-        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
-      >
+        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#FE5900" />
         </View>
@@ -597,8 +633,7 @@ export default function LoginScreen() {
     return (
       <SafeAreaView
         className="flex-1 bg-white dark:bg-transparent"
-        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
-      >
+        style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}>
         <AuthOnboardingSlider onDone={handleFinishOnboarding} />
       </SafeAreaView>
     );
@@ -607,153 +642,177 @@ export default function LoginScreen() {
   return (
     <SafeAreaView
       className="flex-1 bg-white dark:bg-transparent"
-      style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}
-    >
-      <ScrollView className="flex-1">
-      <View className="flex-1 px-6 py-10 justify-between">
-        
-        {/* Header */}
-        <View>
-          {/* Logo */}
-          <View className="items-center flex-1 justify-center  mb-8">
-            <View className="flex-row items-end">
-             <Image source={isDark ? require('@/assets/images/aficab-logo-white.png') : require('@/assets/images/aficab-logo-black.png')}
-                style={{ width: 150, height: 60, resizeMode: 'contain', marginLeft: 10 }} />
-             </View>
-          </View>
-
-          {/* Description */}
-          <Text className="text-center text-muted-foreground text-base mb-8">
-            {t('auth.description')}
-          </Text>
-
-          {/* Email Input */}
-          <View className="mb-8 " >
-            <Input
-              placeholder={t('auth.emailPlaceholder')}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              
-            />
-          </View>
-
-        
-
-          {/* Error Message */}
-          {error ? (
-            <Text className="text-red-500 text-sm mb-4 text-center">{error}</Text>
-          ) : null}
-
-          {/* Main Button */}
-          
-           <GetButtonDialog
-             dialogOpen={dialogOpen}
-             setDialogOpen={setDialogOpen}
-             signInWithOTP={signInWithOTP}
-             loading={loading}
-             email={email}
-             verifyOTP={verifyOTP}
-             token={token}
-             setToken={setToken}
-             otpCountdown={otpCountdown}
-             handleResendOTP={handleResendOTP}
-             labels={{
-               connecting: t('auth.connecting'),
-               signUpOrLogin: t('auth.signUpOrLogin'),
-               otpTitle: t('auth.otpTitle'),
-               otpDescription: t('auth.otpDescription'),
-               otpTimeRemaining: t('auth.otpTimeRemaining'),
-               otpPlaceholder: t('auth.otpPlaceholder'),
-               resendEmail: t('auth.resendEmail'),
-               verify: t('auth.verify'),
-               otpRequired: t('auth.otpRequired'),
-               error: t('common.error'),
-             }}
-           />
-
-          {/* Divider */}
-          <View className="flex-row items-center mb-6">
-            <View className="flex-1 h-px bg-gray-500 dark:bg-gray-600 " />
-            <Text className="mx-3 text-sm  text-gray-900 dark:text-white">{t('auth.or')}</Text>
-            <View className="flex-1 h-px bg-gray-500 dark:bg-gray-600 " />
-          </View>
-
-         {/* Google Button */}
-          <View className="mb-4 items-center">
-            {googleSigninModule ? (
-              <googleSigninModule.GoogleSigninButton
-                size={googleSigninModule.GoogleSigninButton.Size.Wide}
-                color={isDark ? googleSigninModule.GoogleSigninButton.Color.Dark : googleSigninModule.GoogleSigninButton.Color.Light}
-                onPress={handleGoogleLogin}
-                disabled={loading}
-                style={{ width: '100%', height: 48 }}
-              />
-            ) : (
-              <Button
-                className="h-12 rounded-lg w-full flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800"
-                onPress={handleGoogleLogin}
-                disabled={loading}
-              >
-                <View className="flex-row items-center justify-center"> 
-                <Image  source={require('@/assets/images/logo_google.png')} style={{ width: 34, height: 34, resizeMode: 'contain'}} />
-                <Text className="ml-3 font-semibold text-base text-gray-900 dark:text-white">{t('auth.googleContinue')}</Text>
+      style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}>
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <View className="flex-1 justify-between px-6 py-10">
+          {/* Header */}
+          <View>
+            {/* Logo */}
+            <View className="mb-8 flex-1 items-center justify-center">
+              <View className="flex-row items-end">
+                <Image
+                  source={
+                    isDark
+                      ? require('@/assets/images/aficab-logo-white.png')
+                      : require('@/assets/images/aficab-logo-black.png')
+                  }
+                  style={{ width: 150, height: 60, resizeMode: 'contain', marginLeft: 10 }}
+                />
               </View>
+            </View>
+
+            {/* Description */}
+            <Text className="mb-8 text-center text-base text-muted-foreground">
+              {t('auth.description')}
+            </Text>
+
+            {/* Email Input */}
+            <View className="mb-8">
+              <Input
+                placeholder={t('auth.emailPlaceholder')}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  if (email && !loading && !isOtpCooldownActive) {
+                    signInWithOTP();
+                  }
+                }}
+              />
+            </View>
+
+            {/* Error Message */}
+            {error ? <Text className="mb-4 text-center text-sm text-red-500">{error}</Text> : null}
+
+            {/* Main Button */}
+
+            <GetButtonDialog
+              dialogOpen={dialogOpen}
+              setDialogOpen={setDialogOpen}
+              signInWithOTP={signInWithOTP}
+              loading={loading}
+              isResending={isResending}
+              email={email}
+              verifyOTP={verifyOTP}
+              token={token}
+              setToken={setToken}
+              otpCountdown={otpCountdown}
+              handleResendOTP={handleResendOTP}
+              isOtpCooldownActive={isOtpCooldownActive}
+              labels={{
+                connecting: t('auth.connecting'),
+                signUpOrLogin: t('auth.signUpOrLogin'),
+                otpTitle: t('auth.otpTitle'),
+                otpDescription: t('auth.otpDescription'),
+                otpTimeRemaining: t('auth.otpTimeRemaining'),
+                otpResendHint: t('auth.otpResendHint'),
+                otpPlaceholder: t('auth.otpPlaceholder'),
+                resendEmail: t('auth.resendEmail'),
+                verify: t('auth.verify'),
+                otpRequired: t('auth.otpRequired'),
+              }}
+            />
+
+            {/* Divider */}
+            <View className="mb-6 flex-row items-center">
+              <View className="h-px flex-1 bg-gray-500 dark:bg-gray-600" />
+              <Text className="mx-3 text-sm text-gray-900 dark:text-white">{t('auth.or')}</Text>
+              <View className="h-px flex-1 bg-gray-500 dark:bg-gray-600" />
+            </View>
+
+            {/* Google Button */}
+            <View className="mb-4 items-center">
+              {googleSigninModule ? (
+                <googleSigninModule.GoogleSigninButton
+                  size={googleSigninModule.GoogleSigninButton.Size.Wide}
+                  color={
+                    isDark
+                      ? googleSigninModule.GoogleSigninButton.Color.Dark
+                      : googleSigninModule.GoogleSigninButton.Color.Light
+                  }
+                  onPress={handleGoogleLogin}
+                  disabled={loading}
+                  style={{ width: '100%', height: 48 }}
+                />
+              ) : (
+                <Button
+                  className="h-12 w-full flex-row items-center justify-center rounded-lg bg-gray-100 dark:bg-neutral-800"
+                  onPress={handleGoogleLogin}
+                  disabled={loading}>
+                  <View className="flex-row items-center justify-center">
+                    <Image
+                      source={require('@/assets/images/logo_google.png')}
+                      style={{ width: 34, height: 34, resizeMode: 'contain' }}
+                    />
+                    <Text className="ml-3 text-base font-semibold text-gray-900 dark:text-white">
+                      {t('auth.googleContinue')}
+                    </Text>
+                  </View>
+                </Button>
+              )}
+            </View>
+            {/* Apple Button */}
+
+            {Platform.OS === 'ios' && (
+              <Button
+                className="mb-8 h-12 flex-row items-center justify-center rounded-lg bg-gray-100 dark:bg-neutral-800"
+                onPress={handleAppleLogin}
+                disabled={loading}>
+                <View className="flex-row items-center justify-center">
+                  <FontAwesome
+                    name="apple"
+                    size={24}
+                    color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                  />
+                  <Text className="ml-3 text-base font-semibold text-gray-900 dark:text-white">
+                    {t('auth.appleContinue')}
+                  </Text>
+                </View>
               </Button>
             )}
           </View>
-          {/* Apple Button */}
 
-          {Platform.OS === 'ios' && (
-             <Button className=" h-12 rounded-lg mb-8 flex-row items-center justify-center bg-gray-100 dark:bg-neutral-800"
-               onPress={handleAppleLogin}
-               disabled={loading}>
-                  <View className="flex-row items-center justify-center"> 
-            <FontAwesome name="apple" size={24} color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
-            <Text className="ml-3 font-semibold text-base  text-gray-900 dark:text-white">{t('auth.appleContinue')}</Text>
+          {/* Footer */}
+          <View>
+            {/* Terms Text */}
+            <Text className="mb-6 text-xs leading-5 text-gray-600 dark:text-gray-400">
+              {t('auth.legalPrefix')}{' '}
+              <Link href="https://aficab.com/cgu" asChild>
+                <Text className="mb-6 text-xs leading-5 text-orange-500">
+                  {t('auth.legalTerms')}
+                </Text>
+              </Link>{' '}
+              {t('auth.legalMiddle')}{' '}
+              <Link href="https://aficab.com/politique-de-confidentialite" asChild>
+                <Text className="mb-6 text-xs leading-5 text-orange-500">
+                  {t('auth.legalPrivacy')}
+                </Text>
+              </Link>
+              {t('auth.legalSuffix')}
+            </Text>
+
+            {/* Support Text */}
+            <Text className="text-xs text-gray-600 dark:text-gray-400">
+              {t('auth.needHelp')}{' '}
+              <Text className="text-xs text-orange-500" onPress={handleContactSupport}>
+                {t('auth.contactSupport')}
+              </Text>
+            </Text>
           </View>
-          </Button>
-          )}
-         
         </View>
-
-        {/* Footer */}
-        <View>
-          {/* Terms Text */}
-          <Text className="text-gray-600 dark:text-gray-400 text-xs leading-5 mb-6">
-            {t('auth.legalPrefix')}{' '}
-             <Link href="https://aficab.com/cgu" asChild>  
-            <Text className="text-orange-500 text-xs leading-5 mb-6 ">{t('auth.legalTerms')}</Text>
-             </Link>
-            {' '}{t('auth.legalMiddle')}{' '}
-             <Link href="https://aficab.com/politique-de-confidentialite" asChild>  
-            <Text className="text-orange-500 text-xs leading-5 mb-6">{t('auth.legalPrivacy')}</Text>
-            </Link>
-            {t('auth.legalSuffix')}
-          </Text>
-
-          {/* Support Text */}
-          <Text className="text-gray-600 dark:text-gray-400 text-xs">
-            {t('auth.needHelp')}{' '}
-            <Text className="text-orange-500 text-xs" onPress={handleContactSupport}>{t('auth.contactSupport')}</Text>
-          </Text>
-
-        </View>
-      </View>
-    </ScrollView>
-    <Snackbar
-      visible={snackbarVisible}
-      onDismiss={() => setSnackbarVisible(false)}
-      duration={3500}
-      action={{
-        label: t('common.close'),
-        onPress: () => setSnackbarVisible(false),
-      }}
-    >
-      {snackbarMessage}
-    </Snackbar>
+      </ScrollView>
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3500}
+        action={{
+          label: t('common.close'),
+          onPress: () => setSnackbarVisible(false),
+        }}>
+        {snackbarMessage}
+      </Snackbar>
     </SafeAreaView>
- 
   );
 }
 
@@ -762,35 +821,39 @@ function GetButtonDialog({
   setDialogOpen,
   signInWithOTP,
   loading,
+  isResending,
   email,
   verifyOTP,
   token,
   setToken,
   otpCountdown,
   handleResendOTP,
+  isOtpCooldownActive,
   labels,
 }: {
   dialogOpen: boolean;
   setDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  signInWithOTP: () => void;
+  signInWithOTP: () => Promise<OtpRequestResult> | void;
   loading?: boolean;
+  isResending?: boolean;
   email?: string;
   verifyOTP?: (token: string) => void;
   token?: string;
   setToken?: React.Dispatch<React.SetStateAction<string>>;
   otpCountdown?: number;
   handleResendOTP?: () => void;
+  isOtpCooldownActive?: boolean;
   labels?: {
-  connecting: string;
-  signUpOrLogin: string;
-  otpTitle: string;
-  otpDescription: string;
-  otpTimeRemaining: string;
-  otpPlaceholder: string;
-  resendEmail: string;
-  verify: string;
-  otpRequired: string;
-  error: string;
+    connecting: string;
+    signUpOrLogin: string;
+    otpTitle: string;
+    otpDescription: string;
+    otpTimeRemaining: string;
+    otpResendHint: string;
+    otpPlaceholder: string;
+    resendEmail: string;
+    verify: string;
+    otpRequired: string;
   };
 }) {
   const minutes = Math.floor((otpCountdown ?? 0) / 60);
@@ -802,96 +865,109 @@ function GetButtonDialog({
     otpTitle: labels?.otpTitle ?? '',
     otpDescription: labels?.otpDescription ?? '',
     otpTimeRemaining: labels?.otpTimeRemaining ?? '',
+    otpResendHint: labels?.otpResendHint ?? '',
     otpPlaceholder: labels?.otpPlaceholder ?? '',
     resendEmail: labels?.resendEmail ?? '',
     verify: labels?.verify ?? '',
     otpRequired: labels?.otpRequired ?? '',
-    error: labels?.error ?? '',
   };
-  
+
   const [buttonEnabled, setButtonEnabled] = useState(true);
-  
+  const [validationError, setValidationError] = useState('');
+
+  useEffect(() => {
+    if (!loading) {
+      setButtonEnabled(true);
+    }
+  }, [loading]);
+
+  const handleSignInPress = () => {
+    void signInWithOTP();
+  };
+
   return (
-  <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-                {/* button de l'action  */}
-              <Button onPress={signInWithOTP}
-            disabled={loading || !email }
-            className="bg-orange-500 h-12 rounded-lg mb-6"
-              >
-                <Text className="text-white font-bold text-base">
-                  {loading ? resolvedLabels.connecting : resolvedLabels.signUpOrLogin}
-                </Text>
+    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <DialogTrigger asChild>
+        <Button
+          onPress={handleSignInPress}
+          disabled={loading || !email || isOtpCooldownActive}
+          className="mb-6 h-12 rounded-lg bg-orange-500">
+          <Text className="text-base font-bold text-white">
+            {loading ? resolvedLabels.connecting : resolvedLabels.signUpOrLogin}
+          </Text>
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{resolvedLabels.otpTitle}</DialogTitle>
+          <DialogDescription>{resolvedLabels.otpDescription}</DialogDescription>
+          {(otpCountdown ?? 0) > 0 ? (
+            <>
+              <Text className="text-center text-sm font-medium text-orange-500">
+                {resolvedLabels.otpTimeRemaining} : {formattedCountdown}
+              </Text>
+              <Text className="text-center text-xs text-muted-foreground">
+                {resolvedLabels.otpResendHint}
+              </Text>
+            </>
+          ) : null}
+        </DialogHeader>
+
+        <View className="mb-4 mt-4">
+          <Input
+            placeholder={resolvedLabels.otpPlaceholder}
+            keyboardType="number-pad"
+            onChangeText={(text) => {
+              setValidationError('');
+              setButtonEnabled(true);
+              setToken?.(text);
+              if (text.length === 6) {
+                setButtonEnabled(false);
+                Keyboard.dismiss();
+                verifyOTP && verifyOTP(text);
+              }
+            }}
+            textAlign="center"
+          />
+          {validationError ? (
+            <Text className="mt-2 text-center text-sm text-red-500">{validationError}</Text>
+          ) : null}
+        </View>
+        <DialogFooter>
+          <View className="flex-row items-center justify-center">
+            {otpCountdown === 0 ? (
+              <Button
+                className="mr-3 h-12 rounded-lg bg-gray-200 dark:bg-neutral-800"
+                disabled={loading || isResending}
+                onPress={handleResendOTP}>
+                {isResending ? (
+                  <ActivityIndicator size="small" color="#FE5900" />
+                ) : (
+                  <Text className="text-base font-bold text-gray-900 dark:text-white">
+                    {resolvedLabels.resendEmail}
+                  </Text>
+                )}
               </Button>
-            
+            ) : null}
 
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{resolvedLabels.otpTitle}</DialogTitle>
-                <DialogDescription>
-                  {resolvedLabels.otpDescription}
-                </DialogDescription>
-                <Text className="text-center text-sm font-medium text-orange-500">
-                  {resolvedLabels.otpTimeRemaining} : {formattedCountdown}
-                </Text>
-              </DialogHeader>
-              {/* Contenu du dialog ici */}
-               <View className="mb-4 mt-4 " >
-                <Input
-                  placeholder={resolvedLabels.otpPlaceholder}
-                keyboardType="number-pad"
-                onChangeText={(text) => {
-                   setToken?.(text);
-                  if(text.length === 6) {
-                     setButtonEnabled(false);
-                      Keyboard.dismiss();
-                      verifyOTP && verifyOTP(text);
-                  }
-                
-                }}
-                textAlign='center'
-                />
-                </View>
-              {/* Button de fermeture du dialog */}
-                <DialogFooter>
-                  <View className="flex-row items-center justify-center">
-
-                   {otpCountdown === 0 ? (
-                    <Button
-                      className="mr-3 h-12 rounded-lg bg-gray-200 dark:bg-neutral-800"
-                      disabled={loading}
-                      onPress={handleResendOTP}
-                    >
-                      <Text className="font-bold text-base text-gray-900 dark:text-white">
-                        {resolvedLabels.resendEmail}
-                      </Text>
-                    </Button>
-                   ) : null}
-
-                   {/* Button Valider */}
-                    <Button className="bg-orange-500 h-12 rounded-lg flex-1 flex-row items-center justify-center "
-                     disabled={!buttonEnabled}
-                     onPress={() => {
-                      setButtonEnabled(false);
-                        Keyboard.dismiss();
-                        if (token) {
-                          verifyOTP && verifyOTP(token);
-                        }else {Alert.alert(resolvedLabels.error, resolvedLabels.otpRequired)
-                        }
-                      }}
-                    >
-                      <Text className="text-white font-bold text-base">
-                        {resolvedLabels.verify}
-                      </Text>
-                    </Button>
-                   
-                
-                
-                </View>
-                </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
+            <Button
+              className="h-12 flex-1 flex-row items-center justify-center rounded-lg bg-orange-500"
+              disabled={!buttonEnabled}
+              onPress={() => {
+                setButtonEnabled(false);
+                Keyboard.dismiss();
+                if (token) {
+                  verifyOTP && verifyOTP(token);
+                } else {
+                  setValidationError(resolvedLabels.otpRequired);
+                  setButtonEnabled(true);
+                }
+              }}>
+              <Text className="text-base font-bold text-white">{resolvedLabels.verify}</Text>
+            </Button>
+          </View>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
