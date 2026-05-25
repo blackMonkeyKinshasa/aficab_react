@@ -1,8 +1,10 @@
-import { TextClassContext } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
-import { cva, type VariantProps } from 'class-variance-authority';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+
+import { cva, type VariantProps } from 'class-variance-authority';
+
+import { TextClassContext } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
   cn(
@@ -105,10 +107,25 @@ function getIndicatorColor(variant?: VariantProps<typeof buttonVariants>['varian
 }
 
 function isPromiseLike(value: unknown): value is Promise<unknown> {
-  return typeof value === 'object' && value !== null && 'then' in value && typeof value.then === 'function';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'then' in value &&
+    typeof value.then === 'function'
+  );
 }
 
-function Button({ className, variant, size, loading = false, loadingIndicatorColor, onPress, children, disabled, ...props }: ButtonProps) {
+function Button({
+  className,
+  variant,
+  size,
+  loading = false,
+  loadingIndicatorColor,
+  onPress,
+  children,
+  disabled,
+  ...props
+}: ButtonProps) {
   const [internalLoading, setInternalLoading] = useState(false);
   const resolvedIndicatorColor = useMemo(
     () => loadingIndicatorColor ?? getIndicatorColor(variant),
@@ -137,17 +154,20 @@ function Button({ className, variant, size, loading = false, loadingIndicatorCol
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
-        className={cn((disabled || isLoading) && 'opacity-50', buttonVariants({ variant, size }), className)}
+        className={cn(
+          (disabled || isLoading) && 'opacity-50',
+          buttonVariants({ variant, size }),
+          className
+        )}
         role="button"
         disabled={disabled || isLoading}
         onPress={handlePress}
-        {...props}
-      >
-        {typeof children === 'function' ? children : (
+        {...props}>
+        {typeof children === 'function' ? (
+          children
+        ) : (
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{ opacity: isLoading ? 0 : 1 }}>
-              {children}
-            </View>
+            <View style={{ opacity: isLoading ? 0 : 1 }}>{children}</View>
 
             {isLoading ? (
               <View style={{ position: 'absolute', alignSelf: 'center' }}>
