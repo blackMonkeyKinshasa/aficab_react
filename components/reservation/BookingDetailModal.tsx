@@ -281,10 +281,10 @@ export function BookingDetailModal({
                 {isCancelling ? (
                   <View style={styles.cancelButtonContent}>
                     <ActivityIndicator size="small" color="#ffffff" />
-                    <Text style={styles.primaryButtonText}> Annulation...</Text>
+                    <Text style={styles.primaryButtonText}>{t('reservations.cancelLoading')}</Text>
                   </View>
                 ) : (
-                  <Text style={styles.primaryButtonText}> Annuler la course</Text>
+                  <Text style={styles.primaryButtonText}>{t('reservations.cancelAction')}</Text>
                 )}
               </Button>
             </View>

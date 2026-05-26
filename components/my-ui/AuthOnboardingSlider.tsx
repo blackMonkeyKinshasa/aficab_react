@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AppIntroSlider from 'react-native-app-intro-slider';
 import { CarFront, MapPinned, Zap } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import { color } from '@/constants/colors';
+import { useI18n } from '@/lib/i18n';
 
 type SlideItem = {
   key: string;
@@ -58,13 +59,34 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [activeIndex, setActiveIndex] = useState(0);
+  const { t } = useI18n();
 
-  const logoSource = useMemo(
-    () => (isDark
-      ? require('@/assets/images/aficab-app-logo-white.png')
-      : require('@/assets/images/aficab-app-logo-black.png')),
-    [isDark]
-  );
+  const slides = useMemo<SlideItem[]>(() => ([
+    {
+      key: '1',
+      title: t('onboarding.slide1.title'),
+      text: t('onboarding.slide1.text'),
+      icon: 'car',
+      eyebrow: t('onboarding.slide1.eyebrow'),
+      caption: t('onboarding.slide1.caption'),
+    },
+    {
+      key: '2',
+      title: t('onboarding.slide2.title'),
+      text: t('onboarding.slide2.text'),
+      icon: 'flash',
+      eyebrow: t('onboarding.slide2.eyebrow'),
+      caption: t('onboarding.slide2.caption'),
+    },
+    {
+      key: '3',
+      title: t('onboarding.slide3.title'),
+      text: t('onboarding.slide3.text'),
+      icon: 'map',
+      eyebrow: t('onboarding.slide3.eyebrow'),
+      caption: t('onboarding.slide3.caption'),
+    },
+  ]), [t]);
 
   return (
     <AppIntroSlider
@@ -77,18 +99,18 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       renderSkipButton={() => (
         activeIndex < slides.length - 1 ? (
           <TouchableOpacity style={styles.skipButton} onPress={onDone}>
-            <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Ignorer</Text>
+            <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         ) : <View style={styles.skipPlaceholder} />
       )}
       renderNextButton={() => (
         <View style={[styles.nextButton, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
-          <Text style={styles.nextText}>Suivant</Text>
+          <Text style={styles.nextText}>{t('onboarding.next')}</Text>
         </View>
       )}
       renderDoneButton={() => (
         <View style={styles.doneButton}>
-          <Text style={styles.doneText}>Commencer</Text>
+          <Text style={styles.doneText}>{t('onboarding.start')}</Text>
         </View>
       )}
       onSlideChange={(index) => setActiveIndex(index)}
@@ -101,7 +123,7 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
               <View style={[styles.brandPill, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
                 <Text style={styles.brandPillText}>AFICAB</Text>
               </View>
-              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>Kinshasa</Text>
+              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>{t('booking.kinshasa')}</Text>
             </View>
 
              <View style={styles.visualArea}>
@@ -117,10 +139,10 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
 
             <View style={styles.footerRow}>
               <View style={[styles.footerPill, { backgroundColor: isDark ? '#20150F' : '#FFF1E8', borderColor: isDark ? '#5F321B' : '#F3C4A8' }]}>
-                <Text style={styles.footerPillText}>Mobilité premium</Text>
+                <Text style={styles.footerPillText}>{t('onboarding.footer.premiumMobility')}</Text>
               </View>
               <View style={[styles.footerPill, { backgroundColor: isDark ? '#1C212A' : '#F4F4F5', borderColor: isDark ? '#313744' : '#E4E4E7' }]}>
-                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827' }]}>Service 24/7</Text>
+                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827' }]}>{t('onboarding.footer.service247')}</Text>
               </View>
             </View>
           </View>

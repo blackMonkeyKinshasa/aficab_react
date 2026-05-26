@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { AlertTriangle, RefreshCw, ShieldCheck, Store } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useMemo, useState } from 'react';
-import { Linking, Platform, SafeAreaView, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';

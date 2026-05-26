@@ -1,5 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
+import { useI18n } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import * as DialogPrimitive from '@rn-primitives/dialog';
 import { X } from 'lucide-react-native';
@@ -56,6 +57,8 @@ function DialogContent({
   React.RefAttributes<DialogPrimitive.ContentRef> & {
     portalHost?: string;
   }) {
+  const { t } = useI18n();
+
   return (
     <DialogPortal hostName={portalHost}>
       <DialogOverlay>
@@ -81,7 +84,7 @@ function DialogContent({
               as={X}
               className={cn('size-4 shrink-0 text-accent-foreground web:pointer-events-none')}
             />
-            <Text className="sr-only">Fermer</Text>
+            <Text className="sr-only">{t('common.close')}</Text>
           </DialogPrimitive.Close>
         </DialogPrimitive.Content>
       </DialogOverlay>

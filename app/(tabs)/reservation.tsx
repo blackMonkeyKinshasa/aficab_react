@@ -535,13 +535,13 @@ export default function Reservation() {
 
   const handleClientCancelBooking = (booking: Booking) => {
     if (!canClientCancelBooking(booking)) {
-      Alert.alert(t('common.error'), 'Cette reservation ne peut etre annulee que 24h avant le depart.');
+      Alert.alert(t('common.error'), t('reservations.cancelBlockedMessage'));
       return;
     }
 
     Alert.alert(
-      'Annuler la course',
-      'Voulez-vous vraiment annuler cette course ?',
+      t('reservations.cancelConfirmTitle'),
+      t('reservations.cancelConfirmMessage'),
       [
         {
           text: t('common.no'),

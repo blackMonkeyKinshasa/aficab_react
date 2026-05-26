@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, SafeAreaView, Alert, Linking,ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Alert, Linking, ScrollView } from 'react-native';
+import { SafeAreaView as SafeAreaContextView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/text';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -129,7 +130,7 @@ export default function ChekRole() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
+    <SafeAreaContextView style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
         <ScrollView
@@ -195,7 +196,7 @@ export default function ChekRole() {
 
       </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaContextView>
   );
 }
 

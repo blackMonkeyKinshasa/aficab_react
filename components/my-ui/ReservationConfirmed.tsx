@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   StatusBar,
   useColorScheme,
 } from "react-native";
+import { SafeAreaView as SafeAreaContextView } from 'react-native-safe-area-context';
 import { Ionicons } from "@expo/vector-icons";
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
@@ -20,8 +20,8 @@ type Props = {
 };
 
 export function ReservationConfirmedScreen({
-  userName = "Bertin C1",
-  email = "bertinselendo2c1@gmail.com",
+  userName ,
+  email,
   onPressMyBookings,
   onPressContact,
 }: Props) {
@@ -30,7 +30,7 @@ export function ReservationConfirmedScreen({
   const { t, tf } = useI18n();
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}> 
+    <SafeAreaContextView style={[styles.safe, { backgroundColor: theme.background }]}> 
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <View style={styles.container}>
         {/* Badge (cercles + check) */}
@@ -86,7 +86,7 @@ export function ReservationConfirmedScreen({
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </SafeAreaContextView>
   );
 }
 

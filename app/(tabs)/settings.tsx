@@ -458,7 +458,7 @@ export default function SettingsScreen() {
           setLoading(false);
 
         }} className="flex-row items-center justify-center">
-        <Text className="text-center text-sm text-gray-500">Build version : {localClientVersion}</Text>
+        <Text className="text-center text-sm text-gray-500">{t('settings.buildVersionLabel')}: {localClientVersion}</Text>
         </TouchableOpacity>
          <View className="h-8" />
 

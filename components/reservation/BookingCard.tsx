@@ -55,7 +55,7 @@ export function BookingCard({
       <View style={styles.content}>
         {highlighted && badgeIsShow ? (
           <View style={[styles.highlightBadge, { backgroundColor: highlightColor }]}>
-            <Text style={styles.highlightBadgeText}>Nouvelle reservation</Text>
+            <Text style={styles.highlightBadgeText}>{t('reservations.highlightBadge')}</Text>
           </View>
         ) : null}
         <View style={styles.cardTopRow}>

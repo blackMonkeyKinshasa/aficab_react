@@ -1,5 +1,5 @@
 import {
-  Booking,
+  
   CreateBookingInput,
   CreateBookingResponse,
   CreateReviewResponse,

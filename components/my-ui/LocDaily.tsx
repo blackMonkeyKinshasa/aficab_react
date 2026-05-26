@@ -826,7 +826,7 @@ const PriceRow = ({ label, value }: { label: string; value: string }) => (
 
          {/* TITLE */}
           <View style={[styles.sectionHeader,{ marginBottom : 20 }]}>
-            <Text style={{ color: theme.subText, }}>Complétez votre réservation avec des options supplémentaires</Text>
+            <Text style={{ color: theme.subText, }}>{t('booking.extraOptionsIntro')}</Text>
           </View>
 
       {/* OPTIONS */}

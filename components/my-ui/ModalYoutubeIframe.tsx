@@ -4,6 +4,7 @@ import YoutubePlayer from 'react-native-youtube-iframe';
 import { useColorScheme } from 'nativewind';
 
 import { color } from '@/constants/colors';
+import { useI18n } from '@/lib/i18n';
 
 type ModalYoutubeIframeProps = {
   visible: boolean;
@@ -24,6 +25,7 @@ export function ModalYoutubeIframe({
 }: ModalYoutubeIframeProps) {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { t } = useI18n();
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -34,7 +36,7 @@ export function ModalYoutubeIframe({
           <View style={styles.header}>
             <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={[styles.closeText, { color: isDark ? '#FFFFFF' : '#111827' }]}>Fermer</Text>
+              <Text style={[styles.closeText, { color: isDark ? '#FFFFFF' : '#111827' }]}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
 
