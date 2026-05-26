@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
 
 import { getActivity } from '@/api/activity';
-import { Activity } from '@/constants/dataInterface';
 import { supabase } from '@/lib/supabase';
 import { useMyStateNotif } from '@/store/notification-state';
 
@@ -14,9 +13,8 @@ type Props = {
   onPress?: () => void;
 };
 
-export function NotificationIcon({ isDark, onPress }: Props) {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const { countNotif, setCountNotif, clearCountNotif } = useMyStateNotif();
+export function NotificationIcon({ isDark, onPress: _onPress }: Props) {
+  const { countNotif, setCountNotif } = useMyStateNotif();
 
   useEffect(() => {
     supabase.auth
@@ -25,7 +23,6 @@ export function NotificationIcon({ isDark, onPress }: Props) {
         if (user) {
           getActivity({ userId: user.id, isRead: '0' })
             .then((data) => {
-              setActivities(data);
               console.log('Notification count: 0', data.length);
               setCountNotif(data.length);
             })
@@ -33,7 +30,7 @@ export function NotificationIcon({ isDark, onPress }: Props) {
         }
       })
       .catch((err) => console.error(err));
-  }, [countNotif]);
+  }, [countNotif, setCountNotif]);
   const router = useRouter();
   return (
     <TouchableOpacity onPress={() => router.push('/notificationsPage')} style={{ padding: 8 }}>

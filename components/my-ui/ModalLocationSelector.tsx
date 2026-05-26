@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import { IconButton, useTheme } from 'react-native-paper';
+import { IconButton } from 'react-native-paper';
 
 import { Location } from '@/constants/constants';
 import { useI18n } from '@/lib/i18n';
@@ -28,7 +28,6 @@ export function ModalLocationSelector({
   onConfirm: (location: Location) => void;
   disableStatusBar?: boolean;
 }) {
-  const theme = useTheme();
   const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
   const modalBg = isDark ? '#1E2226' : '#ffffff';
@@ -37,7 +36,6 @@ export function ModalLocationSelector({
   const borderColor = isDark ? '#374151' : '#e5e7eb';
 
   const [location, setLocation] = useState<Location | null>(null);
-  const [date, setDate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { recentLocations, removeLocation } = useMyStateLocation();
   const isSearching = searchQuery.trim().length >= 2;
@@ -54,8 +52,6 @@ export function ModalLocationSelector({
     },
     [onConfirm]
   );
-
-  const color = theme.dark ? theme.colors.elevation.level3 : theme.colors.surface;
 
   return (
     <Modal

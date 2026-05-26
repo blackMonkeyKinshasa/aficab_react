@@ -122,7 +122,10 @@ function toLocationPoint(locationDoc: LocationDocLOC) {
   };
 }
 
-function getCouponDiscountAmount(coupon: CouponValidationValidResponse | null, orderTotal: number) {
+function getCouponDiscountAmount(
+  coupon: CouponValidationValidResponse | null,
+  _orderTotal: number
+) {
   if (!coupon) {
     return 0;
   }
@@ -368,7 +371,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [selectedCar?.id, fuel, flex, premium, rentalDays]);
+  }, [appliedCouponCode, selectedCar?.id, fuel, flex, premium, rentalDays]);
 
   useEffect(() => {
     if (appliedCouponCode && code.trim() !== appliedCouponCode) {
@@ -414,6 +417,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setIsRefreshing(true);
       void loadCars(1, true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload vehicles when step changes
   }, [etape]);
 
   useEffect(() => {
@@ -620,6 +624,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome promo runs once per recap context
   }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
 
   const myButton = () => {

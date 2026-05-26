@@ -46,11 +46,6 @@ const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.RECAP]: EtapeReservation.RECAP,
 };
 
-const PREVIOUS_ETAPE: Partial<Record<EtapeReservation, EtapeReservation>> = {
-  [EtapeReservation.OPTION]: EtapeReservation.SELECTION,
-  [EtapeReservation.RECAP]: EtapeReservation.OPTION,
-};
-
 type Props = {
   locationDoc: LocationDocTA;
   isDarkMode: boolean;
@@ -153,7 +148,10 @@ function getAirportTripPrice(car: Car | null, distanceKm: number | null) {
   return Number((distanceKm * taPrice).toFixed(2));
 }
 
-function getCouponDiscountAmount(coupon: CouponValidationValidResponse | null, orderTotal: number) {
+function getCouponDiscountAmount(
+  coupon: CouponValidationValidResponse | null,
+  _orderTotal: number
+) {
   if (!coupon) {
     return 0;
   }
@@ -423,6 +421,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setIsRefreshing(true);
       void loadCars(1, true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload vehicles when step changes
   }, [etape]);
 
   useEffect(() => {
@@ -437,7 +436,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [selectedCar?.id, distanceKm, locationDoc.tripType]);
+  }, [appliedCouponCode, selectedCar?.id, distanceKm, locationDoc.tripType]);
 
   useEffect(() => {
     if (appliedCouponCode && code.trim() !== appliedCouponCode) {
@@ -611,18 +610,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome promo runs once per recap context
   }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
-
-  const handlePreviousEtape = () => {
-    const previousEtape = PREVIOUS_ETAPE[etape];
-
-    if (previousEtape) {
-      setEtape(previousEtape);
-      return;
-    }
-
-    router.back();
-  };
 
   const myButton = () => {
     return (
@@ -858,7 +847,6 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       return `${d.toLocaleDateString(appLocale, { day: 'numeric', month: 'short', year: '2-digit' })} ${d.toLocaleTimeString(appLocale, { hour: '2-digit', minute: '2-digit' })}`;
     })();
     const activeDateLabel = isPositionAller ? allerScheduleLabel : retourScheduleLabel;
-    const trimmedFlyNumber = flyNumber.trim();
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
     const trimmedGuestPhone = guestPhone.trim();

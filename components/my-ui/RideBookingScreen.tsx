@@ -1,5 +1,5 @@
-import React, { ComponentProps, useCallback, useState } from 'react';
-import { Dimensions, Image, Platform, Text, TouchableOpacity, View } from 'react-native';
+import React, { ComponentProps, useState } from 'react';
+import { Dimensions, Image, Text, TouchableOpacity, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'nativewind';
@@ -27,80 +27,12 @@ interface RideBookingScreenProps {
 
 type RideType = 'daily' | 'airport';
 
-interface FormData {
-  location: string;
-  startDate: Date;
-  endDate: Date;
-  showStartDatePicker: boolean;
-  showEndDatePicker: boolean;
-}
-
 export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t } = useI18n();
 
-  const [value, setValue] = useState('account');
   const [rideType, setRideType] = useState<RideType>('daily');
-  const [formData, setFormData] = useState<FormData>({
-    location: '',
-    startDate: new Date(),
-    endDate: new Date(),
-    showStartDatePicker: false,
-    showEndDatePicker: false,
-  });
-  const [date, setDate] = useState<Date | null>(null);
-
-  // Gérer le changement de localisation
-  const handleLocationChange = useCallback((text: string) => {
-    setFormData((prev) => ({ ...prev, location: text }));
-  }, []);
-
-  // Gérer la date de début
-  const handleStartDateChange = useCallback((event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setFormData((prev) => ({ ...prev, showStartDatePicker: false }));
-    }
-    if (selectedDate) {
-      setFormData((prev) => ({ ...prev, startDate: selectedDate }));
-    }
-  }, []);
-
-  // Gérer la date/heure de fin
-  const handleEndDateChange = useCallback((event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setFormData((prev) => ({ ...prev, showEndDatePicker: false }));
-    }
-    if (selectedDate) {
-      setFormData((prev) => ({ ...prev, endDate: selectedDate }));
-    }
-  }, []);
-
-  // Afficher les offres
-  const handleViewOffers = useCallback(() => {
-    console.log('Voir les offres avec:', formData);
-    // Naviguer vers la page des offres
-  }, [formData]);
-
-  // Formater la date
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
-
-  // Formater la date et heure
-  const formatDateTime = (date: Date): string => {
-    return date.toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const TabHeader = ({
     label,

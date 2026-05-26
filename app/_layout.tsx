@@ -13,7 +13,7 @@ import * as Location from 'expo-location';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { RefreshCw } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -103,14 +103,7 @@ const paperDarkTheme = {
   },
 };
 
-const BackButton = ({ onPress, isDark }: { onPress: () => void; isDark: boolean }) => (
-  <TouchableOpacity onPress={onPress} style={{ marginRight: 16 }}>
-    <ArrowLeft size={24} color={isDark ? '#ffffff' : '#000000'} />
-  </TouchableOpacity>
-);
-
 export default Sentry.wrap(function RootLayout() {
-  const { colorScheme } = useColorScheme();
   return (
     // Point d'entree global: tous les ecrans heritent ici des providers analytics/telemetrie.
     <PostHogProvider client={posthogClient}>
@@ -373,7 +366,7 @@ function RootLayoutInner() {
     } else {
       posthog?.reset();
     }
-  }, [user, storedUser, colorScheme]);
+  }, [user, storedUser, colorScheme, posthog]);
 
   useEffect(() => {
     // Une fois connecte, on tente de capturer une position pour enrichir les evenements.
@@ -398,7 +391,7 @@ function RootLayoutInner() {
         reportStartupError('location_bootstrap_failed', error);
       }
     })();
-  }, [user]);
+  }, [user, posthog]);
 
   useEffect(() => {
     // Synchronise l'utilisateur courant avec Sentry pour rattacher les erreurs au bon compte.
@@ -490,6 +483,7 @@ function RootLayoutInner() {
 
     console.log('device token :', useMyStateUser.getState().user?.deviceToken);
     void runPushTokenSync('auto');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on auth/session changes only
   }, [authReady, pushSyncNonce, storedUser?.deviceToken, storedUser?.id, user, userStoreHydrated]);
 
   useEffect(() => {
@@ -506,6 +500,7 @@ function RootLayoutInner() {
     return () => {
       subscription.remove();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- foreground resync is tied to app lifecycle
   }, [authReady, user, userStoreHydrated]);
 
   useEffect(() => {
@@ -525,6 +520,7 @@ function RootLayoutInner() {
       pushTokenListenerRef.current?.remove();
       pushTokenListenerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- token rotation listener is registered once per user
   }, [user]);
 
   useEffect(() => {
@@ -563,6 +559,7 @@ function RootLayoutInner() {
       receivedListenerRef.current = null;
       responseListenerRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- notification listeners are mounted once per route context
   }, [pathname, router]);
 
   if (!authReady) {

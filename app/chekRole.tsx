@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Inclus par défaut dans Expo
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +17,6 @@ import { supabase } from '@/lib/supabase';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 
 export default function ChekRole() {
-  const router = useRouter();
   const setStoredUser = useMyStateUser((state) => state.updateUser);
   const storedUser = useMyStateUser((state) => state.user);
   const { colorScheme } = useColorScheme();

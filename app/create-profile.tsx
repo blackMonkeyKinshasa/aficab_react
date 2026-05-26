@@ -41,7 +41,6 @@ export default function CreateProfile() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
 
-  const [userId, setUserId] = useState('');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [gender, setGender] = useState('');
@@ -58,7 +57,6 @@ export default function CreateProfile() {
   }));
 
   const hydrateForm = (data: User) => {
-    setUserId(data.id);
     setFullName(data.full_name ?? '');
     setPhoneNumber(data.phone ?? '');
     setGender(data.genre ?? '');
@@ -82,7 +80,7 @@ export default function CreateProfile() {
           return;
         }
 
-        const locationDetails = await getUserLocationDetails();
+        void getUserLocationDetails();
 
         if (!isMounted) {
           return;
@@ -101,7 +99,7 @@ export default function CreateProfile() {
 
         setStoredUser(data);
         hydrateForm(data);
-      } catch (error: any) {
+      } catch {
         // console.error('Erreur lors du chargement du profil:', error);
         // Alert.alert('Erreur', error?.message ?? 'Impossible de charger votre profil.');
       } finally {

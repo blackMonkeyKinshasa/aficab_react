@@ -95,6 +95,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 function hasNativeGoogleSigninModule() {
   const turboModuleRegistry =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime probe for optional native module
     require('react-native/Libraries/TurboModule/TurboModuleRegistry').default;
 
   return Boolean(NativeModules?.RNGoogleSignin || turboModuleRegistry?.get?.('RNGoogleSignin'));
@@ -154,13 +155,12 @@ async function signInWithNativeGoogleIdToken(nativeGoogleSigninModule: GoogleSig
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [googleSigninModule, setGoogleSigninModule] = useState<GoogleSigninModule | null>(null);
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const router = useRouter();
-  const { colorScheme, toggleColorScheme } = useColorScheme();
+  const { colorScheme } = useColorScheme();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [token, setToken] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -252,47 +252,6 @@ export default function LoginScreen() {
   const handleFinishOnboarding = async () => {
     await AsyncStorage.setItem('onboarding', 'done');
     setShowOnboarding(false);
-  };
-
-  const handleEmailLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const { error: err, data } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (err) {
-        setError(err.message);
-      } else {
-        analytics.trackLogin(data.user?.id ?? '', email, null);
-        router.replace('/');
-      }
-    } catch (err) {
-      setError(t('auth.genericError'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const { error: err } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (err) {
-        setError(err.message);
-      } else {
-        setError(t('auth.checkEmailConfirm'));
-      }
-    } catch (err) {
-      setError(t('auth.genericError'));
-    } finally {
-      setLoading(false);
-    }
   };
 
   const signInWithOTP = async (): Promise<OtpRequestResult> => {

@@ -235,7 +235,7 @@ export default function Root({ children }: PropsWithChildren) {
           <div className="container">
             <h1>Aficab</h1>
             <h3>Louez en toute simplicite, roulez avec discretion</h3>
-            <p>Redirection vers l'emplacement approprie...</p>
+            <p>Redirection vers l&apos;emplacement approprie...</p>
             <div className="spinner" />
             <div className="manual-link">
               Pas de redirection ?{' '}

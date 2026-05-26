@@ -432,7 +432,7 @@ export default function Notifications() {
         setError(t('notifications.loadError'));
         setLoading(false);
       });
-  }, []);
+  }, [t]);
 
   usePreventRemove(
     activities.some((activity) => !activity.isRead),

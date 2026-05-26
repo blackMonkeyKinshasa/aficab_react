@@ -63,7 +63,7 @@ export default function Signup() {
         Alert.alert(t('signup.successTitle'), t('signup.successMessage'));
         router.replace('/(tabs)');
       }
-    } catch (err) {
+    } catch {
       Alert.alert(t('common.error'), t('auth.genericError'));
     } finally {
       setLoading(false);

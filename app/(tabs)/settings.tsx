@@ -112,7 +112,7 @@ export default function SettingsScreen() {
             await supabase.auth.signOut();
             resetUserSessionState();
             //  router.replace('/(auth)/login');
-          } catch (err) {
+          } catch {
             Alert.alert(t('common.error'), t('settings.logoutError'));
           } finally {
             setLoading(false);
@@ -144,7 +144,7 @@ export default function SettingsScreen() {
             await supabase.auth.signOut();
             resetUserSessionState();
             //  router.replace('/(auth)/login');
-          } catch (err) {
+          } catch {
             Alert.alert(t('common.error'), t('settings.deleteError'));
           } finally {
             setLoading(false);
@@ -192,7 +192,7 @@ export default function SettingsScreen() {
 
   const ContactItem = ({
     label,
-    value,
+    value: _value,
     icon,
     onPress,
   }: {

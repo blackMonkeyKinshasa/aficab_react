@@ -1080,7 +1080,7 @@ export default function Reservation() {
         .catch(() => Alert.alert(t('common.error'), t('reservations.loadError')))
         .finally(() => setLoading(false));
     });
-  }, []);
+  }, [t]);
 
   const handleReviewSubmit = async ({
     ratingDriving,

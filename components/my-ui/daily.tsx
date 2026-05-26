@@ -15,28 +15,9 @@ import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { useMyStateUser } from '@/store/user-state';
 
-interface RideBookingScreenProps {
-  navigation?: any;
-}
-
-type RideType = 'daily' | 'airport';
-
-const formatDate = (d: Date | null) => {
-  if (!d) return '';
-
-  return d.toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
 export function Daily() {
   const router = useRouter();
   const { t } = useI18n();
-  const [value, setValue] = useState('account');
   const [visible, setVisible] = useState(false);
   const [location, setLocation] = useState<Location | null>(null);
   const [dateStart, setDateStart] = useState<Date | null>(null);

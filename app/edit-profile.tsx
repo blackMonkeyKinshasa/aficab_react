@@ -37,7 +37,6 @@ export default function EditProfile() {
     focusField?: string;
     returnToBooking?: string;
   };
-  const loc = getUserLocationDetails();
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [userID, setUserID] = useState('');
@@ -47,13 +46,10 @@ export default function EditProfile() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('STANDARD');
-  const [initialData, setInitialData] = useState(null);
   const [update, setUpdate] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
-  const [countryCode, setCountryCode] = useState<string | null>(null);
-  const [indicatif, setIndicatif] = useState<string | null>(null);
   const [phoneFieldY, setPhoneFieldY] = useState(0);
   const storedUser = useMyStateUser((state) => state.user);
   const setStoredUser = useMyStateUser((state) => state.setUser);
@@ -87,7 +83,6 @@ export default function EditProfile() {
     setGender(data.genre || '');
     setStatus(data.clientType || 'STANDARD');
     setEmail(data.email || '');
-    setInitialData(data as any);
     setImage(data.avatar_url || '');
     setUpdate(false);
   };
@@ -102,11 +97,8 @@ export default function EditProfile() {
       const locationDetails = await getUserLocationDetails();
       const thisCity = locationDetails.city ?? null;
       const thisCountry = locationDetails.country ?? null;
-      const thisCode = locationDetails.countryCode ?? null;
       setCity(thisCity);
       setCountry(thisCountry);
-      setCountryCode(thisCode);
-      setIndicatif(locationDetails.indicatif ?? null);
     };
 
     const loadUserData = async () => {
@@ -147,7 +139,7 @@ export default function EditProfile() {
         ]);
       }
     };
-  }, [setStoredUser, storedUser]);
+  }, [router, setStoredUser, storedUser, t, update]);
 
   useEffect(() => {
     if (!shouldHighlightPhone) {

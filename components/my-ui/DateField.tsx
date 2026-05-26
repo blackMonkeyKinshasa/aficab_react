@@ -17,7 +17,7 @@ type Props = {
 };
 
 export function DateField({
-  departureHour,
+  departureHour: _departureHour,
   label,
   value = null,
   minDate,
