@@ -1,43 +1,34 @@
-import React from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  Platform,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
+import {
+  LocationSearchRow,
+  LocationSearchRowContent,
+  LocationSectionLabel,
+} from '@/components/my-ui/LocationSearchRow';
+import { LocationSearchSkeleton } from '@/components/my-ui/LocationSearchSkeleton';
+import { color } from '@/constants/colors';
 import { Location } from '@/constants/constants';
+import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
+import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
+import {
+  getPlaceRowTexts,
+  isKinshasaLocation,
+  type PlaceRowData,
+  resolveCurrentLocation,
+} from '@/lib/location-utils';
+import { showToast } from '@/lib/toast';
 import { useMyStateLocation } from '@/store/location-state';
 
-const KINSHASA_KEYWORD = 'kinshasa';
-
-function isKinshasaLocation(details: any, description?: string) {
-  const addressParts = Array.isArray(details?.address_components)
-    ? details.address_components.flatMap((component: any) => [
-        component?.long_name,
-        component?.short_name,
-      ])
-    : [];
-
-  const searchableParts = [
-    description,
-    details?.formatted_address,
-    details?.name,
-    details?.vicinity,
-    ...addressParts,
-  ]
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    .map((value) => value.toLowerCase());
-
-  return searchableParts.some((value) => value.includes(KINSHASA_KEYWORD));
-}
+const SEARCH_FIELD_HEIGHT = 48;
+const SEARCH_FIELD_RADIUS = 24;
+/** Debounce before showing skeleton + firing Places API (ms) */
+const PLACES_SEARCH_DEBOUNCE_MS = 500;
 
 export function LocationSelector({
   onSelect,
@@ -50,16 +41,109 @@ export function LocationSelector({
   const { addLocation } = useMyStateLocation();
   const analytics = useAnalytics();
   const { placesLanguage, t } = useI18n();
-  const isDark = useColorScheme() === 'dark';
-  const inputBg = isDark ? '#111827' : '#ffffff';
-  const inputBorder = isDark ? '#374151' : '#cccccc';
-  const inputText = isDark ? '#ffffff' : '#000000';
-  const placeholderText = isDark ? '#6b7280' : '#999999';
-  const listBg = isDark ? '#1E2226' : '#ffffff';
-  const listItemText = isDark ? '#ffffff' : '#000000';
-  const listItemSubText = isDark ? '#A0A0A0' : '#555555';
-  const separatorBg = isDark ? '#374151' : '#e5e7eb';
-  const loaderColor = isDark ? '#ffffff' : '#111827';
+  const themeColors = useFieldThemeColors();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
+  const [isPlacesLoading, setIsPlacesLoading] = useState(false);
+
+  const isSearching = searchQuery.trim().length >= 2;
+
+  const handleQueryChange = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+      onQueryChange?.(text);
+
+      if (text.trim().length < 2) {
+        setIsPlacesLoading(false);
+      }
+    },
+    [onQueryChange]
+  );
+
+  useEffect(() => {
+    if (!isSearching) {
+      setIsPlacesLoading(false);
+      return;
+    }
+
+    const showSkeletonTimer = setTimeout(() => {
+      setIsPlacesLoading(true);
+    }, PLACES_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(showSkeletonTimer);
+      setIsPlacesLoading(false);
+    };
+  }, [searchQuery, isSearching]);
+
+  const handleClearSearch = useCallback(() => {
+    autocompleteRef.current?.clear();
+    handleQueryChange('');
+  }, [handleQueryChange]);
+
+  const handleUseCurrentLocation = useCallback(async () => {
+    if (isResolvingLocation) return;
+
+    setIsResolvingLocation(true);
+
+    try {
+      const location = await resolveCurrentLocation();
+
+      if (!location) {
+        showToast({
+          title: t('common.information'),
+          description: t('booking.kinshasaOnlySearch'),
+          action: 'info',
+        });
+        return;
+      }
+
+      Keyboard.dismiss();
+      handleQueryChange('');
+      addLocation(location);
+      onSelect(location);
+    } catch {
+      showToast({
+        title: t('common.information'),
+        description: t('booking.kinshasaOnlySearch'),
+        action: 'info',
+      });
+    } finally {
+      setIsResolvingLocation(false);
+    }
+  }, [addLocation, handleQueryChange, isResolvingLocation, onSelect, t]);
+
+  const stopPlacesLoading = useCallback(() => {
+    setIsPlacesLoading(false);
+  }, []);
+
+  const renderPlaceRow = useCallback(
+    (rowData: PlaceRowData) => {
+      if (isPlacesLoading) {
+        queueMicrotask(stopPlacesLoading);
+      }
+
+      const { title, subtitle } = getPlaceRowTexts(rowData);
+
+      return (
+        <View style={locationSelectorStyles.resultRow}>
+          <LocationSearchRowContent
+            title={title || t('booking.searchAddress')}
+            subtitle={subtitle}
+            icon="location"
+            useThemeColors
+          />
+        </View>
+      );
+    },
+    [isPlacesLoading, stopPlacesLoading, t]
+  );
+
+  const renderSearchHeader = useCallback(() => {
+    if (!isSearching || isPlacesLoading) return null;
+    return <LocationSectionLabel>{t('booking.searchResult')}</LocationSectionLabel>;
+  }, [isPlacesLoading, isSearching, t]);
 
   return (
     <View
@@ -76,25 +160,63 @@ export function LocationSelector({
         keepResultsAfterBlur={true}
         fetchDetails={true}
         minLength={2}
-        debounce={250}
-        disableScroll={false}
+        debounce={PLACES_SEARCH_DEBOUNCE_MS}
+        isRowScrollable={false}
+        disableScroll={true}
         listViewDisplayed="auto"
         keyboardShouldPersistTaps="always"
-        listLoaderComponent={
-          <View
-            style={{
-              backgroundColor: listBg,
-              paddingHorizontal: 12,
-              paddingVertical: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-            <ActivityIndicator size="small" color={loaderColor} />
-            <Text style={{ color: listItemText }}>{t('booking.loading')}</Text>
+        renderLeftButton={() => (
+          <Ionicons
+            name="search"
+            size={20}
+            color={themeColors.placeholder}
+            style={{ marginLeft: 4, marginRight: 4 }}
+          />
+        )}
+        renderRightButton={() =>
+          searchQuery.length > 0 ? (
+            <Pressable
+              onPress={handleClearSearch}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.cancel')}>
+              <Ionicons name="close-circle" size={22} color={color.primary} />
+            </Pressable>
+          ) : (
+            <View style={{ width: 22 }} />
+          )
+        }
+        renderRow={(rowData) => renderPlaceRow(rowData as PlaceRowData)}
+        renderHeaderComponent={renderSearchHeader}
+        inbetweenCompo={
+          <View>
+            <LocationSearchRow
+              title={t('booking.useCurrentLocation')}
+              icon="navigate"
+              onPress={handleUseCurrentLocation}
+              trailing={
+                isResolvingLocation ? (
+                  <ActivityIndicator size="small" color={color.primary} />
+                ) : null
+              }
+            />
+            {isSearching ? (
+              <View
+                style={[locationSelectorStyles.divider, { backgroundColor: themeColors.separator }]}
+              />
+            ) : null}
+            {isSearching && isPlacesLoading ? (
+              <View className="pt-1">
+                <LocationSectionLabel>{t('booking.searchResult')}</LocationSectionLabel>
+                <LocationSearchSkeleton />
+              </View>
+            ) : null}
           </View>
         }
+        listLoaderComponent={<LocationSearchSkeleton />}
         onFail={(error) => {
+          stopPlacesLoading();
+
           const errorMessage =
             error instanceof Error
               ? error.message
@@ -109,16 +231,22 @@ export function LocationSelector({
             queryType: 'autocomplete',
           });
 
-          Alert.alert(
-            t('common.information'),
-            'Google Places a echoue sur Android. Verifiez la cle API, le reseau et la restriction Places.'
-          );
+          showToast({
+            title: t('common.information'),
+            description:
+              'Google Places a echoue sur Android. Verifiez la cle API, le reseau et la restriction Places.',
+            action: 'info',
+          });
         }}
         onPress={(data, details = null) => {
           if (details) {
             if (!isKinshasaLocation(details, data.description)) {
               autocompleteRef.current?.clear();
-              Alert.alert(t('common.information'), t('booking.kinshasaOnlySearch'));
+              showToast({
+                title: t('common.information'),
+                description: t('booking.kinshasaOnlySearch'),
+                action: 'info',
+              });
               return;
             }
 
@@ -128,7 +256,7 @@ export function LocationSelector({
               lng: details.geometry.location.lng,
             };
             Keyboard.dismiss();
-            onQueryChange?.('');
+            handleQueryChange('');
             addLocation(location);
             onSelect(location);
           }
@@ -148,58 +276,51 @@ export function LocationSelector({
             zIndex: 1000,
           },
           textInputContainer: {
-            backgroundColor: 'transparent',
+            backgroundColor: themeColors.fieldBg,
+            borderRadius: SEARCH_FIELD_RADIUS,
+            height: SEARCH_FIELD_HEIGHT,
+            alignItems: 'center',
+            paddingHorizontal: 12,
+            marginBottom: bookingSpacing.fieldGap,
           },
           textInput: {
-            height: 45,
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            backgroundColor: inputBg,
-            borderColor: inputBorder,
-            borderWidth: 1,
-            color: inputText,
+            flex: 1,
+            height: SEARCH_FIELD_HEIGHT,
+            marginBottom: 0,
+            paddingHorizontal: 8,
+            backgroundColor: 'transparent',
+            borderWidth: 0,
+            color: themeColors.text,
+            fontSize: 16,
           },
           listView: {
-            position: 'absolute',
-            top: 49,
-            left: 0,
-            right: 0,
-            backgroundColor: listBg,
-            color: listItemText,
-            borderRadius: 10,
-            overflow: 'hidden',
-            marginTop: 4,
-            borderWidth: 1,
-            borderColor: separatorBg,
-            shadowColor: '#000000',
-            shadowOpacity: 0.12,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 6 },
-
-            elevation: 1001,
+            position: 'relative',
+            backgroundColor: 'transparent',
+            marginTop: 0,
+            borderWidth: 0,
+            shadowOpacity: 0,
+            elevation: 0,
           },
           row: {
-            backgroundColor: listBg,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
+            backgroundColor: 'transparent',
+            paddingHorizontal: 0,
+            paddingVertical: 0,
           },
           description: {
-            color: listItemText,
+            color: themeColors.listItemText,
           },
           predefinedPlacesDescription: {
-            color: listItemSubText,
+            color: themeColors.listItemSubText,
           },
           poweredContainer: {
-            backgroundColor: listBg,
+            backgroundColor: 'transparent',
           },
-
           separator: {
-            backgroundColor: separatorBg,
+            backgroundColor: themeColors.separator,
           },
-
           loader: {
             size: 'small',
-            color: loaderColor,
+            color: themeColors.loader,
           },
         }}
         textInputProps={{
@@ -209,16 +330,29 @@ export function LocationSelector({
           spellCheck: true,
           keyboardType: 'default',
           returnKeyType: 'search',
-          selectionColor: inputText,
-          clearButtonMode: 'always',
-          placeholderTextColor: placeholderText,
+          selectionColor: color.primary,
+          clearButtonMode: 'never',
+          placeholderTextColor: themeColors.placeholder,
           underlineColorAndroid: 'transparent',
-          backgroundColor: inputBg,
           onChangeText: (text: string) => {
-            onQueryChange?.(text);
+            handleQueryChange(text);
           },
         }}
       />
     </View>
   );
 }
+
+const locationSelectorStyles = StyleSheet.create({
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+});

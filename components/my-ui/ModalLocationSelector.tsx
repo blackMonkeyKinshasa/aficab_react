@@ -1,17 +1,13 @@
-import { useCallback, useState } from 'react';
-import {
-  FlatList,
-  Keyboard,
-  Modal,
-  Text,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Keyboard, StyleSheet, View } from 'react-native';
 
 import { IconButton } from 'react-native-paper';
 
+import { BookingSheetLayout } from '@/components/my-ui/BookingSheetLayout';
+import { LocationSearchRow, LocationSectionLabel } from '@/components/my-ui/LocationSearchRow';
 import { Location } from '@/constants/constants';
+import { bookingSpacing } from '@/constants/spacing';
+import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
 import { useMyStateLocation } from '@/store/location-state';
 
@@ -21,21 +17,14 @@ export function ModalLocationSelector({
   visible,
   onDismiss,
   onConfirm,
-  disableStatusBar = false,
 }: {
   visible: boolean | undefined;
   onDismiss: () => any;
   onConfirm: (location: Location) => void;
-  disableStatusBar?: boolean;
 }) {
   const { t } = useI18n();
-  const isDark = useColorScheme() === 'dark';
-  const modalBg = isDark ? '#1E2226' : '#ffffff';
-  const textColor = isDark ? '#ffffff' : '#000000';
-  const subTextColor = isDark ? '#A0A0A0' : '#555555';
-  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const themeColors = useFieldThemeColors();
 
-  const [location, setLocation] = useState<Location | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const { recentLocations, removeLocation } = useMyStateLocation();
   const isSearching = searchQuery.trim().length >= 2;
@@ -43,7 +32,6 @@ export function ModalLocationSelector({
   const handleSelectLocation = useCallback(
     (nextLocation: Location) => {
       Keyboard.dismiss();
-      setLocation(nextLocation);
       setSearchQuery('');
 
       requestAnimationFrame(() => {
@@ -53,97 +41,68 @@ export function ModalLocationSelector({
     [onConfirm]
   );
 
+  const footerActions = useMemo(
+    () => [
+      {
+        label: t('common.cancel'),
+        onPress: onDismiss,
+        variant: 'outline' as const,
+      },
+    ],
+    [onDismiss, t]
+  );
+
   return (
-    <Modal
-      animationType={'slide'}
-      transparent={false}
-      visible={visible}
-      onRequestClose={onDismiss}
-      presentationStyle="formSheet"
-      statusBarTranslucent={!disableStatusBar}>
-      <>
-        <View style={{ flex: 1, backgroundColor: modalBg }}>
-          {/* Header */}
-          <View
-            style={{
-              padding: 4,
-              flexDirection: 'row',
-              borderBottomWidth: 1,
-              borderBottomColor: borderColor,
-            }}>
-            <View className="flex-1 flex-row items-center">
-              <View className="ml-4 flex-1 items-start justify-end">
-                <IconButton
-                  icon={'close'}
-                  size={24}
-                  iconColor={textColor}
-                  onPress={() => {
-                    onDismiss();
-                  }}
-                />
-              </View>
+    <BookingSheetLayout
+      visible={!!visible}
+      onDismiss={onDismiss}
+      title={t('booking.searchAddress')}
+      footerActions={footerActions}>
+      <View className="w-full py-2" style={{ paddingHorizontal: bookingSpacing.screenPaddingX }}>
+        <LocationSelector
+          onSelect={(selectedLocation) => {
+            handleSelectLocation(selectedLocation);
+          }}
+          onQueryChange={setSearchQuery}
+        />
 
-              <View className="mr-4 flex-1 items-end justify-end">
-                <TouchableOpacity
-                  onPress={() => {
-                    if (location) {
-                      onConfirm(location);
-                    }
-                  }}>
-                  <Text style={{ fontSize: 18, fontWeight: '400', color: textColor }}>
-                    {t('common.save')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* body */}
-          <View className="flex-row items-center">
-            <View style={{ flex: 1, paddingTop: 8 }}>
-              <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
-                <LocationSelector
-                  onSelect={(location) => {
-                    handleSelectLocation(location);
-                  }}
-                  onQueryChange={setSearchQuery}
-                />
-              </View>
-
-              {!isSearching ? (
-                <View style={{ zIndex: 10, paddingHorizontal: 16, paddingVertical: 8 }}>
-                  <FlatList
-                    data={recentLocations}
-                    keyExtractor={(recentLocations) => recentLocations.description}
-                    showsVerticalScrollIndicator={false}
-                    renderItem={({ item: loc }) => (
-                      <TouchableOpacity
-                        onPress={() => {
-                          handleSelectLocation(loc);
-                        }}>
-                        <View className="flex-row">
-                          <Text style={{ marginTop: 16, flex: 1, color: subTextColor }}>
-                            📍 {loc.description}
-                          </Text>
-
-                          <IconButton
-                            icon={'close'}
-                            size={20}
-                            iconColor={'#999'}
-                            onPress={() => {
-                              removeLocation(loc);
-                            }}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    )}
+        {!isSearching && recentLocations.length > 0 ? (
+          <View>
+            <View
+              style={[modalLocationStyles.divider, { backgroundColor: themeColors.separator }]}
+            />
+            <LocationSectionLabel>{t('booking.recentLocations')}</LocationSectionLabel>
+            {recentLocations.map((loc) => (
+              <LocationSearchRow
+                key={loc.description}
+                title={loc.description}
+                icon="location"
+                onPress={() => {
+                  handleSelectLocation(loc);
+                }}
+                trailing={
+                  <IconButton
+                    icon="close"
+                    size={20}
+                    iconColor={themeColors.listItemSubText}
+                    onPress={() => {
+                      removeLocation(loc);
+                    }}
                   />
-                </View>
-              ) : null}
-            </View>
+                }
+              />
+            ))}
           </View>
-        </View>
-      </>
-    </Modal>
+        ) : null}
+      </View>
+    </BookingSheetLayout>
   );
 }
+
+const modalLocationStyles = StyleSheet.create({
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+});

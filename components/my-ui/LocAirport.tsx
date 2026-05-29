@@ -1,18 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { FlatList, Keyboard, Pressable, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -20,14 +7,25 @@ import { useRouter } from 'expo-router';
 import { calculateDistance, generateIDBooking, getAllBookings } from '@/api/booking';
 import { getTaCars } from '@/api/car';
 import { validateCoupon } from '@/api/coupon';
+import {
+  BookingOptionSectionCard,
+  BookingOptionSectionHeader,
+} from '@/components/my-ui/BookingOptionSectionCard';
+import { BookingRecapDetailRow } from '@/components/my-ui/BookingRecapDetailRow';
+import { BookingRecapLayout } from '@/components/my-ui/BookingRecapLayout';
+import { BookingRecapPriceSection } from '@/components/my-ui/BookingRecapPriceSection';
+import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
+import { BookingRecapVehicleCard } from '@/components/my-ui/BookingRecapVehicleCard';
+import { bookingSheetContentClassName } from '@/components/my-ui/BookingSheetLayout';
+import { BookingTripSummaryCard } from '@/components/my-ui/BookingTripSummaryCard';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
-import { Button } from '@/components/ui/button';
+import { VehicleSelectionCard } from '@/components/my-ui/VehicleSelectionCard';
+import { VehicleSelectionListLoader } from '@/components/my-ui/VehicleSelectionListLoader';
+import { Button, ButtonText } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Input } from '@/components/ui/input';
-import { Text as UIText } from '@/components/ui/text';
+import { Input, InputField } from '@/components/ui/input';
 import { color } from '@/constants/colors';
-import { defautColor } from '@/constants/constants';
 import { EtapeReservation, ResStatus, ResType } from '@/constants/databaseEnum';
 import {
   Booking,
@@ -35,10 +33,16 @@ import {
   CouponValidationValidResponse,
   LocationDocTA,
 } from '@/constants/dataInterface';
-import { TranslationKey, useI18n } from '@/lib/i18n';
+import { bookingSpacing, controlHeightStyle } from '@/constants/spacing';
+import { getCouponFeedbackMessage } from '@/lib/coupon-messages';
+import { useFieldThemeColors } from '@/lib/field-theme';
+import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 
 const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
+const filledInputClassName = 'rounded-md border-0 bg-background-100';
 
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
@@ -52,15 +56,6 @@ type Props = {
   onSubmit: (doc: Booking) => void;
   etape: EtapeReservation;
   setEtape: (etape: EtapeReservation) => void;
-};
-
-type Theme = {
-  bg: string;
-  card: string;
-  text: string;
-  subText: string;
-  border: string;
-  input: string;
 };
 
 function toDate(value: Date | string | undefined) {
@@ -175,59 +170,12 @@ function getCouponFinalTotal(coupon: CouponValidationValidResponse | null, order
   return Math.max(0, orderTotal - getCouponDiscountAmount(coupon, orderTotal));
 }
 
-type CarItemProps = {
-  car: Car;
-  theme: Theme;
-  isSelected: boolean;
-  distanceKm: number | null;
-  onPress: (car: Car) => void;
-  t: (key: TranslationKey) => string;
-};
-
-function getAirportPriceLabel(car: Car, distanceKm: number | null) {
-  return `$ ${getAirportTripPrice(car, distanceKm)}`;
-}
-
-function CarItem({ car, theme, isSelected, distanceKm, onPress, t }: CarItemProps) {
-  return (
-    <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(car)}>
-      <View
-        style={[styles.card, { backgroundColor: theme.card }, isSelected && styles.selectedCard]}>
-        <Text style={[styles.carName, { color: theme.text }]}>{car.name}</Text>
-
-        <Text style={{ color: theme.subText }}>
-          {car.category?.name ?? t('booking.categoryUnavailable')}
-        </Text>
-
-        <View style={styles.row}>
-          <View style={styles.iconRow}>
-            <Ionicons name="person" size={16} color={theme.text} />
-            <Text style={{ color: theme.text, marginLeft: 5 }}>{car.seats}</Text>
-          </View>
-
-          <View style={[styles.badge, { backgroundColor: '#f5d7a1' }]}>
-            <Ionicons name="briefcase" size={16} color="#000" />
-            <Text style={{ marginLeft: 5 }}>{car.baggage}</Text>
-          </View>
-        </View>
-
-        <Image
-          source={{ uri: car.images[0] ?? 'https://via.placeholder.com/400x240' }}
-          style={styles.image}
-        />
-
-        <Text style={styles.price}>
-          {getAirportPriceLabel(car, distanceKm)} {t('booking.perTrip')}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
-  const { appLocale, t } = useI18n();
+  const { appLocale, t, tf } = useI18n();
+  const toast = useAppToast();
+  const fieldThemeColors = useFieldThemeColors();
   const emptyCarsTitleKey = 'booking.noVehicleAvailable';
   const emptyCarsDescriptionKey = 'booking.dailyCars.empty.description';
   const scheduleLabel = formatAirportSchedule(
@@ -239,7 +187,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isLoadingCars, setIsLoadingCars] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [code, setCode] = useState('');
@@ -361,11 +309,11 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   };
 
   const loadCars = async (nextPage: number, replace = false) => {
-    if (isLoadingMore) {
+    if (isLoadingCars) {
       return;
     }
 
-    setIsLoadingMore(true);
+    setIsLoadingCars(true);
 
     try {
       const res = await getTaCars({
@@ -379,7 +327,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setPage(nextPage);
       setHasMore(nextCars.length > 0);
     } finally {
-      setIsLoadingMore(false);
+      setIsLoadingCars(false);
       setIsRefreshing(false);
     }
   };
@@ -418,7 +366,6 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setCars([]);
       setPage(1);
       setHasMore(true);
-      setIsRefreshing(true);
       void loadCars(1, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reload vehicles when step changes
@@ -456,21 +403,27 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         const booking = await buildBooking(car);
 
         if (!booking) {
-          Alert.alert(t('common.information'), t('booking.selectVehicleBeforeConfirm'));
+          toast({
+            title: t('common.information'),
+            description: t('booking.selectVehicleBeforeConfirm'),
+            action: 'info',
+          });
           return;
         }
 
         onSubmit(booking);
       } catch (error) {
-        Alert.alert(
-          t('common.error'),
-          error instanceof Error ? error.message : t('booking.generationImpossible')
-        );
+        toast({
+          title: t('common.error'),
+          description: error instanceof Error ? error.message : t('booking.generationImpossible'),
+          action: 'error',
+        });
       }
 
       return;
     }
 
+    Keyboard.dismiss();
     setEtape(NEXT_ETAPE[etape]);
   };
 
@@ -483,7 +436,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   };
 
   const handleLoadMore = () => {
-    if (etape !== EtapeReservation.SELECTION || !hasMore || isLoadingMore) {
+    if (etape !== EtapeReservation.SELECTION || !hasMore || isLoadingCars) {
       return;
     }
 
@@ -491,7 +444,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   };
 
   const handleRefresh = () => {
-    if (isLoadingMore) {
+    if (isLoadingCars) {
       return;
     }
 
@@ -502,6 +455,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
   const handleApplyPromoCode = async (promoCodeOverride?: string) => {
     const normalizedCode = (promoCodeOverride ?? code).trim();
+    Keyboard.dismiss();
 
     if (!normalizedCode) {
       setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
@@ -531,10 +485,9 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
         setPromoFeedback({
           tone: 'success',
           message:
-            response.message ??
-            (normalizedCode === FIRST_BOOKING_PROMO_CODE
+            normalizedCode === FIRST_BOOKING_PROMO_CODE
               ? t('booking.promoCodeWelcomeApplied')
-              : t('booking.promoCodeApplied')),
+              : t('booking.promoCodeApplied'),
         });
         return;
       }
@@ -543,15 +496,31 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       setAppliedCouponCode(null);
       setPromoFeedback({
         tone: 'error',
-        message: response.message || t('booking.promoCodeInvalid'),
+        message: getCouponFeedbackMessage(
+          {
+            code: response.code,
+            message: response.message,
+            minAmount: response.minAmount,
+          },
+          t,
+          tf
+        ),
       });
     } catch (error) {
+      const apiError = error as Error & { code?: string; body?: { minAmount?: number } };
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback({
         tone: 'error',
-        message:
-          error instanceof Error && error.message ? error.message : t('booking.promoCodeInvalid'),
+        message: getCouponFeedbackMessage(
+          {
+            code: apiError.code,
+            message: apiError.message,
+            minAmount: apiError.body?.minAmount,
+          },
+          t,
+          tf
+        ),
       });
     } finally {
       setIsApplyingPromo(false);
@@ -613,65 +582,52 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome promo runs once per recap context
   }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
 
-  const myButton = () => {
-    return (
-      <View className="mt-4 flex-row gap-3">
-        <Button
-          className="h-12 items-center justify-center rounded-lg bg-orange-500"
-          style={{
-            flex: etape !== EtapeReservation.SELECTION ? 1 : undefined,
-            width: etape === EtapeReservation.SELECTION ? '100%' : undefined,
-          }}
-          onPress={() => void handleNextEtape()}>
-          <UIText className="text-base font-bold text-white">{actionLabel}</UIText>
-        </Button>
-      </View>
-    );
-  };
-
   const selectCarsPage = () => {
-    return (
-      <View className="flex-1">
-        <View style={[styles.addressCard, { backgroundColor: theme.card }]}>
-          <View style={styles.addressContent}>
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={[styles.addressText, { color: theme.text }]}>
-              {t('booking.from')} :{' '}
-              {locationDoc.locationDepart.description ?? t('booking.departure')}
-            </Text>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={{ color: theme.subText }}>
-              {t('booking.to')} : {locationDoc.locationDest.description ?? t('booking.destination')}
-            </Text>
-            <Text style={{ color: theme.subText, marginTop: 4 }}>{scheduleLabel}</Text>
-            {distanceKm !== null ? (
-              <Text style={{ color: theme.subText, marginTop: 4 }}>
-                {t('booking.distance')} : {distanceKm.toFixed(1)} km
-              </Text>
-            ) : null}
-          </View>
-          <Ionicons name="pencil" size={20} color={theme.text} onPress={() => router.back()} />
-        </View>
+    const categoryUnavailableLabel = t('booking.categoryUnavailable');
+    const priceUnit = `$${t('booking.perTrip')}`;
 
+    return (
+      <View className={cn('flex-1', bookingSheetContentClassName)}>
         <FlatList
           data={cars}
           keyExtractor={(car) => car.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={{
+            paddingHorizontal: bookingSpacing.screenPaddingX,
+            paddingTop: bookingSpacing.sectionGap,
+            paddingBottom: bookingSpacing.scrollPaddingBottom,
+          }}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
-          ListFooterComponent={
-            isLoadingMore ? (
-              <Text style={[styles.listStateText, { color: theme.subText }]}>
-                {t('booking.loading')}
+          ListHeaderComponent={
+            <BookingTripSummaryCard onEditPress={() => router.back()}>
+              <Text className="text-typography-900 text-base font-medium" numberOfLines={1}>
+                {t('booking.from')} :{' '}
+                {locationDoc.locationDepart.description ?? t('booking.departure')}
               </Text>
+              <Text className="text-typography-500 mt-1 text-sm" numberOfLines={1}>
+                {t('booking.to')} :{' '}
+                {locationDoc.locationDest.description ?? t('booking.destination')}
+              </Text>
+              <Text className="text-typography-500 mt-1 text-sm">{scheduleLabel}</Text>
+              {distanceKm !== null ? (
+                <Text className="text-typography-500 mt-1 text-sm">
+                  {t('booking.distance')} : {distanceKm.toFixed(1)} km
+                </Text>
+              ) : null}
+            </BookingTripSummaryCard>
+          }
+          ListFooterComponent={
+            isLoadingCars && !isRefreshing && cars.length > 0 ? (
+              <VehicleSelectionListLoader compact />
             ) : null
           }
           ListEmptyComponent={
-            !isRefreshing && !isLoadingMore ? (
+            isLoadingCars && cars.length === 0 ? (
+              <VehicleSelectionListLoader />
+            ) : !isLoadingCars ? (
               <ErrorEmpty
                 isDark={isDarkMode}
                 title={t(emptyCarsTitleKey)}
@@ -680,13 +636,13 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
             ) : null
           }
           renderItem={({ item: car }) => (
-            <CarItem
+            <VehicleSelectionCard
               car={car}
-              theme={theme}
               isSelected={selectedCar?.id === car.id}
-              distanceKm={distanceKm}
+              categoryUnavailableLabel={categoryUnavailableLabel}
+              priceAmount={String(getAirportTripPrice(car, distanceKm))}
+              priceUnit={priceUnit}
               onPress={handleCarPress}
-              t={t}
             />
           )}
         />
@@ -695,147 +651,147 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
   };
 
   const selectOption = () => {
+    const optionFooter = (
+      <View style={{ paddingHorizontal: bookingSpacing.screenPaddingX }}>
+        <Button
+          action="primary"
+          variant="solid"
+          size="control"
+          className="w-full rounded-full"
+          style={controlHeightStyle}
+          onPress={() => void handleNextEtape()}>
+          <ButtonText>{actionLabel}</ButtonText>
+        </Button>
+      </View>
+    );
+
     return (
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: 20 }}
-            showsVerticalScrollIndicator={false}>
-            <View style={[styles.container]}>
-              {/* FLY NUMBER */}
-              <View style={[styles.section, { borderColor: theme.border }]}>
-                <View style={[styles.sectionHeader, { flexDirection: 'column' }]}>
-                  <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {t('booking.flightNumberOptional')}
-                  </Text>
+      <View className={cn('flex-1', bookingSheetContentClassName)}>
+        <BookingRecapLayout footer={optionFooter}>
+          <View
+            style={{
+              paddingHorizontal: bookingSpacing.screenPaddingX,
+              paddingTop: bookingSpacing.sectionGap,
+            }}>
+            <BookingTripSummaryCard onEditPress={() => router.back()}>
+              <Text className="text-typography-900 text-base font-medium" numberOfLines={1}>
+                {t('booking.from')} :{' '}
+                {locationDoc.locationDepart.description ?? t('booking.departure')}
+              </Text>
+              <Text className="text-typography-500 mt-1 text-sm" numberOfLines={1}>
+                {t('booking.to')} :{' '}
+                {locationDoc.locationDest.description ?? t('booking.destination')}
+              </Text>
+              <Text className="text-typography-500 mt-1 text-sm">{scheduleLabel}</Text>
+              {distanceKm !== null ? (
+                <Text className="text-typography-500 mt-1 text-sm">
+                  {t('booking.distance')} : {distanceKm.toFixed(1)} km
+                </Text>
+              ) : null}
+            </BookingTripSummaryCard>
 
-                  <Text
-                    style={{ color: theme.subText, fontSize: 14, fontWeight: '400', marginTop: 8 }}>
-                    {t('booking.flightNumberDescription')}
-                  </Text>
-                </View>
-
-                <Input
+            <BookingOptionSectionCard
+              title={t('booking.flightNumberOptional')}
+              description={t('booking.flightNumberDescription')}>
+              <Input variant="outline" size="control" className={filledInputClassName}>
+                <InputField
                   placeholder={t('booking.flightNumberPlaceholder')}
-                  placeholderTextColor={theme.subText}
+                  placeholderTextColor={fieldThemeColors.placeholder}
                   value={flyNumber}
                   onChangeText={setFlyNumber}
-                  style={styles.input}
                 />
-              </View>
+              </Input>
+            </BookingOptionSectionCard>
 
-              {/* COMMENT */}
-              <View style={[styles.section, { borderColor: theme.border }]}>
-                <View style={[styles.sectionHeader, { flexDirection: 'column' }]}>
-                  <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {t('booking.commentOptional')}
-                  </Text>
-                  <Text
-                    style={{ color: theme.subText, fontSize: 14, fontWeight: '400', marginTop: 8 }}>
-                    {t('booking.commentDescription')}
-                  </Text>
-                </View>
-
-                <Input
+            <BookingOptionSectionCard
+              title={t('booking.commentOptional')}
+              description={t('booking.commentDescription')}>
+              <Input variant="outline" size="control" className={filledInputClassName}>
+                <InputField
                   placeholder={t('booking.commentPlaceholder')}
-                  placeholderTextColor={theme.subText}
+                  placeholderTextColor={fieldThemeColors.placeholder}
                   multiline
                   value={comment}
                   onChangeText={setComment}
-                  style={styles.input}
                 />
-              </View>
+              </Input>
+            </BookingOptionSectionCard>
 
-              {/* BOOKING */}
-              <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
-                <View style={[styles.section, { borderColor: theme.border }]}>
+            <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
+              <BookingOptionSectionCard
+                header={
                   <CollapsibleTrigger asChild>
-                    <TouchableOpacity activeOpacity={0.8} style={styles.sectionHeader}>
-                      <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600', flex: 1 }}>
-                        {t('booking.bookForOtherPersonOptional')}
-                      </Text>
-                      <Ionicons
-                        name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
-                        size={20}
-                        color={theme.subText}
+                    <Pressable accessibilityRole="button" className="active:opacity-80">
+                      <BookingOptionSectionHeader
+                        title={t('booking.bookForOtherPersonOptional')}
+                        right={
+                          <Ionicons
+                            name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
+                            size={20}
+                            color={fieldThemeColors.listItemSubText}
+                          />
+                        }
                       />
-                    </TouchableOpacity>
+                    </Pressable>
                   </CollapsibleTrigger>
-
-                  <CollapsibleContent>
-                    <Input
+                }>
+                <CollapsibleContent>
+                  <Input variant="outline" size="control" className={filledInputClassName}>
+                    <InputField
                       placeholder={t('booking.fullName')}
-                      placeholderTextColor={theme.subText}
+                      placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestName}
                       onChangeText={setGuestName}
-                      style={styles.input}
                     />
+                  </Input>
 
-                    <Input
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className={`${filledInputClassName} mt-3`}>
+                    <InputField
                       placeholder={t('booking.phoneNumber')}
-                      placeholderTextColor={theme.subText}
+                      placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestPhone}
                       onChangeText={setGuestPhone}
-                      style={styles.input}
                     />
-                  </CollapsibleContent>
-                </View>
-              </Collapsible>
+                  </Input>
+                </CollapsibleContent>
+              </BookingOptionSectionCard>
+            </Collapsible>
 
-              {/* WARNING GUEST */}
-              <View style={[styles.section, { borderColor: theme.border }]}>
-                <View style={[styles.sectionHeader, { flexDirection: 'column' }]}>
-                  <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
-                    {t('booking.pleaseNote')}
-                  </Text>
-
-                  <View style={{ flexDirection: 'row', marginTop: 8 }}>
-                    <Ionicons name="information-circle-outline" size={16} color={theme.text} />
-                    <Text
-                      style={{
-                        color: theme.subText,
-                        fontSize: 14,
-                        fontWeight: '400',
-                        flex: 1,
-                        marginLeft: 8,
-                      }}>
-                      {t('booking.warningCapacity')}
-                    </Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', marginTop: 10 }}>
-                    <Ionicons name="information-circle-outline" size={16} color={theme.text} />
-                    <Text
-                      style={{
-                        color: theme.subText,
-                        fontSize: 14,
-                        fontWeight: '400',
-                        flex: 1,
-                        marginLeft: 8,
-                      }}>
-                      {t('booking.warningImages')}
-                    </Text>
-                  </View>
-                </View>
+            <BookingOptionSectionCard title={t('booking.pleaseNote')}>
+              <View className="mt-1 flex-row">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={16}
+                  color={fieldThemeColors.listItemText}
+                />
+                <Text className="text-typography-500 ml-2 flex-1 text-sm">
+                  {t('booking.warningCapacity')}
+                </Text>
               </View>
 
-              {/* BUTTON */}
-
-              {myButton()}
-            </View>
-          </ScrollView>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+              <View className="mt-3 flex-row">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={16}
+                  color={fieldThemeColors.listItemText}
+                />
+                <Text className="text-typography-500 ml-2 flex-1 text-sm">
+                  {t('booking.warningImages')}
+                </Text>
+              </View>
+            </BookingOptionSectionCard>
+          </View>
+        </BookingRecapLayout>
+      </View>
     );
   };
 
   const recap = () => {
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
-    const tripTypeLabel =
-      locationDoc.tripType === 'round-trip' ? t('booking.outbound') : t('booking.oneWay');
-    const isRoundTrip = locationDoc.tripType === 'round-trip' ? true : false;
+    const isRoundTrip = locationDoc.tripType === 'round-trip';
     const allerScheduleLabel = formatAirportSchedule(
       { ...locationDoc, tripType: 'one-way' },
       appLocale,
@@ -850,222 +806,147 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
     const trimmedGuestPhone = guestPhone.trim();
+    const departureAddress = isPositionAller
+      ? (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'))
+      : (locationDoc.locationDest.description ?? t('booking.addressUnavailable'));
+    const arrivalAddress = isPositionAller
+      ? (locationDoc.locationDest.description ?? t('booking.addressUnavailable'))
+      : (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'));
+    const priceLines = [
+      {
+        label: `→ ${!isRoundTrip ? t('booking.oneWay') : t('booking.outbound')}`,
+        value: `${tripPrice} $`,
+      },
+      ...(isRoundTrip
+        ? [
+            {
+              label: `← ${t('booking.return')}`,
+              value: `${tripPrice} $`,
+            },
+          ]
+        : []),
+      ...(promoDiscountAmount > 0
+        ? [
+            {
+              label: t('booking.discount'),
+              value: `- ${promoDiscountAmount} $`,
+            },
+          ]
+        : []),
+    ];
+
+    const recapFooter = (
+      <Button
+        action="primary"
+        variant="solid"
+        size="control"
+        className="w-full rounded-full"
+        style={controlHeightStyle}
+        onPress={() => void handleNextEtape()}>
+        <ButtonText>{actionLabel}</ButtonText>
+      </Button>
+    );
 
     return (
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}>
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <View style={{ flexDirection: 'row' }}>
-            {/*Aller*/}
-            <TouchableOpacity
-              style={{ flex: 1 }}
-              onPress={() => {
-                setPositionAller(true);
-              }}>
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text
-                  style={[
-                    styles.recapSectionTitle,
-                    { color: isPositionAller ? defautColor : theme.text },
-                  ]}>
-                  {tripTypeLabel}
-                </Text>
-
-                {/*ligne de séparation*/}
-
-                <View style={{ flexDirection: 'row', height: 1, marginVertical: 12 }}>
-                  <View
-                    style={{
-                      flex: 1,
-                      height: 1,
-                      backgroundColor: isPositionAller ? defautColor : theme.border,
-                    }}
-                  />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            {/*Retour*/}
-            {isRoundTrip && (
-              <TouchableOpacity
-                style={{ flex: 1 }}
-                onPress={() => {
-                  setPositionAller(false);
-                }}>
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text
-                    style={[
-                      styles.recapSectionTitle,
-                      { color: !isPositionAller ? defautColor : theme.text },
-                    ]}>
-                    {t('booking.return')}
-                  </Text>
-                  {/*ligne de séparation*/}
-                  <View style={{ flexDirection: 'row', height: 1, marginVertical: 12 }}>
-                    <View
-                      style={{
-                        flex: 1,
-                        height: 1,
-                        backgroundColor:
-                          isRoundTrip && !isPositionAller ? defautColor : theme.border,
-                      }}
-                    />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/*Date et heure ainsi que lieux de depart*/}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="location-outline" size={18} color={theme.text} />
-
-            <View style={{ flex: 1, justifyContent: 'center', marginLeft: 4 }}>
-              <Text style={[styles.recapDate, { color: theme.subText }]}>{activeDateLabel}</Text>
-              <Text numberOfLines={1} style={[styles.recapDescription, { color: theme.text }]}>
-                {isPositionAller
-                  ? (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'))
-                  : (locationDoc.locationDest.description ?? t('booking.addressUnavailable'))}
-              </Text>
-            </View>
-          </View>
-
-          {/*Estimation de la distance ou de temps entre lees deux points*/}
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 10 }}>
-            <View style={{ height: 40, width: 1, backgroundColor: theme.border }} />
-
-            <View style={{ flex: 1, justifyContent: 'center', marginLeft: 13 }}>
+      <BookingRecapLayout footer={recapFooter}>
+        {isRoundTrip ? (
+          <View className="mb-4 flex-row">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPositionAller(true)}
+              className="flex-1 active:opacity-80">
               <Text
-                numberOfLines={1}
-                style={[styles.recapDate, { color: theme.subText, marginLeft: 4 }]}>
-                {t('booking.approxDistance')} {distanceKm !== null ? distanceKm.toFixed(1) : '0.0'}{' '}
-                km
+                className={cn(
+                  'text-center text-base font-semibold',
+                  isPositionAller ? 'text-primary' : 'text-typography-500'
+                )}>
+                {t('booking.outbound')}
               </Text>
-            </View>
-          </View>
-
-          {/*Date et heure ainsi que lieux de d'arrivée*/}
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginLeft: 4 }}>
-            <Ionicons name="navigate-outline" size={18} color={theme.text} />
-
-            <View style={{ flex: 1, justifyContent: 'center', marginLeft: 4 }}>
-              <Text
-                numberOfLines={1}
-                style={[styles.recapDescription, { color: theme.text, marginLeft: 4 }]}>
-                {isPositionAller
-                  ? (locationDoc.locationDest.description ?? t('booking.addressUnavailable'))
-                  : (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'))}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionSansBordure}>
-          <View style={styles.carRow}>
-            <Image source={{ uri: recapImage }} style={styles.carImage} resizeMode="cover" />
-
-            <View style={{ flex: 1, marginLeft: 15 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.recapCarTitle, { color: theme.text, textAlign: 'center' }]}>
-                  {selectedCar?.name ?? t('booking.noVehicle')}
-                </Text>
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.recapCarSubtitle, { color: theme.subText, textAlign: 'center' }]}>
-                  {selectedCar?.category?.name ?? t('booking.categoryUnavailable')}
-                </Text>
-              </View>
-
               <View
-                style={[
-                  styles.recapCarDetails,
-                  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-                ]}>
-                <View style={[styles.recapBadge, { backgroundColor: theme.input }]}>
-                  <Ionicons name="person" size={14} color={theme.text} />
-                  <Text style={[styles.recapBadgeText, { color: theme.text }]}>
-                    {selectedCar?.seats ?? 0}
-                  </Text>
-                </View>
-                <View style={[styles.recapBadge, { backgroundColor: '#f5d7a1' }]}>
-                  <Ionicons name="briefcase" size={14} color="#000" />
-                  <Text style={[styles.recapBadgeText, { color: '#000' }]}>
-                    {selectedCar?.baggage ?? 0}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+                className={cn(
+                  'mt-3 h-0.5 rounded-full',
+                  isPositionAller ? 'bg-primary' : 'bg-outline-100'
+                )}
+              />
+            </Pressable>
 
-        {/* WARNING GUEST */}
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <View style={[styles.sectionHeader, { flexDirection: 'column' }]}>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '600' }}>
-              {t('booking.cancellationPolicy')}
-            </Text>
-
-            <View style={{ flexDirection: 'row', marginTop: 8 }}>
-              <Ionicons name="information-circle-outline" size={16} color={theme.text} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPositionAller(false)}
+              className="flex-1 active:opacity-80">
               <Text
-                style={{
-                  color: theme.subText,
-                  fontSize: 14,
-                  fontWeight: '400',
-                  flex: 1,
-                  marginLeft: 8,
-                }}>
+                className={cn(
+                  'text-center text-base font-semibold',
+                  !isPositionAller ? 'text-primary' : 'text-typography-500'
+                )}>
+                {t('booking.return')}
+              </Text>
+              <View
+                className={cn(
+                  'mt-3 h-0.5 rounded-full',
+                  !isPositionAller ? 'bg-primary' : 'bg-outline-100'
+                )}
+              />
+            </Pressable>
+          </View>
+        ) : null}
+
+        <BookingRecapVehicleCard
+          imageUri={recapImage}
+          name={selectedCar?.name ?? t('booking.noVehicle')}
+          category={selectedCar?.category?.name ?? t('booking.categoryUnavailable')}
+          seats={selectedCar?.seats ?? 0}
+          baggage={selectedCar?.baggage ?? 0}
+          priceAmount={`${tripPrice} $`}
+          priceUnit={t('booking.perTrip')}
+        />
+
+        <BookingRecapSection title={t('booking.detailsTitle')}>
+          <BookingRecapDetailRow
+            label={
+              isRoundTrip
+                ? isPositionAller
+                  ? t('booking.departureDateTime')
+                  : t('booking.returnDateTime')
+                : t('booking.departureDateTime')
+            }
+            value={activeDateLabel}
+          />
+          <BookingRecapDetailRow label={t('booking.from')} value={departureAddress} />
+          <BookingRecapDetailRow label={t('booking.to')} value={arrivalAddress} />
+          {distanceKm !== null ? (
+            <BookingRecapDetailRow
+              label={t('booking.distance')}
+              value={`${distanceKm.toFixed(1)} km`}
+            />
+          ) : null}
+          {flyNumber ? (
+            <BookingRecapDetailRow label={t('booking.flightNumber')} value={flyNumber} />
+          ) : null}
+          {trimmedComment ? (
+            <BookingRecapDetailRow label={t('booking.comment')} value={trimmedComment} />
+          ) : null}
+          {trimmedGuestName || trimmedGuestPhone ? (
+            <BookingRecapDetailRow
+              label={t('booking.reservationFor')}
+              value={[trimmedGuestName, trimmedGuestPhone].filter(Boolean).join(' · ')}
+            />
+          ) : null}
+        </BookingRecapSection>
+
+        <BookingRecapSection>
+          <View className="flex-row items-start">
+            <Ionicons name="information-circle-outline" size={18} color={theme.subText} />
+            <View className="ml-2 flex-1">
+              <Text className="text-typography-900 text-sm font-semibold">
+                {t('booking.cancellationPolicy')}
+              </Text>
+              <Text className="text-typography-500 mt-1 text-sm">
                 {t('booking.cancellationPolicyText')}
               </Text>
             </View>
           </View>
-        </View>
-
-        {flyNumber ? (
-          <View
-            style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>
-              {t('booking.flightNumber')}
-            </Text>
-            <Text style={[styles.recapDescription, { color: theme.subText }]}>{flyNumber}</Text>
-          </View>
-        ) : null}
-
-        {comment ? (
-          <View
-            style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>
-              {t('booking.comment')}
-            </Text>
-            <Text style={[styles.recapDescription, { color: theme.subText }]}>
-              {trimmedComment}
-            </Text>
-          </View>
-        ) : null}
-
-        {guestName || guestPhone ? (
-          <View
-            style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
-            <Text style={[styles.recapSectionTitle, { color: theme.text }]}>
-              {t('booking.reservationFor')}
-            </Text>
-            {guestName ? (
-              <Text style={[styles.recapDescription, { color: theme.subText }]}>
-                {trimmedGuestName}
-              </Text>
-            ) : null}
-            {guestPhone ? (
-              <Text style={[styles.recapDescription, { color: theme.subText, marginTop: 4 }]}>
-                {trimmedGuestPhone}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
+        </BookingRecapSection>
 
         <PromoCodeField
           label={t('booking.promoCodeLabel')}
@@ -1084,63 +965,26 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
           feedbackTone={promoFeedback?.tone ?? 'default'}
         />
 
-        {promoDiscountAmount > 0 ? (
-          <View style={[styles.section, { borderColor: theme.border }]}>
-            <View style={styles.recapPriceRow}>
-              <Text style={[styles.recapPriceLabel, { color: theme.subText }]}>
-                {t('booking.discount')}
-              </Text>
-              <Text
-                style={[
-                  styles.recapPriceValue,
-                  { color: theme.text },
-                ]}>{`- ${promoDiscountAmount} $`}</Text>
-            </View>
-          </View>
-        ) : null}
-
-        <View style={[styles.section, { borderColor: theme.border }]}>
-          <Text style={[styles.recapSectionTitle, { color: theme.text }]}>
-            {t('booking.priceDetails')}
-          </Text>
-          <View style={styles.recapPriceRow}>
-            <Text style={[styles.recapPriceLabel, { color: theme.subText }]}>
-              {' '}
-              → {!isRoundTrip ? t('booking.oneWay') : t('booking.outbound')} :
-            </Text>
-            <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
-          </View>
-
-          {isRoundTrip && (
-            <View style={styles.recapPriceRow}>
-              <Text style={[styles.recapPriceLabel, { color: theme.subText }]}>
-                {' '}
-                ← {t('booking.return')} :
-              </Text>
-              <Text style={[styles.recapPriceValue, { color: theme.text }]}>{tripPrice} $</Text>
-            </View>
-          )}
-
-          {/*ligne de séparation*/}
-          <View style={{ flexDirection: 'row', height: 1, marginVertical: 12 }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
-          </View>
-
-          <View style={styles.recapPriceRow}>
-            <Text style={[styles.recapTotalLabel, { color: theme.text }]}>
-              {t('booking.total')}
-            </Text>
-            <Text style={[styles.recapTotalValue, { color: theme.text }]}>{finalTotalPrice} $</Text>
-          </View>
-        </View>
-
-        {myButton()}
-      </ScrollView>
+        <BookingRecapPriceSection
+          title={t('booking.priceDetails')}
+          lines={priceLines}
+          totalLabel={t('booking.total')}
+          totalValue={`${finalTotalPrice} $`}
+        />
+      </BookingRecapLayout>
     );
   };
 
+  const isSheetStep = etape === EtapeReservation.SELECTION || etape === EtapeReservation.OPTION;
+
   return (
-    <View className="flex-1 px-6 py-4">
+    <View
+      className="flex-1"
+      style={
+        isSheetStep
+          ? undefined
+          : { paddingHorizontal: bookingSpacing.screenPaddingX, paddingTop: 16 }
+      }>
       {etape === EtapeReservation.SELECTION && selectCarsPage()}
 
       {etape === EtapeReservation.OPTION && selectOption()}
@@ -1166,262 +1010,3 @@ const dark = {
   border: '#374151',
   input: '#111827',
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    marginBottom: 15,
-  },
-
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-
-  section: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 15,
-  },
-
-  sectionSansBordure: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 15,
-  },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-
-  optionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 10,
-  },
-
-  optionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  optionRight: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  infoButton: {
-    padding: 2,
-  },
-
-  input: {
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
-  },
-
-  button: {
-    backgroundColor: '#ff5a00',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-
-  addressCard: {
-    padding: 15,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-
-  addressText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-
-  addressContent: {
-    flex: 1,
-    paddingRight: 12,
-  },
-
-  card: {
-    borderRadius: 16,
-    padding: 15,
-    marginBottom: 20,
-  },
-
-  carRow: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-
-  carImage: {
-    width: 150,
-    height: 100,
-    borderRadius: 10,
-  },
-
-  selectedCard: {
-    borderWidth: 2,
-    borderColor: 'orange',
-  },
-
-  listContent: {
-    paddingBottom: 20,
-  },
-
-  listStateText: {
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-
-  selectedCarText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-
-  box: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-
-  sectionTitle: {
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-
-  totalPriceText: {
-    marginTop: 12,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  carName: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-
-  row: {
-    flexDirection: 'row',
-    marginTop: 10,
-    alignItems: 'center',
-    gap: 15,
-  },
-
-  iconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 6,
-    borderRadius: 8,
-  },
-
-  image: {
-    width: '100%',
-    height: 180,
-    borderRadius: 12,
-    marginTop: 10,
-  },
-
-  price: {
-    marginTop: 10,
-    color: 'orange',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-
-  recapCarTitle: {
-    fontWeight: '700',
-  },
-
-  recapCarSubtitle: {
-    marginBottom: 5,
-  },
-
-  recapCarDetails: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-
-  recapBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-
-  recapBadgeText: {
-    marginLeft: 4,
-  },
-
-  recapSectionTitle: {
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-
-  recapDescription: {
-    fontSize: 14,
-  },
-  recapDate: {
-    fontSize: 12,
-  },
-
-  recapPriceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 6,
-  },
-
-  recapPriceLabel: {},
-
-  recapPriceValue: {
-    fontWeight: '600',
-  },
-
-  recapTotalLabel: {
-    fontWeight: '700',
-  },
-
-  recapTotalValue: {
-    fontWeight: '700',
-  },
-});
