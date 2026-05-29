@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 import { updateDeviceToken } from '@/api/user';
+import { resolveAppHref } from '@/lib/deep-linking';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -84,7 +85,7 @@ export function getNotificationTargetRoute(notification: NotificationLike) {
   }
 
   if (typeof route === 'string' && route.trim()) {
-    return route;
+    return resolveAppHref(route) ?? route;
   }
 
   return '/notificationsPage';
