@@ -12,7 +12,7 @@ import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
 import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -21,12 +21,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
+import { color } from '@/constants/colors';
 import { genderOptions } from '@/constants/constants';
 import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
 export default function EditProfile() {
@@ -56,6 +58,7 @@ export default function EditProfile() {
   const shouldHighlightPhone = focusField === 'phone';
   const shouldReturnToBooking = returnToBooking === '1';
   const { t } = useI18n();
+  const toast = useAppToast();
   const localizedGenderOptions = genderOptions.map((option) => ({
     ...option,
     label: option.value === 'male' ? t('profile.genderMale') : t('profile.genderFemale'),
@@ -184,7 +187,11 @@ export default function EditProfile() {
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
-      Alert.alert(t('profile.requiredTitle'), t('profile.fullNameRequired'));
+      toast({
+        title: t('profile.requiredTitle'),
+        description: t('profile.fullNameRequired'),
+        action: 'error',
+      });
       return;
     }
     if (!userID) return;
@@ -225,7 +232,11 @@ export default function EditProfile() {
       }
     } catch (err: any) {
       console.error(err);
-      Alert.alert(t('common.error'), err?.message ?? t('profile.genericErrorMessage'));
+      toast({
+        title: t('common.error'),
+        description: err?.message ?? t('profile.genericErrorMessage'),
+        action: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -249,7 +260,7 @@ export default function EditProfile() {
 
             {/* Camera Icon Button */}
             <TouchableOpacity
-              className={`absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-orange-500 shadow-lg`}
+              className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-primary shadow-lg"
               onPress={chooseImage}>
               <Camera size={18} color="white" />
             </TouchableOpacity>
@@ -276,7 +287,6 @@ export default function EditProfile() {
               update || setUpdate(true);
             }}
             placeholder="User 54452"
-            isDark={isDark}
           />
 
           {/* Phone Number */}
@@ -286,7 +296,7 @@ export default function EditProfile() {
               shouldHighlightPhone
                 ? {
                     borderWidth: 1,
-                    borderColor: '#f97316',
+                    borderColor: color.primary,
                     borderRadius: 12,
                     padding: 12,
                     marginBottom: 16,
@@ -304,10 +314,9 @@ export default function EditProfile() {
               placeholder="+243821606126"
               keyboardType="phone-pad"
               showInfo={true}
-              isDark={isDark}
             />
             {shouldHighlightPhone ? (
-              <Text className="mb-2 text-sm text-orange-500">{t('profile.phoneHintBooking')}</Text>
+              <Text className="mb-2 text-sm text-primary">{t('profile.phoneHintBooking')}</Text>
             ) : null}
           </View>
 
@@ -333,11 +342,8 @@ export default function EditProfile() {
                 setGender(option?.value ?? '');
                 update || setUpdate(true);
               }}>
-              <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
-                <SelectValue
-                  className={isDark ? 'text-white' : 'text-gray-900'}
-                  placeholder={t('common.select')}
-                />
+              <SelectTrigger>
+                <SelectValue placeholder={t('common.select')} />
               </SelectTrigger>
               <SelectContent>
                 {localizedGenderOptions.map((option) => (
@@ -356,19 +362,19 @@ export default function EditProfile() {
             onChangeText={() => {}}
             placeholder="adresse@email.com"
             editable={false}
-            isDark={isDark}
           />
 
           {/* Save Button */}
 
           {update && (
             <Button
+              action="primary"
+              variant="solid"
+              size="control"
               onPress={handleSaveProfile}
-              disabled={loading}
-              className="mb-4 mt-8 h-12 rounded-lg bg-orange-500">
-              <Text className="text-base font-bold text-white">
-                {loading ? t('profile.saving') : t('profile.saveChanges')}
-              </Text>
+              isDisabled={loading}
+              className="mb-4 mt-8 w-full rounded-md">
+              <ButtonText>{loading ? t('profile.saving') : t('profile.saveChanges')}</ButtonText>
             </Button>
           )}
         </View>

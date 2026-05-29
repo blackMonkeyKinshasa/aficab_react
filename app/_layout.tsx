@@ -2,30 +2,26 @@ import '@/global.css';
 import 'react-native-url-polyfill/auto';
 
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, AppState, Platform, TouchableOpacity, View } from 'react-native';
 
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '@react-navigation/native';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { User } from '@supabase/supabase-js';
 import * as Location from 'expo-location';
-import { Stack, usePathname, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { RefreshCw } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import {
-  MD3DarkTheme,
-  MD3LightTheme,
-  Provider as PaperProvider,
-  Snackbar,
-} from 'react-native-paper';
+import { MD3DarkTheme, MD3LightTheme, Provider as PaperProvider } from 'react-native-paper';
 import { en, fr, registerTranslation } from 'react-native-paper-dates';
 
 import { getUserByID } from '@/api/user';
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
 import { Role } from '@/constants/databaseEnum';
 import { isDev } from '@/constants/env';
@@ -46,6 +42,8 @@ import {
 } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { NAV_THEME } from '@/lib/theme';
+import { getThemePreference } from '@/lib/theme-preference';
+import { showToast } from '@/lib/toast';
 import { useMyStateUser, useUserStoreHydrated } from '@/store';
 
 const POSTHOG_API_KEY = 'phc_m8BC53KhbQB5qoynPaxb3PDRzqrv7Y9MSFkXcfu5UvYX';
@@ -85,8 +83,17 @@ Sentry.init({
 registerTranslation('en', en);
 registerTranslation('fr', fr);
 
-const accentColor = '#FE5900';
-const PUBLIC_ROUTES = new Set(['/login', '/signup']);
+const accentColor = color.primary;
+const PUBLIC_ROUTES = new Set(['/login', '/signup', '/(auth)/login']);
+const POST_LOGIN_BOOTSTRAP_DELAY_MS = 600;
+
+function isPublicAuthRoute(pathname: string, segments: string[]) {
+  if (PUBLIC_ROUTES.has(pathname)) {
+    return true;
+  }
+
+  return segments.includes('login') || segments.includes('signup');
+}
 
 const paperLightTheme = {
   ...MD3LightTheme,
@@ -116,12 +123,11 @@ function RootLayoutInner() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [isSyncingUser, setIsSyncingUser] = useState(false);
-  const [pushTokenSnackbarVisible, setPushTokenSnackbarVisible] = useState(false);
-  const [pushTokenSnackbarMessage, setPushTokenSnackbarMessage] = useState('');
   const { t } = useI18n();
   const pathname = usePathname();
+  const segments = useSegments();
   const router = useRouter();
-  const { colorScheme } = useColorScheme();
+  const { colorScheme, setColorScheme } = useColorScheme();
   const posthog = usePostHog();
   const analytics = useAnalytics();
   const storedUser = useMyStateUser((state) => state.user);
@@ -135,14 +141,13 @@ function RootLayoutInner() {
   const responseListenerRef = useRef<NotificationSubscription | null>(null);
   const [pushSyncNonce, setPushSyncNonce] = useState(0);
 
-  const showPushTokenSnackbar_ = (message: string | null | undefined) => {
-    if (!message) {
-      return;
-    }
-
-    setPushTokenSnackbarMessage(message);
-    setPushTokenSnackbarVisible(true);
-  };
+  useEffect(() => {
+    getThemePreference()
+      .then(setColorScheme)
+      .catch(() => {
+        setColorScheme('light');
+      });
+  }, [setColorScheme]);
 
   const showPushTokenTrace_ = (
     source: 'manuel' | 'auto',
@@ -151,7 +156,12 @@ function RootLayoutInner() {
   ) => {
     const baseTrace = [`trace expo token (${source})`, ...trace].join(' -> ');
     const message = detail ? `${baseTrace} -> resultat: ${detail}` : baseTrace;
-    showPushTokenSnackbar_(message);
+
+    showToast({
+      description: message,
+      action: 'info',
+      duration: 4500,
+    });
   };
 
   const syncExpoPushToken = async (userId: string, currentDeviceToken?: string | null) => {
@@ -371,26 +381,36 @@ function RootLayoutInner() {
   useEffect(() => {
     // Une fois connecte, on tente de capturer une position pour enrichir les evenements.
     // Le flow s'arrete silencieusement si la permission n'est pas accordee.
-    if (!user) return;
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+    if (!user) {
+      return;
+    }
 
-        if (status !== 'granted') return;
+    const userId = user.id;
+    const timerId = setTimeout(() => {
+      void (async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
 
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        posthog?.capture('user_location_captured', {
-          user_id: user.id,
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          platform: Platform.OS,
-        });
-      } catch (error) {
-        reportStartupError('location_bootstrap_failed', error);
-      }
-    })();
+          if (status !== 'granted') {
+            return;
+          }
+
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          posthog?.capture('user_location_captured', {
+            user_id: userId,
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            platform: Platform.OS,
+          });
+        } catch (error) {
+          reportStartupError('location_bootstrap_failed', error);
+        }
+      })();
+    }, POST_LOGIN_BOOTSTRAP_DELAY_MS);
+
+    return () => clearTimeout(timerId);
   }, [user, posthog]);
 
   useEffect(() => {
@@ -458,17 +478,27 @@ function RootLayoutInner() {
     // Garde le flow de navigation coherent:
     // - visiteur => force vers le login hors routes publiques
     // - utilisateur connecte => renvoie vers l'accueil s'il revient sur login/signup
-    const inPublicRoute = PUBLIC_ROUTES.has(pathname);
+    const inPublicRoute = isPublicAuthRoute(pathname, segments);
 
     if (!user && !inPublicRoute) {
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'auth_redirect_to_login',
+        data: { pathname, segments: segments.join('/') },
+      });
       router.replace('/(auth)/login');
       return;
     }
 
     if (user && inPublicRoute) {
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'auth_redirect_to_home',
+        data: { pathname, segments: segments.join('/') },
+      });
       router.replace('/');
     }
-  }, [authReady, pathname, router, user]);
+  }, [authReady, pathname, router, segments, user]);
 
   useEffect(() => {
     if (!authReady || !userStoreHydrated) {
@@ -482,7 +512,12 @@ function RootLayoutInner() {
     }
 
     console.log('device token :', useMyStateUser.getState().user?.deviceToken);
-    void runPushTokenSync('auto');
+
+    const timerId = setTimeout(() => {
+      void runPushTokenSync('auto');
+    }, POST_LOGIN_BOOTSTRAP_DELAY_MS);
+
+    return () => clearTimeout(timerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on auth/session changes only
   }, [authReady, pushSyncNonce, storedUser?.deviceToken, storedUser?.id, user, userStoreHydrated]);
 
@@ -567,9 +602,9 @@ function RootLayoutInner() {
     return null;
   }
   return (
-    // Arbre racine UI: gestures, bottom sheets, theming natif puis routing Expo Router.
+    // Arbre racine UI: gestures, theming natif puis routing Expo Router.
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
+      <GluestackUIProvider mode={colorScheme === 'dark' ? 'dark' : 'light'}>
         <PaperProvider theme={colorScheme === 'dark' ? paperDarkTheme : paperLightTheme}>
           <ThemeProvider value={NAV_THEME[colorScheme ?? 'light']}>
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
@@ -582,30 +617,31 @@ function RootLayoutInner() {
               {/* Ecran hors tabs, pousse au-dessus du flow principal pour modifier le profil. */}
               <Stack.Screen
                 name="edit-profile"
-                options={{
+                options={buildStackScreenOptions({
                   title: t('profile.editTitle'),
-                  headerBackTitle: t('booking.back'),
-                  headerShown: true,
-                  headerTransparent: false,
+                  isDark: colorScheme === 'dark',
+                  canGoBack: true,
                   headerRight: () => (
-                    <TouchableOpacity
-                      onPress={syncStoredUser}
-                      disabled={isSyncingUser}
-                      style={{ marginRight: 16, opacity: isSyncingUser ? 0.7 : 1 }}>
-                      {isSyncingUser ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
-                        />
-                      ) : (
-                        <RefreshCw
-                          size={20}
-                          color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
-                        />
-                      )}
-                    </TouchableOpacity>
+                    <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
+                      <TouchableOpacity
+                        onPress={syncStoredUser}
+                        disabled={isSyncingUser}
+                        style={{ marginRight: 4, opacity: isSyncingUser ? 0.7 : 1 }}>
+                        {isSyncingUser ? (
+                          <ActivityIndicator
+                            size="small"
+                            color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                          />
+                        ) : (
+                          <RefreshCw
+                            size={20}
+                            color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   ),
-                }}
+                })}
               />
 
               <Stack.Screen
@@ -630,19 +666,9 @@ function RootLayoutInner() {
             </Stack>
 
             <PortalHost />
-            <Snackbar
-              visible={pushTokenSnackbarVisible}
-              onDismiss={() => setPushTokenSnackbarVisible(false)}
-              duration={4500}
-              action={{
-                label: t('common.close'),
-                onPress: () => setPushTokenSnackbarVisible(false),
-              }}>
-              {pushTokenSnackbarMessage}
-            </Snackbar>
           </ThemeProvider>
         </PaperProvider>
-      </BottomSheetModalProvider>
+      </GluestackUIProvider>
     </GestureHandlerRootView>
   );
 }

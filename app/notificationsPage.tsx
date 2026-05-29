@@ -8,6 +8,7 @@ import { useColorScheme } from 'nativewind';
 import { getActivity, readNotification } from '@/api/activity';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
+import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
 import { Activity, ActivityAction } from '@/constants/dataInterface';
 import { TranslationKey, useI18n } from '@/lib/i18n';
@@ -512,12 +513,11 @@ export default function Notifications() {
   return (
     <>
       <Stack.Screen
-        options={{
+        options={buildStackScreenOptions({
           title: t('notifications.title'),
-          headerShown: true,
-          headerBackTitle: t('booking.back'),
-          headerBackButtonMenuEnabled: false,
-        }}
+          isDark,
+          canGoBack: true,
+        })}
       />
       <View
         style={[

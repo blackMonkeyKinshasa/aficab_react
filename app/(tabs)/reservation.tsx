@@ -3,19 +3,16 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
-  Linking,
-  Modal,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  TextInput,
   View,
 } from 'react-native';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Search } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import {
@@ -26,14 +23,16 @@ import {
   pawapayPay,
 } from '@/api/booking';
 import { createReview } from '@/api/review';
+import { BookingDetailSheet, canClientCancelBooking } from '@/components/my-ui/BookingDetailSheet';
+import { BookingListCard } from '@/components/my-ui/BookingListCard';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
 import { PaymentModal } from '@/components/my-ui/PaymentModal';
 import { ReviewBookingModal } from '@/components/my-ui/ReviewBookingModal';
-import { Button } from '@/components/ui/button';
+import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
-import { ClientType, PaymentProvider, ResStatus, ResType } from '@/constants/databaseEnum';
+import { PaymentProvider, ResStatus } from '@/constants/databaseEnum';
 import {
   Booking,
   CreateBookingInput,
@@ -44,54 +43,10 @@ import {
 import { useAnalytics } from '@/lib/analytics';
 import { TranslationKey, useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<ResStatus, string> = {
-  [ResStatus.PENDING]: '#FFA500',
-  [ResStatus.PENDINGDRIVER]: '#FFC107',
-  [ResStatus.CONFIRMED]: '#2196F3',
-  [ResStatus.STARTED]: '#9C27B0',
-  [ResStatus.ENDED]: '#4CAF50',
-  [ResStatus.CANCELED]: '#F44336',
-  [ResStatus.ARCHIVED]: '#9E9E9E',
-};
-
-const STATUS_LABELS: Record<ResStatus, TranslationKey> = {
-  [ResStatus.PENDING]: 'reservations.status.pending',
-  [ResStatus.PENDINGDRIVER]: 'reservations.status.pendingDriver',
-  [ResStatus.CONFIRMED]: 'reservations.status.confirmed',
-  [ResStatus.STARTED]: 'reservations.status.started',
-  [ResStatus.ENDED]: 'reservations.status.ended',
-  [ResStatus.CANCELED]: 'reservations.status.canceled',
-  [ResStatus.ARCHIVED]: 'reservations.status.archived',
-};
-
-function fmtDateTime(iso: string | null | undefined, locale: string) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(locale, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function fmtDay(iso: string | null | undefined, locale: string) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString(locale, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function fmtTime(iso: string | null | undefined, locale: string) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-}
 
 const UPCOMING_STATUSES: ResStatus[] = [
   ResStatus.PENDING,
@@ -100,12 +55,6 @@ const UPCOMING_STATUSES: ResStatus[] = [
 ];
 
 const ONGOING_STATUSES: ResStatus[] = [ResStatus.STARTED];
-
-const CLIENT_CANCELLABLE_STATUSES: ResStatus[] = [
-  ResStatus.PENDING,
-  ResStatus.PENDINGDRIVER,
-  ResStatus.CONFIRMED,
-];
 
 const PAST_STATUSES: ResStatus[] = [ResStatus.ENDED, ResStatus.CANCELED, ResStatus.ARCHIVED];
 
@@ -145,439 +94,7 @@ function normalizePhone(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function canClientCancelBooking(booking: Booking) {
-  if (!CLIENT_CANCELLABLE_STATUSES.includes(booking.status)) {
-    return false;
-  }
-
-  if (!booking.departureAt) {
-    return false;
-  }
-
-  const departureTime = new Date(booking.departureAt).getTime();
-
-  if (Number.isNaN(departureTime)) {
-    return false;
-  }
-
-  return departureTime - Date.now() >= 24 * 60 * 60 * 1000;
-}
-
-const CAR_PLACEHOLDER = 'https://via.placeholder.com/120x80';
-
-function getCarImage(booking: Booking): string {
-  const imgs = booking.car?.images;
-  if (imgs && imgs.length > 0) return imgs[0] as string;
-  return CAR_PLACEHOLDER;
-}
-
-// ─── Detail Modal ────────────────────────────────────────────────────────────
-
-function BookingDetailModal({
-  booking,
-  isDark,
-  disableStatusBar = false,
-  onClose,
-  onOpenReview,
-  onOpenPayment,
-  onClientCancelBooking,
-  isCancelling,
-  t,
-  appLocale,
-}: {
-  booking: Booking;
-  isDark: boolean;
-  disableStatusBar?: boolean;
-  onClose: () => void;
-  onOpenReview: (booking: Booking) => void;
-  onOpenPayment: (booking: Booking) => void;
-  onClientCancelBooking: (booking: Booking) => void;
-  isCancelling: boolean;
-  t: (key: TranslationKey) => string;
-  appLocale: string;
-}) {
-  const bg = isDark ? '#262626' : '#f2f2f7';
-  const fg = isDark ? '#fff' : '#000';
-  const sub = isDark ? '#aaa' : '#555';
-  const sep = isDark ? '#333' : '#eee';
-  const modalBg = isDark ? color.appDarkBackground : '#fff';
-
-  const statusColor = STATUS_COLORS[booking.status] ?? '#999';
-
-  const Row = ({ label, value }: { label: string; value: string }) => (
-    <View style={[styles.detailRow, { borderBottomColor: sep }]}>
-      <Text style={[styles.detailLabel, { color: sub }]}>{label}</Text>
-      <Text style={[styles.detailValue, { color: fg }]}>{value}</Text>
-    </View>
-  );
-
-  const driverUser = booking.driver?.user as Record<string, string> | undefined;
-  const driverAvatar = driverUser?.avatar_url ?? null;
-  const driverName = driverUser?.full_name ?? '—';
-  const driverPhone = driverUser?.phone ?? null;
-  const isStandardClient = booking.client?.clientType !== ClientType.PREMIUM;
-  const canPayBooking = isStandardClient && !booking.isPaid;
-  const canCancelBooking = canClientCancelBooking(booking);
-
-  return (
-    <Modal
-      visible
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent={false}
-      presentationStyle="formSheet"
-      statusBarTranslucent={!disableStatusBar}>
-      <View style={[styles.modalContainer, { backgroundColor: modalBg }]}>
-        {/* Header */}
-        <View style={[styles.modalHeader, { backgroundColor: modalBg }]}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Text style={{ color: fg, fontSize: 24 }}>× </Text>
-          </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: fg, flex: 1, textAlign: 'center' }]}>
-            {t('reservations.detailTitle')}
-          </Text>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
-          {/* Car image */}
-          <Image
-            source={{ uri: getCarImage(booking) }}
-            style={styles.detailCarImage}
-            resizeMode="cover"
-          />
-
-          {/* Status badge */}
-          <View
-            style={[
-              styles.statusBadgeLarge,
-              { backgroundColor: statusColor + '22', borderColor: statusColor },
-            ]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusBadgeText, { color: statusColor }]}>
-              {t(STATUS_LABELS[booking.status] ?? 'reservations.status.pending')}
-            </Text>
-          </View>
-
-          {/* Main info */}
-          <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-            <Text style={[styles.sectionTitle, { color: fg }]}>
-              {t('reservations.section.booking')}
-            </Text>
-            <Row label={t('reservations.field.id')} value={booking.id} />
-            <Row
-              label={t('reservations.field.type')}
-              value={
-                booking.type === ResType.LOC
-                  ? t('reservations.type.dailyRental')
-                  : t('reservations.type.airportTransfer')
-              }
-            />
-            <Row
-              label={t('reservations.field.vehicle')}
-              value={`${booking.car?.name ?? '—'} (${booking.car?.registrationId ?? '—'})`}
-            />
-            <Row
-              label={t('reservations.field.departure')}
-              value={fmtDateTime(booking.departureAt, appLocale)}
-            />
-            <Row
-              label={t('reservations.field.return')}
-              value={fmtDateTime(booking.arrivalAt, appLocale)}
-            />
-            {booking.rideStartAt && (
-              <Row
-                label={t('reservations.field.rideStart')}
-                value={fmtDateTime(booking.rideStartAt, appLocale)}
-              />
-            )}
-            {booking.rideEndAt && (
-              <Row
-                label={t('reservations.field.rideEnd')}
-                value={fmtDateTime(booking.rideEndAt, appLocale)}
-              />
-            )}
-            <Row
-              label={t('reservations.field.total')}
-              value={booking.total != null ? `${booking.total} $` : '—'}
-            />
-            <Row
-              label={t('reservations.field.paid')}
-              value={booking.isPaid ? t('common.yes') : t('common.no')}
-            />
-          </View>
-
-          {canPayBooking &&
-          (booking.status === ResStatus.PENDING || booking.status === ResStatus.PENDINGDRIVER) ? (
-            <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Button
-                className="h-11 rounded-xl bg-orange-500"
-                onPress={() => onOpenPayment(booking)}>
-                <Text style={{ color: '#ffffff', fontWeight: '700' }}>
-                  {t('reservations.payment.open')}
-                </Text>
-              </Button>
-            </View>
-          ) : null}
-
-          {/* Lieux */}
-          <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-            <Text style={[styles.sectionTitle, { color: fg }]}>
-              {t('reservations.section.places')}
-            </Text>
-            <Row
-              label={t('reservations.field.departure')}
-              value={booking.departure?.label ?? '—'}
-            />
-            <Row label={t('reservations.field.arrival')} value={booking.arrival?.label ?? '—'} />
-            {booking.taVolNumber && (
-              <Row label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />
-            )}
-          </View>
-
-          {/* Chauffeur */}
-          {booking.driver &&
-            (booking.status === ResStatus.CONFIRMED || booking.status === ResStatus.STARTED) && (
-              <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-                <Text style={[styles.sectionTitle, { color: fg }]}>
-                  {t('reservations.section.driver')}
-                </Text>
-                <View style={styles.driverRow}>
-                  <Image
-                    source={{ uri: driverAvatar ?? CAR_PLACEHOLDER }}
-                    style={styles.driverAvatar}
-                  />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[{ fontSize: 15, fontWeight: '600' }, { color: fg }]}>
-                      {driverName}
-                    </Text>
-                    <Text style={[{ fontSize: 12 }, { color: sub }]}>
-                      {t('reservations.field.license')} : {booking.driver.licenseNumber ?? '—'}
-                    </Text>
-                    <Text style={[{ fontSize: 12 }, { color: sub }]}>
-                      {t('reservations.field.status')} : {booking.driver.status}
-                    </Text>
-                  </View>
-                </View>
-                {driverPhone && (
-                  <View style={styles.contactRow}>
-                    <TouchableOpacity
-                      style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
-                      onPress={() =>
-                        Linking.openURL(`https://wa.me/${driverPhone.replace(/\D/g, '')}`)
-                      }>
-                      <Text style={styles.contactBtnText}>💬 {t('settings.whatsapp')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.contactBtn, { backgroundColor: '#2196F3' }]}
-                      onPress={() => Linking.openURL(`tel:${driverPhone}`)}>
-                      <Text style={styles.contactBtnText}>📞 {t('settings.call')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            )}
-
-          {/* Client */}
-          {booking.client && (
-            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>
-                {t('reservations.section.client')}
-              </Text>
-              <Row label={t('reservations.field.name')} value={booking.client.full_name ?? '—'} />
-              <Row label={t('reservations.field.email')} value={booking.client.email} />
-              <Row
-                label={t('reservations.field.phone')}
-                value={booking.clientPhone ?? booking.client.phone ?? '—'}
-              />
-            </View>
-          )}
-
-          {/* Avis */}
-          {booking.review && (
-            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>
-                {t('reservations.section.review')}
-              </Text>
-              <Row
-                label={t('reservations.field.driving')}
-                value={`${booking.review.ratingDriving}/5`}
-              />
-              <Row
-                label={t('reservations.field.punctuality')}
-                value={`${booking.review.ratingPunctuality}/5`}
-              />
-              <Row
-                label={t('reservations.field.service')}
-                value={`${booking.review.ratingService}/5`}
-              />
-              <Row
-                label={t('reservations.field.vehicle')}
-                value={`${booking.review.ratingVehicle}/5`}
-              />
-              {booking.review.comment && (
-                <Row label={t('reservations.section.comment')} value={booking.review.comment} />
-              )}
-            </View>
-          )}
-
-          {booking.status === ResStatus.ENDED && !booking.review && booking.driverId ? (
-            <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>
-                {t('reservations.reviewForm.ctaTitle')}
-              </Text>
-              <Text style={{ color: sub, fontSize: 13, lineHeight: 18, marginBottom: 12 }}>
-                {t('reservations.reviewForm.ctaDescription')}
-              </Text>
-              <Button
-                className="h-11 rounded-xl bg-orange-500"
-                onPress={() => onOpenReview(booking)}>
-                <Text style={{ color: '#ffffff', fontWeight: '700' }}>
-                  {t('reservations.reviewForm.open')}
-                </Text>
-              </Button>
-            </View>
-          ) : null}
-
-          {/* Coupon */}
-          {booking.coupon && (
-            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>
-                {t('reservations.section.coupon')}
-              </Text>
-              <Row
-                label={t('reservations.field.discount')}
-                value={`-${booking.coupon.discountAmount} j`}
-              />
-              <Row
-                label={t('reservations.field.beforeDiscount')}
-                value={`${booking.coupon.originalAmount} j`}
-              />
-            </View>
-          )}
-
-          {/* Commentaire */}
-          {booking.commentaire ? (
-            <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>
-                {t('reservations.section.comment')}
-              </Text>
-              <Text style={{ color: sub, fontSize: 13, lineHeight: 18 }}>
-                {booking.commentaire}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Annuller la course */}
-          {canCancelBooking ? (
-            <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Button
-                className="h-11 rounded-xl bg-red-500"
-                onPress={() => onClientCancelBooking(booking)}
-                disabled={isCancelling}>
-                {isCancelling ? (
-                  <View style={styles.cancelButtonContent}>
-                    <ActivityIndicator size="small" color="#ffffff" />
-                    <Text style={{ color: '#ffffff', fontWeight: '700' }}> Annulation...</Text>
-                  </View>
-                ) : (
-                  <Text style={{ color: '#ffffff', fontWeight: '700' }}> Annuler la course</Text>
-                )}
-              </Button>
-            </View>
-          ) : null}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── Booking Card ────────────────────────────────────────────────────────────
-
-function BookingCard({
-  item,
-  isDark,
-  highlighted,
-  badgeIsShow = false,
-  onPress,
-  t,
-  appLocale,
-}: {
-  item: Booking;
-  isDark: boolean;
-  highlighted: boolean;
-  badgeIsShow: boolean;
-  onPress: () => void;
-  t: (key: TranslationKey) => string;
-  appLocale: string;
-}) {
-  const bg = isDark ? '#262626' : '#f3f4f6';
-  const fg = isDark ? '#fff' : '#000';
-  const sub = isDark ? '#aaa' : '#666';
-  const statusColor = STATUS_COLORS[item.status] ?? '#999';
-  const highlightColor = isDark ? '#f59e0b' : '#ff8a00';
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        {
-          backgroundColor: highlighted ? (isDark ? '#3a2a0a' : '#fff3d6') : bg,
-          borderWidth: highlighted ? 1.5 : 0,
-          borderColor: highlighted ? highlightColor : 'transparent',
-          flexDirection: 'row',
-          padding: 12,
-          elevation: highlighted ? 4 : 1,
-          shadowColor: highlighted ? highlightColor : '#000',
-          shadowOpacity: highlighted ? 0.18 : 0.07,
-          shadowRadius: highlighted ? 12 : 8,
-          shadowOffset: { width: 0, height: 3 },
-        },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.8}>
-      <Image source={{ uri: getCarImage(item) }} style={styles.cardCarImage} resizeMode="cover" />
-      <View style={{ flex: 1, marginLeft: 12 }}>
-        {highlighted && badgeIsShow ? (
-          <View style={[styles.highlightBadge, { backgroundColor: highlightColor }]}>
-            <Text style={styles.highlightBadgeText}>Nouvelle reservation</Text>
-          </View>
-        ) : null}
-        {/* ID + status */}
-        <View style={styles.cardTopRow}>
-          <Text style={[styles.cardId, { color: sub }]} numberOfLines={1}>
-            {item.id}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {t(STATUS_LABELS[item.status] ?? 'reservations.status.pending')}
-            </Text>
-          </View>
-        </View>
-
-        {/* Nom véhicule */}
-        <Text style={[styles.cardCarName, { color: fg }]} numberOfLines={1}>
-          {item.car?.name ?? '—'}
-        </Text>
-
-        {/* Départ */}
-        <Text style={[styles.cardMeta, { color: sub }]} numberOfLines={1}>
-          🕐 {fmtTime(item.departureAt, appLocale)} · 📅 {fmtDay(item.departureAt, appLocale)}
-        </Text>
-
-        {/* Lieux */}
-        <Text style={[styles.cardMeta, { color: sub }]} numberOfLines={1}>
-          📍 {item.departure?.label ?? '—'}
-        </Text>
-        {item.arrival?.label && item.arrival?.label !== 'N/A' ? (
-          <Text style={[styles.cardMeta, { color: sub }]} numberOfLines={1}>
-            🏁 {item.arrival.label}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
+// ─── Booking List ────────────────────────────────────────────────────────────
 
 function BookingListTab({
   bookings,
@@ -605,13 +122,41 @@ function BookingListTab({
   emptyDescriptionKey: TranslationKey;
 }) {
   const listRef = useRef<FlatList<Booking>>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const borderColor = isDark ? '#2f2f2f' : '#e5e7eb';
+  const searchBg = isDark ? '#1E1E1E' : '#ffffff';
+  const placeholderColor = isDark ? '#6b7280' : '#9ca3af';
+  const inputColor = isDark ? '#ffffff' : '#111827';
+
+  const filteredBookings = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return bookings;
+    }
+
+    return bookings.filter((booking) => {
+      const haystack = [
+        booking.id,
+        booking.car?.name,
+        booking.departure?.label,
+        booking.arrival?.label,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [bookings, searchQuery]);
 
   useEffect(() => {
-    if (!activeHighlightId || bookings.length === 0) {
+    if (!activeHighlightId || filteredBookings.length === 0) {
       return;
     }
 
-    const highlightedIndex = bookings.findIndex((booking) => booking.id === activeHighlightId);
+    const highlightedIndex = filteredBookings.findIndex(
+      (booking) => booking.id === activeHighlightId
+    );
     if (highlightedIndex < 0) {
       return;
     }
@@ -625,54 +170,85 @@ function BookingListTab({
     }, 250);
 
     return () => clearTimeout(timeoutId);
-  }, [activeHighlightId, bookings]);
+  }, [activeHighlightId, filteredBookings]);
 
   return (
-    <FlatList
-      ref={listRef}
-      data={bookings}
-      keyExtractor={(item) => item.id}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#FE5900"
-          colors={['#FE5900']}
+    <View style={styles.listScreen}>
+      <View
+        style={[
+          styles.searchBar,
+          {
+            borderColor,
+            backgroundColor: searchBg,
+          },
+        ]}>
+        <Search size={18} color={placeholderColor} />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={t('reservations.search.placeholder')}
+          placeholderTextColor={placeholderColor}
+          style={[styles.searchInput, { color: inputColor }]}
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
         />
-      }
-      onScrollToIndexFailed={({ averageItemLength, index }) => {
-        listRef.current?.scrollToOffset({
-          animated: true,
-          offset: averageItemLength * index,
-        });
-      }}
-      renderItem={({ item }) => (
-        <BookingCard
-          item={item}
-          isDark={isDark}
-          highlighted={item.id === activeHighlightId}
-          badgeIsShow={rawShowBadge}
-          onPress={() => onSelectBooking(item)}
-          t={t}
-          appLocale={appLocale}
+      </View>
+
+      {filteredBookings.length === 0 ? (
+        <ErrorEmpty isDark={isDark} title={t(emptyTitleKey)} description={t(emptyDescriptionKey)} />
+      ) : (
+        <FlatList
+          ref={listRef}
+          style={styles.list}
+          data={filteredBookings}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={color.primary}
+              colors={[color.primary]}
+            />
+          }
+          onScrollToIndexFailed={({ averageItemLength, index }) => {
+            listRef.current?.scrollToOffset({
+              animated: true,
+              offset: averageItemLength * index,
+            });
+          }}
+          renderItem={({ item }) => (
+            <BookingListCard
+              item={item}
+              isDark={isDark}
+              highlighted={item.id === activeHighlightId}
+              badgeIsShow={rawShowBadge}
+              onPress={() => onSelectBooking(item)}
+              t={t}
+              appLocale={appLocale}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+          showsVerticalScrollIndicator={false}
         />
       )}
-      contentContainerStyle={styles.list}
-      ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
-      ListEmptyComponent={
-        <ErrorEmpty isDark={isDark} title={t(emptyTitleKey)} description={t(emptyDescriptionKey)} />
-      }
-    />
+    </View>
   );
 }
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
-const SCREEN_OPTIONS = (isDark: boolean, onNotif: () => void, title: string) => ({
-  title,
-  headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} onPress={onNotif} />,
-});
+const SCREEN_OPTIONS = (isDark: boolean, onNotif: () => void, title: string) =>
+  buildStackScreenOptions({
+    title,
+    isDark,
+    headerRight: () => (
+      <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
+        <NotificationIcon isDark={isDark} onPress={onNotif} />
+      </View>
+    ),
+  });
 
 export default function Reservation() {
   const { colorScheme } = useColorScheme();
@@ -688,6 +264,7 @@ export default function Reservation() {
     showBadgeId?: string | string[];
   };
   const { t, appLocale } = useI18n();
+  const toast = useAppToast();
   const analytics = useAnalytics();
   const storedUser = useMyStateUser((state) => state.user);
   const showBadgeId = Array.isArray(rawShowBadgeId) ? rawShowBadgeId[0] : rawShowBadgeId;
@@ -721,7 +298,11 @@ export default function Reservation() {
       } = await supabase.auth.getUser();
       await loadBookings(user?.id ?? '');
     } catch {
-      Alert.alert(t('common.error'), t('reservations.loadError'));
+      toast({
+        title: t('common.error'),
+        description: t('reservations.loadError'),
+        action: 'error',
+      });
     } finally {
       setRefreshing(false);
     }
@@ -844,7 +425,11 @@ export default function Reservation() {
       }
 
       updateBookingState(bookingDetails.id, (booking) => ({ ...booking, isPaid: true }));
-      Alert.alert(t('reservations.payment.successTitle'), t('reservations.payment.successMessage'));
+      toast({
+        title: t('reservations.payment.successTitle'),
+        description: t('reservations.payment.successMessage'),
+        action: 'success',
+      });
       return;
     }
 
@@ -890,12 +475,20 @@ export default function Reservation() {
         providerReference: null,
       });
 
-      Alert.alert(t('reservations.payment.pendingTitle'), t('reservations.payment.pendingMessage'));
+      toast({
+        title: t('reservations.payment.pendingTitle'),
+        description: t('reservations.payment.pendingMessage'),
+        action: 'warning',
+      });
       return;
     }
 
     if (paymentMethod === PaymentMethod.cash) {
-      Alert.alert(t('reservations.payment.pendingTitle'), t('reservations.payment.pendingMessage'));
+      toast({
+        title: t('reservations.payment.pendingTitle'),
+        description: t('reservations.payment.pendingMessage'),
+        action: 'warning',
+      });
     }
   };
 
@@ -912,7 +505,11 @@ export default function Reservation() {
         paymentMethod,
         reason: 'missing_phone_number',
       });
-      Alert.alert(t('payment.title'), t('booking.enterPhoneForMobilePayment'));
+      toast({
+        title: t('payment.title'),
+        description: t('booking.enterPhoneForMobilePayment'),
+        action: 'info',
+      });
       return;
     }
 
@@ -1012,10 +609,12 @@ export default function Reservation() {
 
       await processExistingBookingPayment(patchedBookingDetails, paymentMethod);
     } catch (error) {
-      Alert.alert(
-        t('common.error'),
-        error instanceof Error && error.message ? error.message : t('payment.failure.unknown')
-      );
+      toast({
+        title: t('common.error'),
+        description:
+          error instanceof Error && error.message ? error.message : t('payment.failure.unknown'),
+        action: 'error',
+      });
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -1077,10 +676,16 @@ export default function Reservation() {
       const userID = user?.id ?? '';
 
       loadBookings(userID)
-        .catch(() => Alert.alert(t('common.error'), t('reservations.loadError')))
+        .catch(() =>
+          toast({
+            title: t('common.error'),
+            description: t('reservations.loadError'),
+            action: 'error',
+          })
+        )
         .finally(() => setLoading(false));
     });
-  }, [t]);
+  }, [t, toast]);
 
   const handleReviewSubmit = async ({
     ratingDriving,
@@ -1096,7 +701,11 @@ export default function Reservation() {
     comment: string;
   }) => {
     if (!reviewTarget?.id || !reviewTarget.driverId) {
-      Alert.alert(t('common.error'), t('reservations.reviewForm.unavailable'));
+      toast({
+        title: t('common.error'),
+        description: t('reservations.reviewForm.unavailable'),
+        action: 'error',
+      });
       return;
     }
 
@@ -1126,17 +735,20 @@ export default function Reservation() {
       );
 
       setReviewTarget(null);
-      Alert.alert(
-        t('reservations.reviewForm.successTitle'),
-        t('reservations.reviewForm.successMessage')
-      );
+      toast({
+        title: t('reservations.reviewForm.successTitle'),
+        description: t('reservations.reviewForm.successMessage'),
+        action: 'success',
+      });
     } catch (error) {
-      Alert.alert(
-        t('common.error'),
-        error instanceof Error && error.message
-          ? error.message
-          : t('reservations.reviewForm.submitError')
-      );
+      toast({
+        title: t('common.error'),
+        description:
+          error instanceof Error && error.message
+            ? error.message
+            : t('reservations.reviewForm.submitError'),
+        action: 'error',
+      });
     } finally {
       setIsSubmittingReview(false);
     }
@@ -1144,10 +756,11 @@ export default function Reservation() {
 
   const handleClientCancelBooking = (booking: Booking) => {
     if (!canClientCancelBooking(booking)) {
-      Alert.alert(
-        t('common.error'),
-        'Cette reservation ne peut etre annulee que 24h avant le depart.'
-      );
+      toast({
+        title: t('common.error'),
+        description: 'Cette reservation ne peut etre annulee que 24h avant le depart.',
+        action: 'error',
+      });
       return;
     }
 
@@ -1178,14 +791,20 @@ export default function Reservation() {
               status: ResStatus.CANCELED,
             }));
             setSelected(null);
-            Alert.alert('Succès', 'La course a ete annulee.');
+            toast({
+              title: 'Succès',
+              description: 'La course a ete annulee.',
+              action: 'success',
+            });
           } catch (error) {
-            Alert.alert(
-              t('common.error'),
-              error instanceof Error && error.message
-                ? error.message
-                : 'Impossible d annuler cette course.'
-            );
+            toast({
+              title: t('common.error'),
+              description:
+                error instanceof Error && error.message
+                  ? error.message
+                  : 'Impossible d annuler cette course.',
+              action: 'error',
+            });
           } finally {
             setCancellingBookingId(null);
           }
@@ -1217,18 +836,18 @@ export default function Reservation() {
                 elevation: 0,
                 shadowOpacity: 0,
                 borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: isDark ? color.appDarkBackground : '#e5e7eb',
+                borderBottomColor: isDark ? '#2a2a2a' : '#e5e7eb',
               },
               tabBarIndicatorStyle: {
-                backgroundColor: '#FE5900',
+                backgroundColor: color.primary,
                 height: 3,
                 borderRadius: 999,
               },
-              tabBarActiveTintColor: isDark ? '#ffffff' : '#111827',
-              tabBarInactiveTintColor: isDark ? '#7c7c84' : '#6b7280',
+              tabBarActiveTintColor: color.primary,
+              tabBarInactiveTintColor: '#6B7280',
               tabBarLabelStyle: {
                 textTransform: 'none',
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: '700',
               },
               tabBarPressColor: 'transparent',
@@ -1299,19 +918,17 @@ export default function Reservation() {
         )}
       </View>
 
-      {selected && (
-        <BookingDetailModal
-          booking={selected}
-          isDark={isDark}
-          onClose={() => setSelected(null)}
-          onOpenReview={(booking) => setReviewTarget(booking)}
-          onOpenPayment={openPaymentModal}
-          onClientCancelBooking={handleClientCancelBooking}
-          isCancelling={cancellingBookingId === selected.id}
-          t={t}
-          appLocale={appLocale}
-        />
-      )}
+      <BookingDetailSheet
+        booking={selected}
+        isOpen={selected !== null}
+        onClose={() => setSelected(null)}
+        onOpenReview={(booking) => setReviewTarget(booking)}
+        onOpenPayment={openPaymentModal}
+        onClientCancelBooking={handleClientCancelBooking}
+        isCancelling={selected !== null && cancellingBookingId === selected.id}
+        t={t}
+        appLocale={appLocale}
+      />
 
       {isSubmittingPayment ? (
         <View style={styles.loadingOverlay}>
@@ -1348,7 +965,30 @@ export default function Reservation() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  list: { padding: 16, paddingBottom: 32 },
+  listScreen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  list: { flex: 1 },
+  listContent: { paddingBottom: 8 },
+  listSeparator: { height: 12 },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -1376,98 +1016,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555555',
     textAlign: 'center',
-  },
-  card: {
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-    marginHorizontal: 0,
-  },
-  cardCarImage: { width: 100, height: 80, borderRadius: 10 },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  cardId: { fontSize: 10, flex: 1, marginRight: 6 },
-  cardCarName: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
-  cardMeta: { fontSize: 12, marginTop: 2 },
-  highlightBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 999,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  highlightBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  statusBadgeLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginVertical: 12,
-  },
-  statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  statusBadgeText: { fontSize: 13, fontWeight: '600' },
-
-  modalContainer: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 16,
-    //borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ccc',
-  },
-  closeBtn: { marginRight: 12 },
-  modalTitle: { fontSize: 17, fontWeight: '700' },
-  modalScroll: { padding: 16, paddingBottom: 40 },
-  detailCarImage: { width: '100%', height: 200, borderRadius: 14, marginBottom: 4 },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  detailLabel: { fontSize: 13, flex: 1 },
-  detailValue: { fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },
-  driverRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  driverAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#ccc' },
-  contactRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  contactBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  contactBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  cancelButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
   },
 });

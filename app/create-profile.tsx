@@ -19,7 +19,7 @@ import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
 import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -28,12 +28,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
+import { color } from '@/constants/colors';
 import { genderOptions } from '@/constants/constants';
 import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
 export default function CreateProfile() {
@@ -51,6 +53,7 @@ export default function CreateProfile() {
   const setStoredUser = useMyStateUser((state) => state.setUser);
   const clearStoredUser = useMyStateUser((state) => state.clearUser);
   const { t } = useI18n();
+  const toast = useAppToast();
   const localizedGenderOptions = genderOptions.map((option) => ({
     ...option,
     label: option.value === 'male' ? t('profile.genderMale') : t('profile.genderFemale'),
@@ -129,7 +132,11 @@ export default function CreateProfile() {
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
-      Alert.alert(t('profile.requiredTitle'), t('profile.fullNameRequired'));
+      toast({
+        title: t('profile.requiredTitle'),
+        description: t('profile.fullNameRequired'),
+        action: 'error',
+      });
       return;
     }
 
@@ -174,12 +181,20 @@ export default function CreateProfile() {
       router.replace('/');
     } catch (error: any) {
       if (error.code === 'DUPLICATE_ENTRY') {
-        Alert.alert(t('profile.duplicatePhoneTitle'), t('profile.duplicatePhoneMessage'));
+        toast({
+          title: t('profile.duplicatePhoneTitle'),
+          description: t('profile.duplicatePhoneMessage'),
+          action: 'warning',
+        });
         return;
       }
 
       console.error(error);
-      Alert.alert(t('common.error'), error?.message ?? t('profile.genericErrorMessage'));
+      toast({
+        title: t('common.error'),
+        description: error?.message ?? t('profile.genericErrorMessage'),
+        action: 'error',
+      });
     } finally {
       setSaving(false);
     }
@@ -218,7 +233,6 @@ export default function CreateProfile() {
               value={fullName}
               onChangeText={setFullName}
               placeholder="Jean Dupont"
-              isDark={isDark}
             />
 
             <FormField
@@ -228,7 +242,6 @@ export default function CreateProfile() {
               placeholder="+243821606126"
               keyboardType="phone-pad"
               showInfo={true}
-              isDark={isDark}
             />
 
             <View className="mb-6">
@@ -251,11 +264,8 @@ export default function CreateProfile() {
                 onValueChange={(option) => {
                   setGender(option?.value ?? '');
                 }}>
-                <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
-                  <SelectValue
-                    className={isDark ? 'text-white' : 'text-gray-900'}
-                    placeholder={t('common.select')}
-                  />
+                <SelectTrigger>
+                  <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent>
                   {localizedGenderOptions.map((option) => (
@@ -267,10 +277,13 @@ export default function CreateProfile() {
               </Select>
             </View>
 
-            <Button onPress={handleSaveProfile} className="mb-4 mt-8 h-12 rounded-lg bg-orange-500">
-              <Text className="text-base font-bold text-white">
-                {saving ? t('profile.saving') : t('profile.continue')}
-              </Text>
+            <Button
+              action="primary"
+              variant="solid"
+              size="control"
+              onPress={handleSaveProfile}
+              className="mb-4 mt-8 w-full rounded-md">
+              <ButtonText>{saving ? t('profile.saving') : t('profile.continue')}</ButtonText>
             </Button>
           </View>
         </ScrollView>
@@ -313,7 +326,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f97316',
+    backgroundColor: color.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

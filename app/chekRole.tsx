@@ -7,13 +7,14 @@ import { useColorScheme } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getUserByID } from '@/api/user';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 import { color } from '@/constants/colors';
 import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
 import { User } from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 
 export default function ChekRole() {
@@ -24,6 +25,7 @@ export default function ChekRole() {
   const [remoteUser, setRemoteUser] = useState<User | null>(null);
   const analytics = useAnalytics();
   const { t, tf } = useI18n();
+  const toast = useAppToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -94,7 +96,11 @@ export default function ChekRole() {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert(t('common.error'), t('settings.openLinkError'));
+      toast({
+        title: t('common.error'),
+        description: t('settings.openLinkError'),
+        action: 'error',
+      });
     }
   };
 
@@ -184,28 +190,28 @@ export default function ChekRole() {
           </View>
 
           <Button
-            className="my-3 h-14 flex-row items-center justify-center rounded-2xl"
-            style={{
-              backgroundColor: color.primary,
-              width: '100%',
-              minHeight: 56,
-              paddingVertical: 16,
-            }}
+            action="primary"
+            variant="solid"
+            size="lg"
+            className="my-3 h-14 w-full rounded-md"
             onPress={handleContactSupport}>
             <View className="flex-row items-center justify-center">
               <MaterialCommunityIcons name="headset" size={18} color="#FFFFFF" />
-              <Text style={styles.buttonText}>{t('settings.contactUs')}</Text>
+              <ButtonText className="ml-2 text-white">{t('settings.contactUs')}</ButtonText>
             </View>
           </Button>
 
           <Button
-            className="my-3 h-14 flex-row items-center justify-center rounded-2xl border"
+            action="primary"
             variant="outline"
-            style={{ width: '100%', minHeight: 56, paddingVertical: 16 }}
+            size="lg"
+            className="my-3 h-14 w-full rounded-md border"
             onPress={handleLogout}>
             <View className="flex-row items-center justify-center">
-              <MaterialCommunityIcons name="logout-variant" size={20} color="#FF5C00" />
-              <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+              <MaterialCommunityIcons name="logout-variant" size={20} color={color.primary} />
+              <ButtonText className="ml-2" style={{ color: color.primary }}>
+                {t('settings.logout')}
+              </ButtonText>
             </View>
           </Button>
         </View>

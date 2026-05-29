@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Alert, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 import { Camera, ChevronDown } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/button';
+import { FormField } from '@/components/my-ui/FormField';
+import { Button, ButtonText } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 
 export default function Signup() {
   const { colorScheme } = useColorScheme();
@@ -22,6 +24,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const { t } = useI18n();
+  const toast = useAppToast();
 
   const statusOptions = [
     { label: t('signup.passenger'), value: 'passenger' },
@@ -31,7 +34,11 @@ export default function Signup() {
 
   const handleSave = async () => {
     if (!fullName || !phoneNumber || !status) {
-      Alert.alert(t('common.error'), t('signup.requiredFields'));
+      toast({
+        title: t('common.error'),
+        description: t('signup.requiredFields'),
+        action: 'error',
+      });
       return;
     }
 
@@ -42,11 +49,14 @@ export default function Signup() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        Alert.alert(t('common.error'), t('signup.userNotFound'));
+        toast({
+          title: t('common.error'),
+          description: t('signup.userNotFound'),
+          action: 'error',
+        });
         return;
       }
 
-      // Mettre à jour le profil utilisateur
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -58,117 +68,83 @@ export default function Signup() {
         .eq('id', user.id);
 
       if (error) {
-        Alert.alert(t('common.error'), error.message);
+        toast({
+          title: t('common.error'),
+          description: error.message,
+          action: 'error',
+        });
       } else {
-        Alert.alert(t('signup.successTitle'), t('signup.successMessage'));
+        toast({
+          title: t('signup.successTitle'),
+          description: t('signup.successMessage'),
+          action: 'success',
+        });
         router.replace('/(tabs)');
       }
     } catch {
-      Alert.alert(t('common.error'), t('auth.genericError'));
+      toast({
+        title: t('common.error'),
+        description: t('auth.genericError'),
+        action: 'error',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleContactSupport = () => {
-    // Ouvrir le support client
     console.log('Contact support');
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-black' : 'bg-white'}`} edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Header */}
         <View className="items-center px-6 py-8">
-          <Text className={`mb-4 text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            {t('signup.title')}
-          </Text>
-          <Text className={`text-center text-base ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+          <Text className="mb-4 text-3xl font-bold text-foreground">{t('signup.title')}</Text>
+          <Text className="text-center text-base text-muted-foreground">
             {t('signup.subtitle')}
           </Text>
         </View>
 
-        {/* Avatar Section */}
         <View className="mb-8 items-center">
-          <View
-            className={`relative h-24 w-24 items-center justify-center rounded-full ${
-              isDark ? 'bg-gray-800' : 'bg-gray-100'
-            }`}>
-            {/* User Icon */}
+          <View className="relative h-24 w-24 items-center justify-center rounded-full bg-muted">
             <View className="items-center">
               <Text className="text-5xl">👤</Text>
             </View>
 
-            {/* Camera Icon Button */}
-            <TouchableOpacity
-              className={`absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full ${
-                isDark ? 'bg-orange-500' : 'bg-orange-500'
-              }`}>
+            <TouchableOpacity className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-primary">
               <Camera size={20} color="white" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Form Section */}
         <View className="space-y-6 px-6">
-          {/* Full Name Input */}
-          <View>
-            <Text className={`mb-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {t('signup.fullName')}
-            </Text>
-            <TextInput
-              placeholder="User 54452"
-              value={fullName}
-              onChangeText={setFullName}
-              placeholderTextColor={isDark ? '#666666' : '#999999'}
-              className={`rounded-lg px-4 py-4 text-base font-medium ${
-                isDark ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'
-              }`}
-              editable={!loading}
-            />
-          </View>
+          <FormField
+            label={t('signup.fullName')}
+            placeholder="User 54452"
+            value={fullName}
+            onChangeText={setFullName}
+            editable={!loading}
+          />
 
-          {/* Phone Number Input */}
-          <View>
-            <Text className={`mb-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {t('signup.phoneNumber')}
-            </Text>
-            <TextInput
-              placeholder="+243821606126"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-              placeholderTextColor={isDark ? '#666666' : '#999999'}
-              className={`rounded-lg px-4 py-4 text-base font-medium ${
-                isDark ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'
-              }`}
-              editable={!loading}
-            />
-          </View>
+          <FormField
+            label={t('signup.phoneNumber')}
+            placeholder="+243821606126"
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            keyboardType="phone-pad"
+            editable={!loading}
+          />
 
-          {/* Status Dropdown */}
           <View>
-            <Text className={`mb-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              {t('signup.status')}
-            </Text>
+            <Text className="mb-2 text-sm text-muted-foreground">{t('signup.status')}</Text>
             <TouchableOpacity
               onPress={() => setShowStatusDropdown(!showStatusDropdown)}
-              className={`flex-row items-center justify-between rounded-lg px-4 py-4 ${
-                isDark ? 'bg-gray-800' : 'bg-gray-100'
-              }`}>
-              <Text
-                className={`text-base ${
-                  status
-                    ? isDark
-                      ? 'text-white'
-                      : 'text-gray-900'
-                    : isDark
-                      ? 'text-gray-400'
-                      : 'text-gray-600'
-                }`}>
+              className="flex-row items-center justify-between rounded-xl bg-muted px-4 py-4">
+              <Text className={`text-base ${status ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {status
                   ? statusOptions.find((opt) => opt.value === status)?.label
                   : t('signup.statusPlaceholder')}
@@ -176,12 +152,8 @@ export default function Signup() {
               <ChevronDown size={24} color={isDark ? '#666666' : '#999999'} />
             </TouchableOpacity>
 
-            {/* Dropdown Menu */}
-            {showStatusDropdown && (
-              <View
-                className={`mt-2 overflow-hidden rounded-lg border ${
-                  isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
-                }`}>
+            {showStatusDropdown ? (
+              <View className="mt-2 overflow-hidden rounded-lg border border-border bg-card">
                 {statusOptions.map((option) => (
                   <TouchableOpacity
                     key={option.value}
@@ -189,33 +161,28 @@ export default function Signup() {
                       setStatus(option.value);
                       setShowStatusDropdown(false);
                     }}
-                    className={`border-b px-4 py-3 ${
-                      isDark ? 'border-gray-700' : 'border-gray-200'
-                    }`}>
-                    <Text className={`text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {option.label}
-                    </Text>
+                    className="border-b border-border px-4 py-3">
+                    <Text className="text-base text-foreground">{option.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
 
-          {/* Save Button */}
           <Button
+            action="primary"
+            variant="solid"
+            size="control"
             onPress={handleSave}
-            disabled={loading || !fullName || !phoneNumber || !status}
-            className="mt-6 h-12 rounded-lg bg-orange-500">
-            <Text className="text-base font-bold text-white">
-              {loading ? t('signup.saving') : t('signup.save')}
-            </Text>
+            isDisabled={loading || !fullName || !phoneNumber || !status}
+            className="mt-6 w-full rounded-md">
+            <ButtonText>{loading ? t('signup.saving') : t('signup.save')}</ButtonText>
           </Button>
 
-          {/* Support Text */}
           <View className="mt-8 items-center">
-            <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <Text className="text-sm text-muted-foreground">
               {t('auth.needHelp')}{' '}
-              <Text className="font-semibold text-orange-500" onPress={handleContactSupport}>
+              <Text className="font-semibold text-primary" onPress={handleContactSupport}>
                 {t('auth.contactSupport')}
               </Text>
             </Text>
@@ -223,8 +190,7 @@ export default function Signup() {
         </View>
       </ScrollView>
 
-      {/* Bottom Indicator */}
-      <View className={`h-1 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`} />
+      <View className="h-1 bg-muted" />
     </SafeAreaView>
   );
 }

@@ -189,7 +189,7 @@ export default function Root({ children }: PropsWithChildren) {
 
               #deep-link-redirect .spinner {
                 border: 3px solid #f3f3f3;
-                border-top: 3px solid #FE5900;
+                border-top: 3px solid #ff5705;
                 border-radius: 50%;
                 width: 40px;
                 height: 40px;

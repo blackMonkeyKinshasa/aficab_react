@@ -1,23 +1,15 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Keyboard, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
-import { HeaderBackButton } from '@react-navigation/elements';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { createNewBooking, maxicashVISA, pawapayPay } from '@/api/booking';
+import { bookingSheetContentClassName } from '@/components/my-ui/BookingSheetLayout';
 import { LocAirport } from '@/components/my-ui/LocAirport';
 import { LocDaily } from '@/components/my-ui/LocDaily';
 import { PaymentModal } from '@/components/my-ui/PaymentModal';
 import { ReservationConfirmedScreen } from '@/components/my-ui/ReservationConfirmed';
+import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import {
   ClientType,
   EtapeReservation,
@@ -36,6 +28,7 @@ import {
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
 const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
@@ -44,14 +37,13 @@ const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
   [EtapeReservation.RECAP]: EtapeReservation.OPTION,
 };
 
-const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
-  title,
-  headerTransparent: false,
-  headerLeft: () => (
-    <HeaderBackButton tintColor={isDark ? '#FFFFFF' : '#000000'} onPress={onPress} />
-  ),
-  headerBackTitle: 'Retour',
-});
+const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) =>
+  buildStackScreenOptions({
+    title,
+    isDark,
+    canGoBack: true,
+    onBack: onPress,
+  });
 
 function getPawapayFailureMessage(failureCode?: string | null) {
   return failureCode ?? 'UNKNOWN';
@@ -87,6 +79,7 @@ type ConfirmationState = {
 
 export default function NewBooking() {
   const { t } = useI18n();
+  const toast = useAppToast();
   const router = useRouter();
   const { doc: docParam } = useLocalSearchParams() as { doc?: string };
   const doc: LocationDoc | null = docParam ? JSON.parse(docParam) : null;
@@ -136,6 +129,7 @@ export default function NewBooking() {
   };
 
   const onSubmitDocBooking = (doc: Booking) => {
+    Keyboard.dismiss();
     console.log(doc);
     setBookingDoc(doc);
     analytics.trackPaymentModalOpened({
@@ -166,7 +160,11 @@ export default function NewBooking() {
         paymentMethod,
         reason: 'missing_phone_number',
       });
-      Alert.alert(t('payment.title'), t('booking.enterPhoneForMobilePayment'));
+      toast({
+        title: t('payment.title'),
+        description: t('booking.enterPhoneForMobilePayment'),
+        action: 'info',
+      });
       return;
     }
 
@@ -294,7 +292,11 @@ export default function NewBooking() {
         paymentProvider,
         errorMessage: err?.message ?? 'booking_creation_failed',
       });
-      Alert.alert(t('common.error'), err?.message ?? t('auth.genericError'));
+      toast({
+        title: t('common.error'),
+        description: err?.message ?? t('auth.genericError'),
+        action: 'error',
+      });
       console.error('Erreur lors de la création de la réservation :', err);
     } finally {
       setSubmitting(false);
@@ -437,6 +439,8 @@ export default function NewBooking() {
   };
 
   const handleHeaderBackPress = () => {
+    Keyboard.dismiss();
+
     if (etape !== EtapeReservation.SELECTION) {
       setEtape(PREVIOUS_ETAPE[etape]);
       return;
@@ -490,10 +494,14 @@ export default function NewBooking() {
           headerBackTitle: t('booking.back'),
         }}
       />
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.container}>
+      <View style={styles.container}>
+        <View
+          className={
+            etape === EtapeReservation.SELECTION || etape === EtapeReservation.OPTION
+              ? `flex-1 ${bookingSheetContentClassName}`
+              : 'flex-1'
+          }
+          style={styles.container}>
           {doc.type === ResType.LOC ? (
             <>
               <LocDaily
@@ -533,7 +541,7 @@ export default function NewBooking() {
           onClose={() => closePaymentModal('backdrop')}
           onSubmit={onSubmitPayement}
         />
-      </KeyboardAvoidingView>
+      </View>
     </>
   );
 }

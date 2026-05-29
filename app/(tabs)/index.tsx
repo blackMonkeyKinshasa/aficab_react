@@ -8,6 +8,7 @@ import { getUserByID } from '@/api/user';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
 import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
+import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
 import { Role } from '@/constants/databaseEnum';
 import { useAnalytics } from '@/lib/analytics';
 import { supabase } from '@/lib/supabase';
@@ -16,21 +17,26 @@ import { useAppConfigState } from '@/store/app-config-state';
 
 type ApiUserError = Error & { status?: number; code?: string };
 
-const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
-  title: '',
-  headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
-  headerLeft: () => (
-    <Image
-      source={
-        isDark
-          ? require('@/assets/images/aficab-logo-white.png')
-          : require('@/assets/images/aficab-logo-black.png')
-      }
-      style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
-    />
-  ),
-});
+const SCREEN_OPTIONS = (isDark: boolean, onPress: () => void) =>
+  buildStackScreenOptions({
+    title: '',
+    isDark,
+    headerLeft: () => (
+      <Image
+        source={
+          isDark
+            ? require('@/assets/images/aficab-logo-white.png')
+            : require('@/assets/images/aficab-logo-black.png')
+        }
+        style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
+      />
+    ),
+    headerRight: () => (
+      <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
+        <NotificationIcon isDark={isDark} onPress={onPress} />
+      </View>
+    ),
+  });
 
 function isUserNotFoundError(error: unknown) {
   const apiError = error as ApiUserError | undefined;
@@ -193,9 +199,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={SCREEN_OPTIONS('Accueil', isDark, () => router.push('/notificationsPage'))}
-      />
+      <Stack.Screen options={SCREEN_OPTIONS(isDark, () => router.push('/notificationsPage'))} />
 
       <View style={{ flex: 1 }}>
         <RideBookingScreen />

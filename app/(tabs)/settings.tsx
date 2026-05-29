@@ -25,6 +25,7 @@ import { deleteUserByID } from '@/api/user';
 import { Avatar } from '@/components/my-ui/Avatar';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
+import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
@@ -38,21 +39,29 @@ import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/consta
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+import { setThemePreference } from '@/lib/theme-preference';
+import { useAppToast } from '@/lib/toast';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 import { useAppConfigState } from '@/store/app-config-state';
 import { AppLanguage, useAppLanguageState } from '@/store/language-state';
 
-const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
-  title: title,
-  headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
-});
+const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) =>
+  buildStackScreenOptions({
+    title,
+    isDark,
+    headerRight: () => (
+      <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
+        <NotificationIcon isDark={isDark} onPress={onPress} />
+      </View>
+    ),
+  });
 
 export default function SettingsScreen() {
-  const { colorScheme, toggleColorScheme } = useColorScheme();
+  const { colorScheme, setColorScheme } = useColorScheme();
   const router = useRouter();
   const isDark = colorScheme === 'dark';
   const { language, t } = useI18n();
+  const toast = useAppToast();
   const setLanguage = useAppLanguageState((state) => state.setLanguage);
   const [loading, setLoading] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
@@ -85,7 +94,11 @@ export default function SettingsScreen() {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert(t('common.error'), t('settings.openLinkError'));
+      toast({
+        title: t('common.error'),
+        description: t('settings.openLinkError'),
+        action: 'error',
+      });
     }
   };
 
@@ -113,7 +126,11 @@ export default function SettingsScreen() {
             resetUserSessionState();
             //  router.replace('/(auth)/login');
           } catch {
-            Alert.alert(t('common.error'), t('settings.logoutError'));
+            toast({
+              title: t('common.error'),
+              description: t('settings.logoutError'),
+              action: 'error',
+            });
           } finally {
             setLoading(false);
           }
@@ -145,7 +162,11 @@ export default function SettingsScreen() {
             resetUserSessionState();
             //  router.replace('/(auth)/login');
           } catch {
-            Alert.alert(t('common.error'), t('settings.deleteError'));
+            toast({
+              title: t('common.error'),
+              description: t('settings.deleteError'),
+              action: 'error',
+            });
           } finally {
             setLoading(false);
           }
@@ -184,7 +205,7 @@ export default function SettingsScreen() {
   const SectionTitle = ({ title, isOrange = false }: { title: string; isOrange?: boolean }) => (
     <Text
       className={`px-4 py-4 text-base font-bold ${
-        isOrange ? 'text-orange-500' : isDark ? 'text-white' : 'text-gray-900'
+        isOrange ? 'text-primary' : isDark ? 'text-white' : 'text-gray-900'
       }`}>
       {title}
     </Text>
@@ -270,11 +291,8 @@ export default function SettingsScreen() {
                 onValueChange={(option) => {
                   setLanguage((option?.value as AppLanguage) ?? 'fr');
                 }}>
-                <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
-                  <SelectValue
-                    className={isDark ? 'text-white' : 'text-gray-900'}
-                    placeholder={t('common.select')}
-                  />
+                <SelectTrigger>
+                  <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent>
                   {languageOptions.map((option) => (
@@ -290,8 +308,9 @@ export default function SettingsScreen() {
               icon={THEME_ICONS[colorScheme ?? 'light']}
               label={t('settings.theme')}
               onPress={() => {
-                // Changer le theme
-                toggleColorScheme();
+                const nextTheme = colorScheme === 'dark' ? 'light' : 'dark';
+                setColorScheme(nextTheme);
+                void setThemePreference(nextTheme);
               }}
             />
 

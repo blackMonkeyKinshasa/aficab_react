@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { AlertTriangle, RefreshCw, ShieldCheck, Store } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
-import { Button } from '@/components/ui/button';
+import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getStoreUrl } from '@/constants/app-links';
 import { color } from '@/constants/colors';
@@ -145,27 +145,35 @@ export default function UpdateAppScreen() {
         {/* BUTTONS */}
         <View className="mt-6 gap-3">
           <Button
-            className="h-14 flex-row items-center justify-center rounded-2xl"
-            style={{ backgroundColor: color.primary }}
-            loading={refreshing}
-            onPress={handleRetry}>
+            action="primary"
+            variant="solid"
+            size="lg"
+            className="h-14 rounded-md"
+            onPress={handleRetry}
+            isDisabled={refreshing}>
             <View className="flex-row items-center justify-center">
-              <RefreshCw color="#fff" size={18} />
-              <Text className="ml-2 text-base font-semibold text-white">
+              {refreshing ? (
+                <ButtonSpinner color="#ffffff" />
+              ) : (
+                <RefreshCw color="#fff" size={18} />
+              )}
+              <ButtonText className="ml-2">
                 {refreshing ? t('update.checking') : t('update.checkAgain')}
-              </Text>
+              </ButtonText>
             </View>
           </Button>
 
           <Button
-            className="h-14 flex-row items-center justify-center rounded-2xl border"
+            action="primary"
             variant="outline"
+            size="lg"
+            className="h-14 rounded-md border"
             onPress={handleOpenStore}>
             <View className="flex-row items-center justify-center">
               <Store color={color.primary} size={18} />
-              <Text className="ml-2 text-base font-semibold" style={{ color: color.primary }}>
+              <ButtonText className="ml-2" style={{ color: color.primary }}>
                 {t('update.button')}
-              </Text>
+              </ButtonText>
             </View>
           </Button>
         </View>
