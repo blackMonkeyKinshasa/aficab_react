@@ -1,8 +1,11 @@
-import { KeyboardTypeOptions, Text, View } from 'react-native';
+import { KeyboardTypeOptions, View } from 'react-native';
 
-import { Input } from '@/components/ui/input';
+import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
+import { Input, InputField } from '@/components/ui/input';
 
 import { InfoIcon } from './InfoIcon';
+
+const filledInputClassName = 'rounded-md border-0 bg-background-100';
 
 export function FormField({
   label,
@@ -12,7 +15,6 @@ export function FormField({
   editable = true,
   showInfo = false,
   keyboardType = 'default',
-  isDark,
 }: {
   label: string;
   value: string;
@@ -21,25 +23,30 @@ export function FormField({
   editable?: boolean;
   showInfo?: boolean;
   keyboardType?: KeyboardTypeOptions;
-  isDark: boolean;
 }) {
   return (
-    <View className="mb-6">
-      <View className="mb-2 flex-row items-center">
-        <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{label}</Text>
-        {showInfo && (
+    <FormControl className="mb-6">
+      <FormControlLabel className="mb-2 flex-row items-center">
+        <FormControlLabelText className="text-typography-500">{label}</FormControlLabelText>
+        {showInfo ? (
           <View className="ml-2">
             <InfoIcon />
           </View>
-        )}
-      </View>
+        ) : null}
+      </FormControlLabel>
       <Input
-        placeholder={placeholder}
-        onChangeText={onChangeText}
-        value={value}
-        editable={editable}
-        keyboardType={keyboardType}
-      />
-    </View>
+        variant="outline"
+        size="control"
+        className={filledInputClassName}
+        isDisabled={!editable}>
+        <InputField
+          placeholder={placeholder}
+          onChangeText={onChangeText}
+          value={value}
+          editable={editable}
+          keyboardType={keyboardType}
+        />
+      </Input>
+    </FormControl>
   );
 }
