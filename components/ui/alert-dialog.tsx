@@ -5,7 +5,7 @@ import * as AlertDialogPrimitive from '@rn-primitives/alert-dialog';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
 import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
-import { buttonTextVariants, buttonVariants } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
 import { TextClassContext } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -117,26 +117,29 @@ function AlertDialogDescription({
 
 function AlertDialogAction({
   className,
+  children,
   ...props
 }: AlertDialogPrimitive.ActionProps & React.RefAttributes<AlertDialogPrimitive.ActionRef>) {
   return (
-    <TextClassContext.Provider value={buttonTextVariants({ className })}>
-      <AlertDialogPrimitive.Action className={cn(buttonVariants(), className)} {...props} />
-    </TextClassContext.Provider>
+    <AlertDialogPrimitive.Action asChild {...props}>
+      <Button action="primary" variant="solid" size="md" className={cn('rounded-md', className)}>
+        <ButtonText>{children as React.ReactNode}</ButtonText>
+      </Button>
+    </AlertDialogPrimitive.Action>
   );
 }
 
 function AlertDialogCancel({
   className,
+  children,
   ...props
 }: AlertDialogPrimitive.CancelProps & React.RefAttributes<AlertDialogPrimitive.CancelRef>) {
   return (
-    <TextClassContext.Provider value={buttonTextVariants({ className, variant: 'outline' })}>
-      <AlertDialogPrimitive.Cancel
-        className={cn(buttonVariants({ variant: 'outline' }), className)}
-        {...props}
-      />
-    </TextClassContext.Provider>
+    <AlertDialogPrimitive.Cancel asChild {...props}>
+      <Button action="primary" variant="outline" size="md" className={cn('rounded-md', className)}>
+        <ButtonText>{children as React.ReactNode}</ButtonText>
+      </Button>
+    </AlertDialogPrimitive.Cancel>
   );
 }
 
