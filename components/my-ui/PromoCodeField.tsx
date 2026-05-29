@@ -1,6 +1,12 @@
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Input } from '@/components/ui/input';
+import { Button, ButtonText } from '@/components/ui/button';
+import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
+import { Input, InputField } from '@/components/ui/input';
+import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
+
+const filledInputClassName = 'rounded-md border-0 bg-background-100';
 
 type PromoCodeFieldProps = {
   label: string;
@@ -30,66 +36,64 @@ export function PromoCodeField({
   textColor,
   subTextColor,
   borderColor,
-  inputBackgroundColor,
-  titleSize = 16,
   disabled = false,
   isApplying = false,
   feedbackMessage = null,
   feedbackTone = 'default',
 }: PromoCodeFieldProps) {
-  const feedbackColor =
-    feedbackTone === 'success' ? '#16a34a' : feedbackTone === 'error' ? '#dc2626' : subTextColor;
+  const feedbackClassName =
+    feedbackTone === 'success'
+      ? 'text-green-600'
+      : feedbackTone === 'error'
+        ? 'text-destructive'
+        : 'text-muted-foreground';
 
   return (
-    <View style={{ borderWidth: 1, borderColor, borderRadius: 12, padding: 12, marginBottom: 15 }}>
-      <Text style={{ color: textColor, fontSize: titleSize, fontWeight: '600', marginBottom: 10 }}>
-        {label}
-      </Text>
+    <View className="mb-4 rounded-md border p-3" style={{ borderColor }}>
+      <FormControl>
+        <FormControlLabel className="mb-2">
+          <FormControlLabelText
+            className="font-semibold"
+            style={{ color: textColor, fontSize: 16 }}>
+            {label}
+          </FormControlLabelText>
+        </FormControlLabel>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Input
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={subTextColor}
-          editable={!disabled && !isApplying}
-          style={{
-            flex: 1,
-            backgroundColor: inputBackgroundColor,
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            marginRight: 8,
-            borderWidth: 1,
-            borderColor,
-            color: textColor,
-          }}
-        />
+        <View className="flex-row items-center gap-2">
+          <Input
+            variant="outline"
+            size="control"
+            className={cn('flex-1', filledInputClassName)}
+            isDisabled={disabled || isApplying}>
+            <InputField
+              value={value}
+              onChangeText={onChangeText}
+              placeholder={placeholder}
+              placeholderTextColor={subTextColor}
+              editable={!disabled && !isApplying}
+              style={{ color: textColor }}
+            />
+          </Input>
 
-        <TouchableOpacity
-          style={{
-            backgroundColor: inputBackgroundColor,
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            borderRadius: 10,
-            borderWidth: 1,
-            borderColor,
-            opacity: disabled || isApplying ? 0.6 : 1,
-          }}
-          onPress={onApply}
-          disabled={disabled || isApplying}
-          activeOpacity={0.8}>
-          {isApplying ? (
-            <ActivityIndicator size="small" color={textColor} />
-          ) : (
-            <Text style={{ color: textColor, fontWeight: '500' }}>{actionLabel}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <Button
+            action="primary"
+            variant="outline"
+            size="control"
+            className="min-w-32 rounded-md px-4"
+            onPress={onApply}
+            isDisabled={disabled || isApplying}>
+            {isApplying ? (
+              <ActivityIndicator size="small" color={textColor} />
+            ) : (
+              <ButtonText style={{ color: textColor }}>{actionLabel}</ButtonText>
+            )}
+          </Button>
+        </View>
 
-      {feedbackMessage ? (
-        <Text style={{ color: feedbackColor, fontSize: 12, marginTop: 10 }}>{feedbackMessage}</Text>
-      ) : null}
+        {feedbackMessage ? (
+          <Text className={cn('mt-2 text-xs', feedbackClassName)}>{feedbackMessage}</Text>
+        ) : null}
+      </FormControl>
     </View>
   );
 }

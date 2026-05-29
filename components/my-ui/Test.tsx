@@ -5,8 +5,7 @@ import { Link, Stack } from 'expo-router';
 import { MoonStarIcon, StarIcon, SunIcon } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
-import { Button } from '@/components/ui/button';
-import { Icon } from '@/components/ui/icon';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
 const SCREEN_OPTIONS = {
@@ -43,14 +42,14 @@ export default function Screen() {
         </View>
         <View className="flex-row gap-2">
           <Link href="https://reactnativereusables.com" asChild>
-            <Button>
-              <Text>Browse the Docs</Text>
+            <Button action="primary" variant="solid" size="md" className="rounded-md">
+              <ButtonText>Browse the Docs</ButtonText>
             </Button>
           </Link>
           <Link href="https://github.com/founded-labs/react-native-reusables" asChild>
-            <Button variant="ghost">
-              <Text>Star the Repo</Text>
-              <Icon as={StarIcon} />
+            <Button action="default" variant="solid" size="md" className="rounded-md">
+              <ButtonText>Star the Repo</ButtonText>
+              <ButtonIcon as={StarIcon} />
             </Button>
           </Link>
         </View>
@@ -69,11 +68,12 @@ function ThemeToggle() {
 
   return (
     <Button
+      action="default"
+      variant="solid"
+      size="md"
       onPressIn={toggleColorScheme}
-      size="icon"
-      variant="ghost"
-      className="ios:size-9 rounded-full web:mx-4">
-      <Icon as={THEME_ICONS[colorScheme ?? 'light']} className="size-5" />
+      className="ios:size-9 rounded-md web:mx-4">
+      <ButtonIcon as={THEME_ICONS[colorScheme ?? 'light']} className="size-5" />
     </Button>
   );
 }

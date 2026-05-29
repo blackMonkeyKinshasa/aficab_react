@@ -6,17 +6,22 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   useColorScheme,
   View,
 } from 'react-native';
 
+import { Input, InputField, InputSlot } from '@/components/ui/input';
 import { color } from '@/constants/colors';
 import { PaymentMethod } from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
+import {
+  dismissKeyboard,
+  keyboardAvoidingBehavior,
+  useKeyboardVisibility,
+} from '@/lib/use-keyboard-visibility';
 
 interface Props {
   visible: boolean;
@@ -34,6 +39,8 @@ const PAYMENT_LOGOS = {
   [PaymentMethod.card]: require('@/assets/money/visa.png'),
   [PaymentMethod.cash]: require('@/assets/money/cash.png'),
 } as const;
+
+const filledInputClassName = 'rounded-md border-0 bg-background-100';
 
 const PaymentCard = memo(function PaymentCard({
   type,
@@ -87,13 +94,12 @@ export function PaymentModal({
   const containerBg = isDark ? color.appDarkBackground : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#000000';
   const subTextColor = isDark ? '#A0A0A0' : '#555555';
-  const inputBorder = isDark ? '#374151' : '#dddddd';
-  const inputBg = isDark ? '#111827' : '#ffffff';
-  const inputText = isDark ? '#ffffff' : '#000000';
+  const isKeyboardVisible = useKeyboardVisibility();
+  const analytics = useAnalytics();
 
   const [selected, setSelected] = useState<PaymentMethod>(PaymentMethod.mpesa);
   const [phone, setPhone] = useState('');
-  const analytics = useAnalytics();
+
   const showPhoneField = selected !== PaymentMethod.cash && selected !== PaymentMethod.card;
   const paymentLabel =
     selected === PaymentMethod.mpesa
@@ -136,6 +142,7 @@ export function PaymentModal({
     ],
     [isPremium, t]
   );
+
   const selectedPaymentLabel =
     paymentOptions.find((option) => option.type === selected)?.label ?? t('payment.payWith');
 
@@ -143,21 +150,30 @@ export function PaymentModal({
     if (!visible) {
       setSelected(PaymentMethod.mpesa);
       setPhone('');
+      dismissKeyboard();
     }
   }, [visible]);
+
+  const handleClose = () => {
+    dismissKeyboard();
+    onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent={!disableStatusBar}>
-      <KeyboardAvoidingView behavior="padding" style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={keyboardAvoidingBehavior}
+        enabled={isKeyboardVisible}
+        style={styles.overlay}>
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
-          onPress={submitting ? undefined : onClose}
+          onPress={submitting ? undefined : handleClose}
         />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={[styles.modalCard, { backgroundColor: containerBg }]}>
@@ -177,29 +193,35 @@ export function PaymentModal({
               ))}
             </View>
 
-            {showPhoneField && (
+            {showPhoneField ? (
               <>
                 <Text style={[styles.label, { color: subTextColor, marginBottom: 15 }]}>
                   {t('payment.phoneInfoFor')} ({paymentLabel}) :
                 </Text>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                  <Text style={{ color: subTextColor, marginRight: 10 }}>+243</Text>
-                  <TextInput
-                    placeholder={t('payment.phonePlaceholder')}
-                    placeholderTextColor={subTextColor}
-                    value={phone}
-                    onChangeText={setPhone}
-                    style={[
-                      styles.input,
-                      { borderColor: inputBorder, backgroundColor: inputBg, color: inputText },
-                    ]}
-                    keyboardType="phone-pad"
-                    editable={!submitting}
-                  />
+                <View style={styles.phoneInputWrapper}>
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className={filledInputClassName}
+                    isDisabled={submitting}>
+                    <InputSlot className="pl-3">
+                      <Text style={{ color: subTextColor }}>+243</Text>
+                    </InputSlot>
+                    <InputField
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder={t('payment.phonePlaceholder')}
+                      placeholderTextColor={subTextColor}
+                      keyboardType="phone-pad"
+                      editable={!submitting}
+                      returnKeyType="done"
+                      style={{ color: textColor }}
+                    />
+                  </Input>
                 </View>
               </>
-            )}
+            ) : null}
 
             <TouchableOpacity
               style={[styles.button, submitting && styles.buttonDisabled]}
@@ -293,11 +315,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#555',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 10,
+  phoneInputWrapper: {
     marginBottom: 15,
   },
   button: {
@@ -315,11 +333,5 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
-  },
-  closeButton: {
-    marginTop: 12,
-  },
-  closeText: {
-    textAlign: 'center',
   },
 });
