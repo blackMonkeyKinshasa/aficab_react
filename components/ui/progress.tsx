@@ -1,6 +1,6 @@
-import { cn } from '@/lib/utils';
-import * as ProgressPrimitive from '@rn-primitives/progress';
 import { Platform, View } from 'react-native';
+
+import * as ProgressPrimitive from '@rn-primitives/progress';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -8,6 +8,8 @@ import Animated, {
   useDerivedValue,
   withSpring,
 } from 'react-native-reanimated';
+
+import { cn } from '@/lib/utils';
 
 function Progress({
   className,

@@ -1,13 +1,16 @@
+import * as React from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
+
+import * as SelectPrimitive from '@rn-primitives/select';
+import { Check, ChevronDown, ChevronDownIcon, ChevronUpIcon } from 'lucide-react-native';
+import { FadeIn, FadeOut } from 'react-native-reanimated';
+import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
+
 import { Icon } from '@/components/ui/icon';
 import { NativeOnlyAnimatedView } from '@/components/ui/native-only-animated-view';
 import { TextClassContext } from '@/components/ui/text';
+import { controlHeightStyle } from '@/constants/spacing';
 import { cn } from '@/lib/utils';
-import * as SelectPrimitive from '@rn-primitives/select';
-import { Check, ChevronDown, ChevronDownIcon, ChevronUpIcon } from 'lucide-react-native';
-import * as React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
-import { FadeIn, FadeOut } from 'react-native-reanimated';
-import { FullWindowOverlay as RNFullWindowOverlay } from 'react-native-screens';
 
 type Option = SelectPrimitive.Option;
 
@@ -28,8 +31,8 @@ function SelectValue({
     <SelectPrimitive.Value
       ref={ref}
       className={cn(
-        'line-clamp-1 flex flex-row items-center gap-2 text-sm text-foreground',
-        !value && 'text-muted-foreground',
+        'text-typography-900 line-clamp-1 flex flex-1 flex-row items-center text-base',
+        !value && 'text-typography-500',
         className
       )}
       {...props}
@@ -41,28 +44,31 @@ function SelectTrigger({
   ref,
   className,
   children,
-  size = 'default',
+  size = 'control',
+  style,
   ...props
 }: SelectPrimitive.TriggerProps &
   React.RefAttributes<SelectPrimitive.TriggerRef> & {
     children?: React.ReactNode;
-    size?: 'default' | 'sm';
+    size?: 'control' | 'default' | 'sm';
   }) {
   return (
     <SelectPrimitive.Trigger
       ref={ref}
+      style={size === 'control' ? [controlHeightStyle, style] : style}
       className={cn(
-        'flex h-10 flex-row items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 shadow-sm shadow-black/5 dark:bg-input/30 dark:active:bg-input/50 sm:h-9',
+        'border-background-300 bg-background-100 flex w-full flex-row items-center justify-between gap-2 rounded-md border-0 px-3',
+        size === 'control' ? '' : 'h-10 py-2 sm:h-9',
         Platform.select({
-          web: 'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive w-fit whitespace-nowrap text-sm outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+          web: 'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive focus-visible:border-primary-700 focus-visible:ring-indicator-primary whitespace-nowrap text-base outline-none transition-[color,box-shadow] focus-visible:ring-1 focus-visible:ring-inset disabled:cursor-not-allowed data-[disabled=true]:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0',
         }),
-        props.disabled && 'opacity-50',
+        props.disabled && 'opacity-40',
         size === 'sm' && 'h-8 py-2 sm:py-1.5',
         className
       )}
       {...props}>
       <>{children}</>
-      <Icon as={ChevronDown} aria-hidden={true} className="size-4 text-muted-foreground" />
+      <Icon as={ChevronDown} aria-hidden={true} className="text-typography-500 size-4" />
     </SelectPrimitive.Trigger>
   );
 }
@@ -146,7 +152,7 @@ function SelectLabel({
 
 function SelectItem({
   className,
-  children,
+  children: _children,
   ...props
 }: SelectPrimitive.ItemProps & React.RefAttributes<SelectPrimitive.ItemRef>) {
   return (
@@ -227,6 +233,7 @@ function SelectScrollDownButton({
 }
 
 export {
+  type Option,
   Select,
   SelectContent,
   SelectGroup,
@@ -237,5 +244,4 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-  type Option,
 };

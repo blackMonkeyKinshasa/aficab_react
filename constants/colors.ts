@@ -1,5 +1,5 @@
-
 export const color = {
-  primary: '#FE5900',
+  primary: '#ff5705',
+  white: '#fff',
   appDarkBackground: '#151820',
 };

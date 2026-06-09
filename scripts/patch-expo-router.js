@@ -18,8 +18,18 @@ module.exports = {
 };
 `;
 
-const expoLocationTsconfigFile = path.join(process.cwd(), 'node_modules', 'expo-location', 'tsconfig.json');
-const expoSplashScreenTsconfigFile = path.join(process.cwd(), 'node_modules', 'expo-splash-screen', 'tsconfig.json');
+const expoLocationTsconfigFile = path.join(
+  process.cwd(),
+  'node_modules',
+  'expo-location',
+  'tsconfig.json'
+);
+const expoSplashScreenTsconfigFile = path.join(
+  process.cwd(),
+  'node_modules',
+  'expo-splash-screen',
+  'tsconfig.json'
+);
 const expoKeepAwakeDir = path.join(process.cwd(), 'node_modules', 'expo-keep-awake');
 const gorhomBottomSheetDir = path.join(process.cwd(), 'node_modules', '@gorhom', 'bottom-sheet');
 const reactNavigationElementsDir = path.join(
@@ -38,24 +48,14 @@ const reactNativeSafeAreaContextDir = path.join(
   'node_modules',
   'react-native-safe-area-context'
 );
-const gorhomPortalDir = path.join(
-  process.cwd(),
-  'node_modules',
-  '@gorhom',
-  'portal'
-);
+const gorhomPortalDir = path.join(process.cwd(), 'node_modules', '@gorhom', 'portal');
 const reactNativeGradlePluginDir = path.join(
   process.cwd(),
   'node_modules',
   '@react-native',
   'gradle-plugin'
 );
-const supabaseAuthJsDir = path.join(
-  process.cwd(),
-  'node_modules',
-  '@supabase',
-  'auth-js'
-);
+const supabaseAuthJsDir = path.join(process.cwd(), 'node_modules', '@supabase', 'auth-js');
 const hermesParserDir = path.join(process.cwd(), 'node_modules', 'hermes-parser');
 const hermesParserDistDir = path.join(hermesParserDir, 'dist');
 const expoMetroRuntimeDir = path.join(process.cwd(), 'node_modules', '@expo', 'metro-runtime');
@@ -82,12 +82,7 @@ function mergeMissingDirectoryContents(sourceDir, targetDir) {
   let copiedAny = false;
 
   for (const childName of fs.readdirSync(sourceDir)) {
-    if (
-      copyMissingPath(
-        path.join(sourceDir, childName),
-        path.join(targetDir, childName)
-      )
-    ) {
+    if (copyMissingPath(path.join(sourceDir, childName), path.join(targetDir, childName))) {
       copiedAny = true;
     }
   }
@@ -117,12 +112,7 @@ function copyMissingChildren(sourceDir, targetDir, names) {
   const copiedNames = [];
 
   for (const name of names) {
-    if (
-      copyMissingPath(
-        path.join(sourceDir, name),
-        path.join(targetDir, name)
-      )
-    ) {
+    if (copyMissingPath(path.join(sourceDir, name), path.join(targetDir, name))) {
       copiedNames.push(name);
     }
   }
@@ -304,7 +294,9 @@ function replaceExactString(filePath, oldText, newText) {
   }
 
   if (!fileContent.includes(oldText)) {
-    console.warn(`${path.relative(process.cwd(), filePath)} did not match the expected content. Skipping patch.`);
+    console.warn(
+      `${path.relative(process.cwd(), filePath)} did not match the expected content. Skipping patch.`
+    );
     return;
   }
 
@@ -515,17 +507,16 @@ function patchExpoMetroRuntime() {
 
     for (const entry of entriesToRestore) {
       if (
-        copyMissingPath(
-          path.join(packedPackageDir, entry),
-          path.join(expoMetroRuntimeDir, entry)
-        )
+        copyMissingPath(path.join(packedPackageDir, entry), path.join(expoMetroRuntimeDir, entry))
       ) {
         restoredEntries.push(entry);
       }
     }
 
     if (!fs.existsSync(mainEntryPath)) {
-      throw new Error(`Unable to restore @expo/metro-runtime main entry: ${expoMetroRuntimePackageJson.main}`);
+      throw new Error(
+        `Unable to restore @expo/metro-runtime main entry: ${expoMetroRuntimePackageJson.main}`
+      );
     }
 
     console.log(
@@ -536,7 +527,9 @@ function patchExpoMetroRuntime() {
 
 function patchExpoPackageManager() {
   if (!fs.existsSync(expoCliDir)) {
-    console.warn('@expo/cli package not found in node_modules. Skipping @expo/package-manager patch.');
+    console.warn(
+      '@expo/cli package not found in node_modules. Skipping @expo/package-manager patch.'
+    );
     return;
   }
 
@@ -561,8 +554,8 @@ function patchExpoPackageManager() {
   const typeEntry = installedPackageJson?.types ?? null;
 
   if (
-    tryResolveModulePath(path.join(expoPackageManagerDir, mainEntry))
-    && (!typeEntry || fs.existsSync(path.join(expoPackageManagerDir, typeEntry)))
+    tryResolveModulePath(path.join(expoPackageManagerDir, mainEntry)) &&
+    (!typeEntry || fs.existsSync(path.join(expoPackageManagerDir, typeEntry)))
   ) {
     console.log('@expo/package-manager main entry exists, no patch needed.');
     return;
@@ -583,10 +576,7 @@ function patchExpoPackageManager() {
 
     for (const entry of restoreEntries) {
       if (
-        copyMissingPath(
-          path.join(packedPackageDir, entry),
-          path.join(expoPackageManagerDir, entry)
-        )
+        copyMissingPath(path.join(packedPackageDir, entry), path.join(expoPackageManagerDir, entry))
       ) {
         restoredEntries.push(entry);
       }
@@ -627,12 +617,7 @@ function patchExpoKeepAwake() {
     const restoredEntries = [];
 
     for (const entry of ['src', 'build']) {
-      if (
-        copyMissingPath(
-          path.join(packedPackageDir, entry),
-          path.join(expoKeepAwakeDir, entry)
-        )
-      ) {
+      if (copyMissingPath(path.join(packedPackageDir, entry), path.join(expoKeepAwakeDir, entry))) {
         restoredEntries.push(entry);
       }
     }
@@ -765,17 +750,16 @@ function patchGorhomBottomSheet() {
 
     for (const entry of ['src', 'lib']) {
       if (
-        copyMissingPath(
-          path.join(packedPackageDir, entry),
-          path.join(gorhomBottomSheetDir, entry)
-        )
+        copyMissingPath(path.join(packedPackageDir, entry), path.join(gorhomBottomSheetDir, entry))
       ) {
         restoredEntries.push(entry);
       }
     }
 
     if (!fs.existsSync(reactNativeEntryPath)) {
-      throw new Error(`Unable to restore @gorhom/bottom-sheet entry: ${packageJson['react-native']}`);
+      throw new Error(
+        `Unable to restore @gorhom/bottom-sheet entry: ${packageJson['react-native']}`
+      );
     }
 
     console.log(
@@ -807,7 +791,9 @@ function patchExpoCliBundledNativeModulesFallback() {
 
 function patchReactNativeSafeAreaContext() {
   if (!fs.existsSync(reactNativeSafeAreaContextDir)) {
-    console.warn('react-native-safe-area-context package not found in node_modules. Skipping patch.');
+    console.warn(
+      'react-native-safe-area-context package not found in node_modules. Skipping patch.'
+    );
     return;
   }
 
@@ -821,7 +807,15 @@ function patchReactNativeSafeAreaContext() {
     withPackedPackage(packageSpec, (packedPackageDir) => {
       const restoredEntries = [];
 
-      for (const entry of ['src', 'lib', 'common', 'android', 'ios', 'jest', 'react-native.config.js']) {
+      for (const entry of [
+        'src',
+        'lib',
+        'common',
+        'android',
+        'ios',
+        'jest',
+        'react-native.config.js',
+      ]) {
         if (
           copyMissingPath(
             path.join(packedPackageDir, entry),
@@ -833,7 +827,9 @@ function patchReactNativeSafeAreaContext() {
       }
 
       if (!tryResolveModulePath(path.join(reactNativeSafeAreaContextDir, sourceEntry))) {
-        console.warn('Unable to restore react-native-safe-area-context source entry from the published package.');
+        console.warn(
+          'Unable to restore react-native-safe-area-context source entry from the published package.'
+        );
         return;
       }
 
@@ -858,8 +854,50 @@ function patchReactNativeSafeAreaContext() {
     });
 
     if (changed) {
-      console.log('Patched react-native-safe-area-context package.json to restore source entrypoints.');
+      console.log(
+        'Patched react-native-safe-area-context package.json to restore source entrypoints.'
+      );
     }
+  }
+}
+
+function patchTailwindVariants() {
+  const packageDir = path.join(process.cwd(), 'node_modules', 'tailwind-variants');
+  const packageJsonPath = path.join(packageDir, 'package.json');
+
+  if (!fs.existsSync(packageJsonPath)) {
+    return;
+  }
+
+  const distTypesPath = path.join(packageDir, 'dist', 'index.d.ts');
+  const brokenTypesPath = path.join(packageDir, 'types', 'index.d.ts');
+
+  if (!fs.existsSync(distTypesPath)) {
+    return;
+  }
+
+  const changed = patchJsonFile(packageJsonPath, (mutablePackageJson) => {
+    const defaultExport = mutablePackageJson.exports?.['.'];
+
+    if (defaultExport?.types !== './types/index.d.ts') {
+      return false;
+    }
+
+    defaultExport.types = './dist/index.d.ts';
+    return true;
+  });
+
+  if (changed) {
+    console.log(
+      'Patched tailwind-variants package.json exports to use dist/index.d.ts instead of missing types/index.d.ts.'
+    );
+    return;
+  }
+
+  if (!fs.existsSync(brokenTypesPath)) {
+    fs.mkdirSync(path.dirname(brokenTypesPath), { recursive: true });
+    fs.copyFileSync(distTypesPath, brokenTypesPath);
+    console.log('Restored tailwind-variants types/index.d.ts from dist/index.d.ts.');
   }
 }
 
@@ -897,12 +935,7 @@ function patchMissingTypeDeclarations() {
       const restoredEntries = [];
 
       for (const entry of restoreEntries) {
-        if (
-          copyMissingPath(
-            path.join(packedPackageDir, entry),
-            path.join(packageDir, entry)
-          )
-        ) {
+        if (copyMissingPath(path.join(packedPackageDir, entry), path.join(packageDir, entry))) {
           restoredEntries.push(entry);
         }
       }
@@ -956,8 +989,8 @@ function patchGorhomPortal() {
     }
 
     if (
-      !tryResolveModulePath(path.join(gorhomPortalDir, packageJson['react-native']))
-      || !tryResolveModulePath(path.join(gorhomPortalDir, 'src/components/portal/Portal'))
+      !tryResolveModulePath(path.join(gorhomPortalDir, packageJson['react-native'])) ||
+      !tryResolveModulePath(path.join(gorhomPortalDir, 'src/components/portal/Portal'))
     ) {
       throw new Error('Unable to restore @gorhom/portal React Native sources.');
     }
@@ -1056,10 +1089,7 @@ function patchSupabaseAuthJs() {
 
     for (const entry of requiredEntries) {
       if (
-        copyMissingPath(
-          path.join(packedPackageDir, entry),
-          path.join(supabaseAuthJsDir, entry)
-        )
+        copyMissingPath(path.join(packedPackageDir, entry), path.join(supabaseAuthJsDir, entry))
       ) {
         restoredEntries.push(entry);
       }
@@ -1110,9 +1140,9 @@ function patchBrokenDependencyManifests() {
       for (const field of ['react-native', 'source']) {
         const fieldValue = mutablePackageJson[field];
         if (
-          typeof fieldValue === 'string'
-          && fieldValue.startsWith('src/')
-          && !tryResolveModulePath(path.join(packageDir, fieldValue))
+          typeof fieldValue === 'string' &&
+          fieldValue.startsWith('src/') &&
+          !tryResolveModulePath(path.join(packageDir, fieldValue))
         ) {
           mutablePackageJson[field] = fallbackEntry;
           hasChanges = true;
@@ -1121,11 +1151,13 @@ function patchBrokenDependencyManifests() {
 
       const defaultExport = mutablePackageJson.exports?.['.'];
       if (
-        typeof defaultExport?.default === 'string'
-        && defaultExport.default.includes('src/')
-        && !tryResolveModulePath(path.join(packageDir, defaultExport.default))
+        typeof defaultExport?.default === 'string' &&
+        defaultExport.default.includes('src/') &&
+        !tryResolveModulePath(path.join(packageDir, defaultExport.default))
       ) {
-        defaultExport.default = fallbackEntry.startsWith('.') ? fallbackEntry : `./${fallbackEntry}`;
+        defaultExport.default = fallbackEntry.startsWith('.')
+          ? fallbackEntry
+          : `./${fallbackEntry}`;
         hasChanges = true;
       }
 
@@ -1169,12 +1201,7 @@ function patchBrokenDirectDependencies() {
       const restoredEntries = [];
 
       for (const entry of restoreEntries) {
-        if (
-          copyMissingPath(
-            path.join(packedPackageDir, entry),
-            path.join(packageDir, entry)
-          )
-        ) {
+        if (copyMissingPath(path.join(packedPackageDir, entry), path.join(packageDir, entry))) {
           restoredEntries.push(entry);
         }
       }
@@ -1225,7 +1252,8 @@ function patchExpoLocalMavenRepos() {
     return;
   }
 
-  const expoPackageDirs = fs.readdirSync(nodeModulesDir, { withFileTypes: true })
+  const expoPackageDirs = fs
+    .readdirSync(nodeModulesDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && /^expo($|-)/.test(entry.name))
     .map((entry) => path.join(nodeModulesDir, entry.name));
 
@@ -1236,7 +1264,11 @@ function patchExpoLocalMavenRepos() {
     const localMavenRepoDir = path.join(packageDir, 'local-maven-repo');
     const packageJsonPath = path.join(packageDir, 'package.json');
 
-    if (!fs.existsSync(moduleConfigPath) || !fs.existsSync(localMavenRepoDir) || !fs.existsSync(packageJsonPath)) {
+    if (
+      !fs.existsSync(moduleConfigPath) ||
+      !fs.existsSync(localMavenRepoDir) ||
+      !fs.existsSync(packageJsonPath)
+    ) {
       continue;
     }
 
@@ -1255,7 +1287,10 @@ function patchExpoLocalMavenRepos() {
     );
 
     const pomPath = path.join(artifactDir, `${publication.artifactId}-${publication.version}.pom`);
-    const moduleMetadataPath = path.join(artifactDir, `${publication.artifactId}-${publication.version}.module`);
+    const moduleMetadataPath = path.join(
+      artifactDir,
+      `${publication.artifactId}-${publication.version}.module`
+    );
 
     if (fs.existsSync(pomPath) && fs.existsSync(moduleMetadataPath)) {
       continue;
@@ -1285,7 +1320,9 @@ function patchExpoLocalMavenRepos() {
   }
 
   if (restoredPackages === 0) {
-    console.log('Expo local Maven repositories already include required metadata, no patch needed.');
+    console.log(
+      'Expo local Maven repositories already include required metadata, no patch needed.'
+    );
   }
 }
 
@@ -1303,6 +1340,7 @@ patchExpoPackageManager();
 patchExpoCliBundledNativeModulesFallback();
 patchBrokenDirectDependencies();
 patchExpoLocalMavenRepos();
+patchTailwindVariants();
 patchMissingTypeDeclarations();
 patchReactNativeSafeAreaContext();
 patchGorhomPortal();

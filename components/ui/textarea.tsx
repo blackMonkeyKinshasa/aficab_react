@@ -1,5 +1,6 @@
-import { cn } from '@/lib/utils';
 import { Platform, TextInput, type TextInputProps } from 'react-native';
+
+import { cn } from '@/lib/utils';
 
 type TextareaProps = TextInputProps & {
   placeholderClassName?: string;
@@ -26,7 +27,10 @@ function Textarea({
       numberOfLines={numberOfLines}
       textAlignVertical="top"
       {...(Platform.OS === 'web'
-        ? ({ placeholderClassName: cn('text-muted-foreground', placeholderClassName) } as Record<string, string>)
+        ? ({ placeholderClassName: cn('text-muted-foreground', placeholderClassName) } as Record<
+            string,
+            string
+          >)
         : {})}
       {...props}
     />

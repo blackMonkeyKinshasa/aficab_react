@@ -1,7 +1,8 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import YoutubePlayer from 'react-native-youtube-iframe';
+
 import { useColorScheme } from 'nativewind';
+import YoutubePlayer from 'react-native-youtube-iframe';
 
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
@@ -32,11 +33,14 @@ export function ModalYoutubeIframe({
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.card, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}> 
+        <View
+          style={[styles.card, { backgroundColor: isDark ? color.appDarkBackground : '#FFFFFF' }]}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <Text style={[styles.closeText, { color: isDark ? '#FFFFFF' : '#111827' }]}>{t('common.close')}</Text>
+              <Text style={[styles.closeText, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+                {t('common.close')}
+              </Text>
             </TouchableOpacity>
           </View>
 

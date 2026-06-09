@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
 
 import { updateDeviceToken } from '@/api/user';
@@ -43,6 +44,16 @@ function getNotificationsModule(): NotificationsModule | null {
   }
 
   return require('expo-notifications') as NotificationsModule;
+}
+
+export function reportPushTokenStage(stage: string, extra?: Record<string, unknown>) {
+  Sentry.addBreadcrumb({
+    category: 'push_token',
+    message: stage,
+    data: extra,
+    level: stage.includes('error') || stage.includes('denied') ? 'warning' : 'info',
+  });
+  console.log('[push_token]', stage, extra ?? '');
 }
 
 export function ensureNotificationsReady() {
@@ -96,6 +107,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
 
   if (Platform.OS === 'web') {
     trace.push('blocage: plateforme web');
+    reportPushTokenStage('web', { platform: Platform.OS });
     return {
       token: null,
       errorMessage: 'Les notifications push ne sont pas disponibles sur le web.',
@@ -110,6 +122,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   if (!notifications) {
     console.log('Les notifications push distantes ne sont pas prises en charge dans Expo Go.');
     trace.push('blocage: module indisponible ou expo go');
+    reportPushTokenStage('notifications-module-unavailable', { platform: Platform.OS });
     return {
       token: null,
       errorMessage: 'Les notifications push distantes ne sont pas prises en charge dans Expo Go.',
@@ -135,6 +148,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   if (!Device.isDevice) {
     console.log('Les notifications push necessitent un appareil physique.');
     trace.push('blocage: appareil non physique');
+    reportPushTokenStage('not-physical-device', { platform: Platform.OS });
     return {
       token: null,
       errorMessage: 'Les notifications push necessitent un appareil physique.',
@@ -158,6 +172,11 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
 
   if (finalStatus !== 'granted') {
     trace.push('blocage: permission refusee');
+    reportPushTokenStage('permission-denied', {
+      platform: Platform.OS,
+      existingStatus,
+      finalStatus,
+    });
     return {
       token: null,
       errorMessage: 'La permission des notifications a ete refusee.',
@@ -167,12 +186,11 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   }
 
   trace.push('lecture du projectId eas');
-  const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 
   if (!projectId) {
     trace.push('blocage: projectId eas manquant');
+    reportPushTokenStage('missing-project-id', { platform: Platform.OS });
     return {
       token: null,
       errorMessage: 'EAS projectId manquant pour enregistrer le token push.',
@@ -182,15 +200,59 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   }
 
   trace.push('generation du token expo');
-  const { data } = await notifications.getExpoPushTokenAsync({ projectId });
-  trace.push('token expo genere avec succes');
+  try {
+    const { data } = await notifications.getExpoPushTokenAsync({ projectId });
+    trace.push('token expo genere avec succes');
+    reportPushTokenStage('success', { platform: Platform.OS });
 
-  return {
-    token: data,
-    errorMessage: null,
-    stage: 'success',
-    trace,
-  };
+    return {
+      token: data,
+      errorMessage: null,
+      stage: 'success',
+      trace,
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'Erreur inconnue lors de la generation du token push.';
+
+    trace.push(`erreur fcm: ${errorMessage}`);
+    reportPushTokenStage('fcm-token-error', {
+      platform: Platform.OS,
+      errorMessage,
+    });
+    Sentry.captureException(error instanceof Error ? error : new Error(errorMessage), {
+      tags: { push_token_stage: 'fcm-token-error', platform: Platform.OS },
+    });
+
+    return {
+      token: null,
+      errorMessage,
+      stage: 'fcm-token-error',
+      trace,
+    };
+  }
+}
+
+export async function syncPushTokenOnAppActive(): Promise<PushTokenRegistrationResult> {
+  return registerForPushNotificationsAsync();
+}
+
+export function subscribeToPushTokenChanges(
+  listener: (token: string) => void
+): NotificationSubscription | null {
+  const notifications = ensureNotificationsReady();
+
+  if (!notifications) {
+    return null;
+  }
+
+  return notifications.addPushTokenListener(({ data }) => {
+    if (typeof data === 'string' && data.trim()) {
+      listener(data);
+    }
+  });
 }
 
 export async function getLastNotificationResponseAsync(): Promise<NotificationResponseLike | null> {
@@ -244,5 +306,23 @@ export function addNotificationResponseReceivedListener(
 }
 
 export async function persistUserDeviceToken(userId: string, deviceToken: string) {
-  return updateDeviceToken(userId, deviceToken);
+  const result = await updateDeviceToken(userId, deviceToken);
+
+  if (result && typeof result === 'object' && 'deviceToken' in result) {
+    const returnedToken = String(result.deviceToken ?? '');
+
+    if (!returnedToken) {
+      Sentry.captureMessage('device_token_patch_missing_in_response', {
+        level: 'warning',
+        extra: { userId },
+      });
+    }
+  } else {
+    Sentry.captureMessage('device_token_patch_unexpected_response', {
+      level: 'warning',
+      extra: { userId },
+    });
+  }
+
+  return result;
 }

@@ -1,14 +1,8 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-  useColorScheme,
-} from "react-native";
-import { SafeAreaView as SafeAreaContextView } from 'react-native-safe-area-context';
-import { Ionicons } from "@expo/vector-icons";
+import React from 'react';
+import { StatusBar, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
 
@@ -20,24 +14,24 @@ type Props = {
 };
 
 export function ReservationConfirmedScreen({
-  userName ,
+  userName,
   email,
   onPressMyBookings,
   onPressContact,
 }: Props) {
-  const isDark = useColorScheme() === "dark";
+  const isDark = useColorScheme() === 'dark';
   const theme = isDark ? darkTheme : lightTheme;
   const { t, tf } = useI18n();
 
   return (
-    <SafeAreaContextView style={[styles.safe, { backgroundColor: theme.background }]}> 
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.container}>
         {/* Badge (cercles + check) */}
         <View style={styles.badgeWrap}>
-          <View style={[styles.ringOuter, { backgroundColor: theme.ringOuter }]}> 
-            <View style={[styles.ringMiddle, { backgroundColor: theme.ringMiddle }]}> 
-              <View style={[styles.ringInner, { backgroundColor: theme.accent }]}> 
+          <View style={[styles.ringOuter, { backgroundColor: theme.ringOuter }]}>
+            <View style={[styles.ringMiddle, { backgroundColor: theme.ringMiddle }]}>
+              <View style={[styles.ringInner, { backgroundColor: theme.accent }]}>
                 <Ionicons name="checkmark" size={28} color="#FFFFFF" />
               </View>
             </View>
@@ -45,7 +39,9 @@ export function ReservationConfirmedScreen({
         </View>
 
         {/* Textes */}
-        <Text style={[styles.kicker, { color: theme.textPrimary }]}>{tf('confirmation.kickerMessage', { userName })}</Text>
+        <Text style={[styles.kicker, { color: theme.textPrimary }]}>
+          {tf('confirmation.kickerMessage', { userName })}
+        </Text>
 
         <Text style={[styles.title, { color: theme.heading }]}>{t('confirmation.title')}</Text>
 
@@ -65,9 +61,10 @@ export function ReservationConfirmedScreen({
                 backgroundColor: theme.primaryButtonBg,
                 borderColor: theme.primaryButtonBorder,
               },
-            ]}
-          >
-            <Text style={[styles.buttonPrimaryText, { color: theme.primaryButtonText }]}>{t('confirmation.myBookings')}</Text>
+            ]}>
+            <Text style={[styles.buttonPrimaryText, { color: theme.primaryButtonText }]}>
+              {t('confirmation.myBookings')}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -80,46 +77,47 @@ export function ReservationConfirmedScreen({
                 backgroundColor: theme.secondaryButtonBg,
                 borderColor: theme.secondaryButtonBorder,
               },
-            ]}
-          >
-            <Text style={[styles.buttonSecondaryText, { color: theme.secondaryButtonText }]}>{t('confirmation.contactUs')}</Text>
+            ]}>
+            <Text style={[styles.buttonSecondaryText, { color: theme.secondaryButtonText }]}>
+              {t('confirmation.contactUs')}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaContextView>
+    </SafeAreaView>
   );
 }
 
 const lightTheme = {
-  background: "#FFFFFF",
-  accent: "#16A34A",
-  ringOuter: "rgba(34, 197, 94, 0.12)",
-  ringMiddle: "rgba(34, 197, 94, 0.22)",
-  heading: "#0B0B0B",
-  textPrimary: "#111827",
-  textSecondary: "#4B5563",
-  primaryButtonBg: "#FFFFFF",
-  primaryButtonBorder: "#16A34A",
-  primaryButtonText: "#111827",
-  secondaryButtonBg: "#FFFFFF",
-  secondaryButtonBorder: "#D1D5DB",
-  secondaryButtonText: "#111827",
+  background: '#FFFFFF',
+  accent: '#16A34A',
+  ringOuter: 'rgba(34, 197, 94, 0.12)',
+  ringMiddle: 'rgba(34, 197, 94, 0.22)',
+  heading: '#0B0B0B',
+  textPrimary: '#111827',
+  textSecondary: '#4B5563',
+  primaryButtonBg: '#FFFFFF',
+  primaryButtonBorder: '#16A34A',
+  primaryButtonText: '#111827',
+  secondaryButtonBg: '#FFFFFF',
+  secondaryButtonBorder: '#D1D5DB',
+  secondaryButtonText: '#111827',
 };
 
 const darkTheme = {
   background: color.appDarkBackground,
-  accent: "#22C55E",
-  ringOuter: "rgba(34, 197, 94, 0.16)",
-  ringMiddle: "rgba(34, 197, 94, 0.28)",
-  heading: "#F9FAFB",
-  textPrimary: "#E5E7EB",
-  textSecondary: "#9CA3AF",
-  primaryButtonBg: "#1F2937",
-  primaryButtonBorder: "#22C55E",
-  primaryButtonText: "#F9FAFB",
+  accent: '#22C55E',
+  ringOuter: 'rgba(34, 197, 94, 0.16)',
+  ringMiddle: 'rgba(34, 197, 94, 0.28)',
+  heading: '#F9FAFB',
+  textPrimary: '#E5E7EB',
+  textSecondary: '#9CA3AF',
+  primaryButtonBg: '#1F2937',
+  primaryButtonBorder: '#22C55E',
+  primaryButtonText: '#F9FAFB',
   secondaryButtonBg: color.appDarkBackground,
-  secondaryButtonBorder: "#374151",
-  secondaryButtonText: "#E5E7EB",
+  secondaryButtonBorder: '#374151',
+  secondaryButtonText: '#E5E7EB',
 };
 
 const styles = StyleSheet.create({
@@ -127,8 +125,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   badgeWrap: { marginBottom: 18 },
@@ -136,24 +134,24 @@ const styles = StyleSheet.create({
     width: 118,
     height: 118,
     borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ringMiddle: {
     width: 86,
     height: 86,
     borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   ringInner: {
     width: 54,
     height: 54,
     borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
     // ombre légère
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
@@ -163,25 +161,25 @@ const styles = StyleSheet.create({
   kicker: {
     fontSize: 16,
     marginBottom: 10,
-    textAlign: "center",
+    textAlign: 'center',
   },
   title: {
     fontSize: 34,
     lineHeight: 38,
-    fontWeight: "800",
-    textAlign: "center",
+    fontWeight: '800',
+    textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 14.5,
     lineHeight: 20,
-    textAlign: "center",
+    textAlign: 'center',
     maxWidth: 520,
     marginBottom: 18,
   },
 
   actions: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: 12,
     marginTop: 6,
   },
@@ -191,16 +189,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     minWidth: 148,
-    alignItems: "center",
+    alignItems: 'center',
   },
   buttonPrimary: {},
   buttonPrimaryText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   buttonSecondary: {},
   buttonSecondaryText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: '700',
   },
 });

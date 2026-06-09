@@ -1,24 +1,30 @@
-import { View, SectionList, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from '@/components/ui/text';
-import { Stack, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
-import { useColorScheme } from 'nativewind';
-import { getActivity } from '@/api/activity';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ActivityAction } from '@/constants/dataInterface';
-import { supabase } from '@/lib/supabase';
+import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { usePreventRemove } from '@react-navigation/native';
+import { Stack, useNavigation, useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
+
+import { getActivity, readNotification } from '@/api/activity';
+import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
-import { useNavigation } from 'expo-router';
-import { readNotification } from '@/api/activity';
+import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
+import { Activity, ActivityAction } from '@/constants/dataInterface';
 import { TranslationKey, useI18n } from '@/lib/i18n';
-import {ErrorEmpty} from '@/components/my-ui/errorEmpty';
-import {useMyStateNotif} from '@/store/notification-state'
 import { clearNotificationBadgeAsync } from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
+import { useMyStateNotif } from '@/store/notification-state';
 
 function formatDate(iso: string, locale: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString(locale, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function getDayKey(iso: string) {
@@ -128,24 +134,39 @@ function getBookingPreview(activity: Activity, locale: string) {
   }
 
   const booking = activity.booking;
-  const routeParts = [booking.departure?.label, booking.arrival?.label]
-    .filter((value): value is string => Boolean(value && value !== 'N/A'));
+  const routeParts = [booking.departure?.label, booking.arrival?.label].filter(
+    (value): value is string => Boolean(value && value !== 'N/A')
+  );
 
   return {
     vehicle: activity.car?.name ?? activity.target ?? activity.bookingId ?? '—',
     departureTime: booking.departureAt
-      ? new Date(booking.departureAt).toLocaleTimeString(locale, {  weekday: 'long',   
-  day: '2-digit',    
-  month: '2-digit',
-  year: 'numeric',hour: '2-digit', minute: '2-digit' })
+      ? new Date(booking.departureAt).toLocaleTimeString(locale, {
+          weekday: 'long',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
       : '—',
     route: routeParts.length > 0 ? routeParts.join(' → ') : '—',
   };
 }
 
-function getActionMeta(action: ActivityAction, activity: Activity, t: ReturnType<typeof useI18n>['t'], tf: ReturnType<typeof useI18n>['tf'], appLocale: string) {
+function getActionMeta(
+  action: ActivityAction,
+  activity: Activity,
+  t: ReturnType<typeof useI18n>['t'],
+  tf: ReturnType<typeof useI18n>['tf'],
+  appLocale: string
+) {
   const bookingLabel = activity.booking?.car?.name ?? activity.target ?? activity.bookingId ?? '';
-  const driverName = activity.driver?.user?.full_name ?? activity.booking?.driver?.user?.full_name ?? activity.target ?? '';
+  const driverName =
+    activity.driver?.user?.full_name ??
+    activity.booking?.driver?.user?.full_name ??
+    activity.target ??
+    '';
   const carName = activity.booking?.car?.name ?? '';
   const carPlate = activity.booking?.car?.registrationId ?? '';
   const schedule = getBookingTiming(activity, appLocale);
@@ -197,7 +218,9 @@ function getActionMeta(action: ActivityAction, activity: Activity, t: ReturnType
           driverName ? `${driverName} vient de demarrer.` : '',
           carName ? `${carName}${carPlate ? ` [${carPlate}]` : ''}.` : '',
           schedule ? `Arrivee estimee : ${schedule}.` : '',
-        ].filter(Boolean).join(' '),
+        ]
+          .filter(Boolean)
+          .join(' '),
         icon: '🚗',
         tone: '#7c3aed',
       };
@@ -234,7 +257,12 @@ function getActionMeta(action: ActivityAction, activity: Activity, t: ReturnType
         tone: '#dc2626',
       };
     default:
-      return { title: 'Nouvelle activite', body: activity.target ?? '', icon: '•', tone: '#6b7280' };
+      return {
+        title: 'Nouvelle activite',
+        body: activity.target ?? '',
+        icon: '•',
+        tone: '#6b7280',
+      };
   }
 }
 
@@ -266,8 +294,7 @@ function NotificationItem({
         styles.item,
         { backgroundColor: isDark ? '#17181c' : '#ffffff' },
         !item.isRead && { borderColor: meta.tone, borderWidth: 1.5 },
-      ]}
-    >
+      ]}>
       <View style={styles.itemRow}>
         <View style={[styles.iconWrap, { backgroundColor: `${meta.tone}22` }]}>
           <Text style={[styles.iconText, { color: meta.tone }]}>{meta.icon}</Text>
@@ -296,12 +323,18 @@ function NotificationItem({
           </View>
 
           {bookingPreview ? (
-            <View style={[styles.bookingPreviewCard, { backgroundColor: isDark ? '#202127' : '#f8fafc' }]}>
+            <View
+              style={[
+                styles.bookingPreviewCard,
+                { backgroundColor: isDark ? '#202127' : '#f8fafc' },
+              ]}>
               <View style={styles.previewRow}>
                 <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
                   {t('reservations.field.vehicle')}
                 </Text>
-                <Text style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]} numberOfLines={1}>
+                <Text
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  numberOfLines={1}>
                   {bookingPreview.vehicle}
                 </Text>
               </View>
@@ -309,7 +342,9 @@ function NotificationItem({
                 <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
                   {t('reservations.field.departure')}
                 </Text>
-                <Text style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]} numberOfLines={1}>
+                <Text
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  numberOfLines={1}>
                   {bookingPreview.departureTime}
                 </Text>
               </View>
@@ -317,7 +352,9 @@ function NotificationItem({
                 <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
                   {t('reservations.section.places')}
                 </Text>
-                <Text style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]} numberOfLines={2}>
+                <Text
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  numberOfLines={2}>
                   {bookingPreview.route}
                 </Text>
               </View>
@@ -362,68 +399,78 @@ export default function Notifications() {
       return new Date(right.createAt).getTime() - new Date(left.createAt).getTime();
     });
 
-    const groups = ordered.reduce<Array<{ title: string; key: string; data: Activity[] }>>((accumulator, activity) => {
-      const key = getDayKey(activity.createAt);
-      const existingGroup = accumulator.find((group) => group.key === key);
+    const groups = ordered.reduce<{ title: string; key: string; data: Activity[] }[]>(
+      (accumulator, activity) => {
+        const key = getDayKey(activity.createAt);
+        const existingGroup = accumulator.find((group) => group.key === key);
 
-      if (existingGroup) {
-        existingGroup.data.push(activity);
+        if (existingGroup) {
+          existingGroup.data.push(activity);
+          return accumulator;
+        }
+
+        accumulator.push({
+          key,
+          title: formatDaySectionTitle(activity.createAt, appLocale),
+          data: [activity],
+        });
+
         return accumulator;
-      }
-
-      accumulator.push({
-        key,
-        title: formatDaySectionTitle(activity.createAt, appLocale),
-        data: [activity],
-      });
-
-      return accumulator;
-    }, []);
+      },
+      []
+    );
 
     return groups;
   }, [activities, appLocale]);
-  
+
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        console.log('user', user.id);
-        getActivity({userId :user.id})
-          .then((data) => {setActivities(data)}) 
-          .catch(() => setError(t('notifications.loadError')))
-          .finally(() => setLoading(false));
-      }
-    }).catch(() => {
-      setError(t('notifications.loadError'));
-      setLoading(false);
-    });
-   
-  }, []);
-
-  usePreventRemove(activities.some((activity) => !activity.isRead), ({ data }) => {
-    const unreadNotifications = activities.filter((activity) => !activity.isRead);
-
-    if (unreadNotifications.length === 0 || isMarkingAsReadRef.current) {
-      return;
-    }
-
-    isMarkingAsReadRef.current = true;
-
-    Promise.allSettled(unreadNotifications.map((activity) => readNotification(activity.id)))
-      .then(() => {
-        setActivities((currentActivities) =>
-          currentActivities.map((activity) =>
-            activity.isRead ? activity : { ...activity, isRead: true }
-          )
-        );
-        clearCountNotif();
-        requestAnimationFrame(() => {
-          navigation.dispatch(data.action);
-        });
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => {
+        if (user) {
+          console.log('user', user.id);
+          getActivity({ userId: user.id })
+            .then((data) => {
+              setActivities(data);
+            })
+            .catch(() => setError(t('notifications.loadError')))
+            .finally(() => setLoading(false));
+        }
       })
-      .finally(() => {
-        isMarkingAsReadRef.current = false;
+      .catch(() => {
+        setError(t('notifications.loadError'));
+        setLoading(false);
       });
-  });
+  }, [t]);
+
+  usePreventRemove(
+    activities.some((activity) => !activity.isRead),
+    ({ data }) => {
+      const unreadNotifications = activities.filter((activity) => !activity.isRead);
+
+      if (unreadNotifications.length === 0 || isMarkingAsReadRef.current) {
+        return;
+      }
+
+      isMarkingAsReadRef.current = true;
+
+      Promise.allSettled(unreadNotifications.map((activity) => readNotification(activity.id)))
+        .then(() => {
+          setActivities((currentActivities) =>
+            currentActivities.map((activity) =>
+              activity.isRead ? activity : { ...activity, isRead: true }
+            )
+          );
+          clearCountNotif();
+          requestAnimationFrame(() => {
+            navigation.dispatch(data.action);
+          });
+        })
+        .finally(() => {
+          isMarkingAsReadRef.current = false;
+        });
+    }
+  );
 
   const handleNotificationPress = (selectedActivity: Activity) => {
     let shouldCallApi = false;
@@ -448,7 +495,7 @@ export default function Notifications() {
         pathname: '/(tabs)/reservation',
         params: {
           highlightBookingId: selectedActivity.bookingId,
-        //  openBookingId: selectedActivity.bookingId, /*pour ouvrir les detail*/
+          //  openBookingId: selectedActivity.bookingId, /*pour ouvrir les detail*/
         },
       });
     };
@@ -461,58 +508,69 @@ export default function Notifications() {
     readNotification(selectedActivity.id)
       .then(openRelatedBooking)
       .catch(() => {
-      setActivities((currentActivities) =>
-        currentActivities.map((activityItem) =>
-          activityItem.id === selectedActivity.id ? { ...activityItem, isRead: false } : activityItem
-        )
-      );
-    });
+        setActivities((currentActivities) =>
+          currentActivities.map((activityItem) =>
+            activityItem.id === selectedActivity.id
+              ? { ...activityItem, isRead: false }
+              : activityItem
+          )
+        );
+      });
   };
-
 
   return (
     <>
-      <Stack.Screen options={{ title: t('notifications.title'), headerShown: true, headerBackTitle: t('booking.back'), headerBackButtonMenuEnabled: false }} />
-      <View style={[styles.container, { backgroundColor: isDark ? color.appDarkBackground : '#f2f2f7' }]}>
+      <Stack.Screen
+        options={buildStackScreenOptions({
+          title: t('notifications.title'),
+          isDark,
+          canGoBack: true,
+        })}
+      />
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: isDark ? color.appDarkBackground : '#f2f2f7' },
+        ]}>
         {loading ? (
           <LoadingView />
         ) : error ? (
           <Text style={[styles.emptyText, { color: isDark ? '#aaa' : '#555' }]}>{error}</Text>
         ) : (
           <View style={{ flex: 1, width: '100%' }}>
-            
-          <SectionList
-            sections={sections}
-            keyExtractor={(item) => item.id}
-            renderSectionHeader={({ section }) => (
-              <View style={styles.sectionHeaderWrap}>
-                <Text style={[styles.sectionHeaderText, { color: isDark ? '#f3f4f6' : '#111827' }]}>
-                  {section.title}
-                </Text>
-              </View>
-            )}
-            renderItem={({ item }) => (
-              <NotificationItem
-                item={item}
-                isDark={isDark}
-                onPress={() => handleNotificationPress(item)}
-                t={t}
-                tf={tf}
-                appLocale={appLocale}
-              />
-            )}
-            contentContainerStyle={styles.list}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            SectionSeparatorComponent={() => <View style={styles.sectionSpacer} />}
-            stickySectionHeadersEnabled={false}
-            ListEmptyComponent={
-              <ErrorEmpty
-              isDark={isDark}
-              title={t(emptyTitleKeyNotifiction)}
-              description={t(emptyDescriptionKeyNotifiction)}
-              />
-            }
-          />
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.id}
+              renderSectionHeader={({ section }) => (
+                <View style={styles.sectionHeaderWrap}>
+                  <Text
+                    style={[styles.sectionHeaderText, { color: isDark ? '#f3f4f6' : '#111827' }]}>
+                    {section.title}
+                  </Text>
+                </View>
+              )}
+              renderItem={({ item }) => (
+                <NotificationItem
+                  item={item}
+                  isDark={isDark}
+                  onPress={() => handleNotificationPress(item)}
+                  t={t}
+                  tf={tf}
+                  appLocale={appLocale}
+                />
+              )}
+              contentContainerStyle={styles.list}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+              SectionSeparatorComponent={() => <View style={styles.sectionSpacer} />}
+              stickySectionHeadersEnabled={false}
+              ListEmptyComponent={
+                <ErrorEmpty
+                  isDark={isDark}
+                  title={t(emptyTitleKeyNotifiction)}
+                  description={t(emptyDescriptionKeyNotifiction)}
+                />
+              }
+            />
           </View>
         )}
       </View>
@@ -521,8 +579,8 @@ export default function Notifications() {
 }
 
 const styles = StyleSheet.create({
-  container:  { flex: 1 , alignItems: 'center', justifyContent: 'center' },
-  list:       { paddingTop: 16, paddingHorizontal: 12, paddingBottom: 32},
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list: { paddingTop: 16, paddingHorizontal: 12, paddingBottom: 32 },
   item: {
     borderRadius: 20,
     padding: 16,
@@ -532,25 +590,44 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
   },
-  itemRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  iconWrap:   { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  iconText:   { fontSize: 18, fontWeight: '700' },
-  contentWrap:{ flex: 1 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  iconText: { fontSize: 18, fontWeight: '700' },
+  contentWrap: { flex: 1 },
   itemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  title:      { fontSize: 16, fontWeight: '700', flex: 1 },
-  body:       { fontSize: 13, marginBottom: 10, lineHeight: 19 },
-  metaRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  date:       { fontSize: 11, fontWeight: '500' },
-  unreadDot:  { width: 8, height: 8, borderRadius: 4, marginLeft: 8 },
-  bookingPreviewCard: { marginTop: 12, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  previewRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  previewLabel:{ width: 72, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  previewValue:{ flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 17 },
-  linkChip:   { alignSelf: 'flex-start', marginTop: 12, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-  linkChipText:{ fontSize: 12, fontWeight: '700' },
-  separator:  { height: 10 },
+  title: { fontSize: 16, fontWeight: '700', flex: 1 },
+  body: { fontSize: 13, marginBottom: 10, lineHeight: 19 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  date: { fontSize: 11, fontWeight: '500' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 8 },
+  bookingPreviewCard: {
+    marginTop: 12,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  previewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  previewLabel: { width: 72, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  previewValue: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  linkChip: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  linkChipText: { fontSize: 12, fontWeight: '700' },
+  separator: { height: 10 },
   sectionHeaderWrap: { paddingHorizontal: 4, paddingBottom: 8 },
   sectionHeaderText: { fontSize: 15, fontWeight: '800', textTransform: 'capitalize' },
   sectionSpacer: { height: 14 },
-  emptyText:  { textAlign: 'center', marginTop: 60, fontSize: 14 },
+  emptyText: { textAlign: 'center', marginTop: 60, fontSize: 14 },
 });

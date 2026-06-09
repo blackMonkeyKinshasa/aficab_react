@@ -1,5 +1,6 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
+
+import { ScrollViewStyleReset } from 'expo-router/html';
 
 import {
   APP_DEEP_LINK_HOST,
@@ -188,7 +189,7 @@ export default function Root({ children }: PropsWithChildren) {
 
               #deep-link-redirect .spinner {
                 border: 3px solid #f3f3f3;
-                border-top: 3px solid #FE5900;
+                border-top: 3px solid #ff5705;
                 border-radius: 50%;
                 width: 40px;
                 height: 40px;
@@ -234,10 +235,13 @@ export default function Root({ children }: PropsWithChildren) {
           <div className="container">
             <h1>Aficab</h1>
             <h3>Louez en toute simplicite, roulez avec discretion</h3>
-            <p>Redirection vers l'emplacement approprie...</p>
+            <p>Redirection vers l&apos;emplacement approprie...</p>
             <div className="spinner" />
             <div className="manual-link">
-              Pas de redirection ? <a href="https://aficab.com" id="manual-redirect">Cliquez ici</a>
+              Pas de redirection ?{' '}
+              <a href="https://aficab.com" id="manual-redirect">
+                Cliquez ici
+              </a>
             </div>
           </div>
         </div>

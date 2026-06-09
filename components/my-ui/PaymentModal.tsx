@@ -1,42 +1,46 @@
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from 'react';
 import {
-  View,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  StyleSheet,
-  Image,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Keyboard,
   useColorScheme,
-} from "react-native";
+  View,
+} from 'react-native';
 
-import { PaymentMethod } from "@/constants/dataInterface";
-import { useAnalytics } from '@/lib/analytics';
+import { Input, InputField, InputSlot } from '@/components/ui/input';
 import { color } from '@/constants/colors';
+import { PaymentMethod } from '@/constants/dataInterface';
+import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
-
-
-
+import {
+  dismissKeyboard,
+  keyboardAvoidingBehavior,
+  useKeyboardVisibility,
+} from '@/lib/use-keyboard-visibility';
 
 interface Props {
   visible: boolean;
   isPremium: boolean;
   disableStatusBar?: boolean;
-  onSubmit : (paymentMethod: PaymentMethod,phoneNumber?:string) => void;
+  onSubmit: (paymentMethod: PaymentMethod, phoneNumber?: string) => void;
   onClose: () => void;
   submitting?: boolean;
 }
 
 const PAYMENT_LOGOS = {
-  [PaymentMethod.mpesa]: require("@/assets/money/mpesa.png"),
-  [PaymentMethod.orange]: require("@/assets/money/orange.png"),
-  [PaymentMethod.airtel]: require("@/assets/money/airtel.png"),
-  [PaymentMethod.card]: require("@/assets/money/visa.png"),
-  [PaymentMethod.cash]: require("@/assets/money/cash.png"),
+  [PaymentMethod.mpesa]: require('@/assets/money/mpesa.png'),
+  [PaymentMethod.orange]: require('@/assets/money/orange.png'),
+  [PaymentMethod.airtel]: require('@/assets/money/airtel.png'),
+  [PaymentMethod.card]: require('@/assets/money/visa.png'),
+  [PaymentMethod.cash]: require('@/assets/money/cash.png'),
 } as const;
+
+const filledInputClassName = 'rounded-md border-0 bg-background-100';
 
 const PaymentCard = memo(function PaymentCard({
   type,
@@ -58,15 +62,18 @@ const PaymentCard = memo(function PaymentCard({
       style={[
         styles.card,
         {
-          backgroundColor: isActive ? (isDark ? '#1a3a25' : '#e8f5ec') : isDark ? '#2a2f35' : '#ffffff',
+          backgroundColor: isActive
+            ? isDark
+              ? '#1a3a25'
+              : '#e8f5ec'
+            : isDark
+              ? '#2a2f35'
+              : '#ffffff',
           borderColor: isActive ? '#04a24c' : isDark ? '#374151' : '#dddddd',
         },
       ]}
-      onPress={() => onPress(type)}
-    >
-      <View style={styles.check}>
-        {isActive && <View style={styles.innerCheck} />}
-      </View>
+      onPress={() => onPress(type)}>
+      <View style={styles.check}>{isActive && <View style={styles.innerCheck} />}</View>
 
       <Image source={logo} style={styles.logo} resizeMode="contain" fadeDuration={0} />
       <Text style={[styles.cardText, { color: isDark ? '#ffffff' : '#000000' }]}>{label}</Text>
@@ -74,66 +81,106 @@ const PaymentCard = memo(function PaymentCard({
   );
 });
 
-export function PaymentModal({ visible, isPremium, disableStatusBar = false, onClose , onSubmit, submitting = false}: Props) {
+export function PaymentModal({
+  visible,
+  isPremium,
+  disableStatusBar = false,
+  onClose,
+  onSubmit,
+  submitting = false,
+}: Props) {
   const { t } = useI18n();
   const isDark = useColorScheme() === 'dark';
   const containerBg = isDark ? color.appDarkBackground : '#ffffff';
   const textColor = isDark ? '#ffffff' : '#000000';
   const subTextColor = isDark ? '#A0A0A0' : '#555555';
-  const inputBorder = isDark ? '#374151' : '#dddddd';
-  const inputBg = isDark ? '#111827' : '#ffffff';
-  const inputText = isDark ? '#ffffff' : '#000000';
+  const isKeyboardVisible = useKeyboardVisibility();
+  const analytics = useAnalytics();
 
   const [selected, setSelected] = useState<PaymentMethod>(PaymentMethod.mpesa);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState('');
   const [showPhoneValidation, setShowPhoneValidation] = useState(false);
-  const analytics = useAnalytics();
   const showPhoneField = selected !== PaymentMethod.cash && selected !== PaymentMethod.card;
   const isPhoneValid = /^\d{9}$/.test(phone);
   const showPhoneError = showPhoneField && showPhoneValidation && !isPhoneValid;
-  const paymentLabel = selected === PaymentMethod.mpesa
-    ? t('payment.mpesa')
-    : selected === PaymentMethod.orange
-      ? t('payment.orange')
-      : t('payment.airtel');
+  const paymentLabel =
+    selected === PaymentMethod.mpesa
+      ? t('payment.mpesa')
+      : selected === PaymentMethod.orange
+        ? t('payment.orange')
+        : t('payment.airtel');
 
   const paymentOptions = useMemo(
     () => [
-      { type: PaymentMethod.mpesa, label: t('payment.mpesa'), logo: PAYMENT_LOGOS[PaymentMethod.mpesa] },
-      { type: PaymentMethod.orange, label: t('payment.orange'), logo: PAYMENT_LOGOS[PaymentMethod.orange] },
-      { type: PaymentMethod.airtel, label: t('payment.airtel'), logo: PAYMENT_LOGOS[PaymentMethod.airtel] },
-      { type: PaymentMethod.card, label: t('payment.card'), logo: PAYMENT_LOGOS[PaymentMethod.card] },
+      {
+        type: PaymentMethod.mpesa,
+        label: t('payment.mpesa'),
+        logo: PAYMENT_LOGOS[PaymentMethod.mpesa],
+      },
+      {
+        type: PaymentMethod.orange,
+        label: t('payment.orange'),
+        logo: PAYMENT_LOGOS[PaymentMethod.orange],
+      },
+      {
+        type: PaymentMethod.airtel,
+        label: t('payment.airtel'),
+        logo: PAYMENT_LOGOS[PaymentMethod.airtel],
+      },
+      {
+        type: PaymentMethod.card,
+        label: t('payment.card'),
+        logo: PAYMENT_LOGOS[PaymentMethod.card],
+      },
       ...(isPremium
-        ? [{ type: PaymentMethod.cash, label: t('payment.cash'), logo: PAYMENT_LOGOS[PaymentMethod.cash] }]
+        ? [
+            {
+              type: PaymentMethod.cash,
+              label: t('payment.cash'),
+              logo: PAYMENT_LOGOS[PaymentMethod.cash],
+            },
+          ]
         : []),
     ],
     [isPremium, t]
   );
-  const selectedPaymentLabel = paymentOptions.find((option) => option.type === selected)?.label ?? t('payment.payWith');
+
+  const selectedPaymentLabel =
+    paymentOptions.find((option) => option.type === selected)?.label ?? t('payment.payWith');
 
   React.useEffect(() => {
     if (!visible) {
       setSelected(PaymentMethod.mpesa);
       setPhone('');
       setShowPhoneValidation(false);
+      dismissKeyboard();
     }
   }, [visible]);
+
+  const handleClose = () => {
+    dismissKeyboard();
+    onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
-      statusBarTranslucent={!disableStatusBar}
-    >
-      <KeyboardAvoidingView behavior="padding" style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={submitting ? undefined : onClose} />
+      onRequestClose={handleClose}
+      statusBarTranslucent={!disableStatusBar}>
+      <KeyboardAvoidingView
+        behavior={keyboardAvoidingBehavior}
+        enabled={isKeyboardVisible}
+        style={styles.overlay}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={submitting ? undefined : handleClose}
+        />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={[styles.modalCard, { backgroundColor: containerBg }]}> 
-            <Text style={[styles.title, { color: textColor }]}>
-              {t('payment.title')}
-            </Text>
+          <View style={[styles.modalCard, { backgroundColor: containerBg }]}>
+            <Text style={[styles.title, { color: textColor }]}>{t('payment.title')}</Text>
 
             <View style={styles.grid}>
               {paymentOptions.map((option) => (
@@ -149,7 +196,7 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
               ))}
             </View>
 
-            {showPhoneField && (
+            {showPhoneField ? (
               <>
                 <Text style={[styles.label, { color: subTextColor, marginBottom: 15 }]}>
                   {t('payment.phoneInfoFor')} ({paymentLabel}) :
@@ -161,37 +208,51 @@ export function PaymentModal({ visible, isPremium, disableStatusBar = false, onC
                   </Text>
                 )}
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15, backgroundColor: inputBg, borderColor: showPhoneError ? '#dc2626' : inputBorder, borderWidth: 1, borderRadius: 10, padding: 10 }}>
-                  <Text style={{ color: subTextColor, marginRight: 5, fontSize: 15,  }}>+243</Text>
-                   <View style={{ backgroundColor: subTextColor, height: 16, width: 1,  marginRight: 5, }}></View>
-                 
-                  <TextInput
-                    placeholder={t('payment.phonePlaceholder')}
-                    placeholderTextColor={subTextColor}
-                    value={phone}
-                    onChangeText={(value) => {
-                      const sanitizedValue = value.replace(/\D/g, '').slice(0, 9);
-                      setPhone(sanitizedValue);
-                    }}
-                    style={ { borderColor: inputBorder, backgroundColor: inputBg, color: inputText, flex: 1, }}
-                    keyboardType="phone-pad"
-                    editable={!submitting}
-                  />
+                <View style={styles.phoneInputWrapper}>
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className={filledInputClassName}
+                    isDisabled={submitting}>
+                    <InputSlot className="pl-3">
+                      <Text style={{ color: subTextColor }}>+243</Text>
+                    </InputSlot>
+                    <InputField
+                      value={phone}
+                      onChangeText={(value) => {
+                        const sanitizedValue = value.replace(/\D/g, '').slice(0, 9);
+                        setPhone(sanitizedValue);
+                      }}
+                      placeholder={t('payment.phonePlaceholder')}
+                      placeholderTextColor={subTextColor}
+                      keyboardType="phone-pad"
+                      editable={!submitting}
+                      returnKeyType="done"
+                      style={{ color: textColor }}
+                    />
+                  </Input>
                 </View>
               </>
-            )}
+            ) : null}
 
-            <TouchableOpacity style={[styles.button, submitting && styles.buttonDisabled]} disabled={submitting} onPress={() => {
-              if (showPhoneField && !isPhoneValid) {
-                setShowPhoneValidation(true);
-                return;
-              }
+            <TouchableOpacity
+              style={[styles.button, submitting && styles.buttonDisabled]}
+              disabled={submitting}
+              onPress={() => {
+                if (showPhoneField && !isPhoneValid) {
+                  setShowPhoneValidation(true);
+                  return;
+                }
 
-              analytics.trackPaymentMethodSelected(selected, phone);
-              analytics.trackPaymentSubmitted(selected);
-              onSubmit(selected, phone);
-            }}>
-              <Text style={styles.buttonText}>{submitting ? t('booking.paymentProcessing') : `${t('payment.payWith')} ${selectedPaymentLabel}`}</Text>
+                analytics.trackPaymentMethodSelected(selected, phone);
+                analytics.trackPaymentSubmitted(selected);
+                onSubmit(selected, phone);
+              }}>
+              <Text style={styles.buttonText}>
+                {submitting
+                  ? t('booking.paymentProcessing')
+                  : `${t('payment.payWith')} ${selectedPaymentLabel}`}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableWithoutFeedback>
@@ -221,41 +282,41 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 15,
     textAlign: 'center',
   },
   grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   card: {
-    width: "48%",
+    width: '48%',
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: '#ddd',
     borderRadius: 12,
     padding: 10,
     marginBottom: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   check: {
-    position: "absolute",
+    position: 'absolute',
     top: 8,
     left: 8,
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: "#aaa",
-    justifyContent: "center",
-    alignItems: "center",
+    borderColor: '#aaa',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   innerCheck: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#04a24c",
+    backgroundColor: '#04a24c',
   },
   logo: {
     width: 50,
@@ -269,13 +330,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 5,
     fontSize: 14,
-    color: "#555",
+    color: '#555',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 10,
+  phoneInputWrapper: {
     marginBottom: 15,
   },
   phoneErrorText: {
@@ -284,26 +341,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   button: {
-    backgroundColor: "#ff6600",
+    backgroundColor: '#ff6600',
     padding: 15,
     borderRadius: 10,
-    alignItems: "center",
-     marginBottom: 15,
+    alignItems: 'center',
+    marginBottom: 15,
     marginTop: 15,
   },
   buttonText: {
-    color: "#fff",
-    fontWeight: "700",
-   fontSize: 16,
-
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
   buttonDisabled: {
     opacity: 0.7,
-  },
-  closeButton: {
-    marginTop: 12,
-  },
-  closeText: {
-    textAlign: "center",
   },
 });

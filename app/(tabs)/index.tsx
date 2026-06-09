@@ -1,40 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
+
 import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 
 import { getUserByID } from '@/api/user';
+import { LoadingView } from '@/components/my-ui/LoadingView';
 import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
 import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
-import { LoadingView } from '@/components/my-ui/LoadingView';
-import { useAppConfigState } from '@/store/app-config-state';
-import { useMyStateUser } from '@/store';
-import { supabase } from '@/lib/supabase';
-import {Role} from '@/constants/databaseEnum';
+import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
+import { Role } from '@/constants/databaseEnum';
 import { useAnalytics } from '@/lib/analytics';
+import { supabase } from '@/lib/supabase';
+import { useMyStateUser } from '@/store';
+import { useAppConfigState } from '@/store/app-config-state';
 
 type ApiUserError = Error & { status?: number; code?: string };
 
-const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) => ({
-  title: '',
-  headerTransparent: false,
-  headerRight: () => <NotificationIcon isDark={isDark} onPress={onPress} />,
-  headerLeft: () => (
-    <Image
-      source={
-        isDark
-          ? require('@/assets/images/aficab-logo-white.png')
-          : require('@/assets/images/aficab-logo-black.png')
-      }
-      style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
-    />
-  ),
-});
+const SCREEN_OPTIONS = (isDark: boolean, onPress: () => void) =>
+  buildStackScreenOptions({
+    title: '',
+    isDark,
+    headerLeft: () => (
+      <Image
+        source={
+          isDark
+            ? require('@/assets/images/aficab-logo-white.png')
+            : require('@/assets/images/aficab-logo-black.png')
+        }
+        style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
+      />
+    ),
+    headerRight: () => (
+      <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
+        <NotificationIcon isDark={isDark} onPress={onPress} />
+      </View>
+    ),
+  });
 
 function isUserNotFoundError(error: unknown) {
   const apiError = error as ApiUserError | undefined;
 
-  return apiError?.status === 404 || apiError?.code === 'USER_NOT_FOUND' || apiError?.message === 'User not found';
+  return (
+    apiError?.status === 404 ||
+    apiError?.code === 'USER_NOT_FOUND' ||
+    apiError?.message === 'User not found'
+  );
 }
 
 export default function HomeScreen() {
@@ -64,21 +75,19 @@ export default function HomeScreen() {
 
     if (cachedUser?.id && !mustRefreshUser) {
       if (cachedUser.role === Role.DRIVER) {
-            analytics.trackRoleMismatchRedirect(cachedUser.id, {
-              email: cachedUser.email ?? cachedUser.email ?? '',
-              role: cachedUser?.role,
-              sourceScreen: 'home',
-              targetScreen: 'chekRole',
-            });
-            router.replace('/chekRole');
-            return;
-          }
+        analytics.trackRoleMismatchRedirect(cachedUser.id, {
+          email: cachedUser.email ?? cachedUser.email ?? '',
+          role: cachedUser?.role,
+          sourceScreen: 'home',
+          targetScreen: 'chekRole',
+        });
+        router.replace('/chekRole');
+        return;
+      }
       return;
     }
 
     const loadUser = async () => {
-
-      
       try {
         setLoading(true);
 
@@ -90,9 +99,6 @@ export default function HomeScreen() {
           return;
         }
 
-      
-
-     
         if (cachedUser?.id === user.id && !mustRefreshUser) {
           if (!cachedUser.full_name?.trim()) {
             router.replace('/create-profile');
@@ -181,11 +187,19 @@ export default function HomeScreen() {
     return () => {
       isMounted = false;
     };
-  }, [appIsLock, loading, refreshAppConfig, router, shouldFetchAppConfig, storedUser?.full_name, storedUser?.id]);
+  }, [
+    appIsLock,
+    loading,
+    refreshAppConfig,
+    router,
+    shouldFetchAppConfig,
+    storedUser?.full_name,
+    storedUser?.id,
+  ]);
 
   return (
     <>
-      <Stack.Screen options={SCREEN_OPTIONS('Accueil', isDark, () => router.push('/notificationsPage'))} />
+      <Stack.Screen options={SCREEN_OPTIONS(isDark, () => router.push('/notificationsPage'))} />
 
       <View style={{ flex: 1 }}>
         <RideBookingScreen />

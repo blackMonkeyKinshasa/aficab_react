@@ -8,17 +8,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { Stack, useRouter } from 'expo-router';
 import { Camera } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
-import { getUserByID, updateUserByID } from '@/api/user';
 import { uploadAvatar } from '@/api/uploadFiles';
+import { getUserByID, updateUserByID } from '@/api/user';
 import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
 import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -27,22 +28,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
+import { color } from '@/constants/colors';
 import { genderOptions } from '@/constants/constants';
 import { User } from '@/constants/dataInterface';
-import { takePhoto, pickImageToGallery, uriToBlob } from '@/constants/image-manager';
-import { useMyStateUser } from '@/store/user-state';
-import { supabase } from '@/lib/supabase';
-import {getUserLocationDetails} from '@/lib/my-location';
+import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
-
-
+import { getUserLocationDetails } from '@/lib/my-location';
+import { supabase } from '@/lib/supabase';
+import { useAppToast } from '@/lib/toast';
+import { useMyStateUser } from '@/store/user-state';
 
 export default function CreateProfile() {
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const router = useRouter();
- 
-  const [userId, setUserId] = useState('');
+
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [gender, setGender] = useState('');
@@ -53,14 +53,13 @@ export default function CreateProfile() {
   const setStoredUser = useMyStateUser((state) => state.setUser);
   const clearStoredUser = useMyStateUser((state) => state.clearUser);
   const { t } = useI18n();
+  const toast = useAppToast();
   const localizedGenderOptions = genderOptions.map((option) => ({
     ...option,
     label: option.value === 'male' ? t('profile.genderMale') : t('profile.genderFemale'),
   }));
 
-
   const hydrateForm = (data: User) => {
-    setUserId(data.id);
     setFullName(data.full_name ?? '');
     setPhoneNumber(data.phone ?? '');
     setGender(data.genre ?? '');
@@ -84,7 +83,7 @@ export default function CreateProfile() {
           return;
         }
 
-        const locationDetails = await getUserLocationDetails();
+        void getUserLocationDetails();
 
         if (!isMounted) {
           return;
@@ -103,9 +102,9 @@ export default function CreateProfile() {
 
         setStoredUser(data);
         hydrateForm(data);
-      } catch (error: any) {
-       // console.error('Erreur lors du chargement du profil:', error);
-       // Alert.alert('Erreur', error?.message ?? 'Impossible de charger votre profil.');
+      } catch {
+        // console.error('Erreur lors du chargement du profil:', error);
+        // Alert.alert('Erreur', error?.message ?? 'Impossible de charger votre profil.');
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -123,14 +122,21 @@ export default function CreateProfile() {
   const chooseImage = () => {
     Alert.alert(t('profile.selectImageTitle'), t('profile.selectImageMessage'), [
       { text: t('profile.camera'), onPress: async () => setImage((await takePhoto()) || '') },
-      { text: t('profile.gallery'), onPress: async () => setImage((await pickImageToGallery()) || '') },
+      {
+        text: t('profile.gallery'),
+        onPress: async () => setImage((await pickImageToGallery()) || ''),
+      },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
-      Alert.alert(t('profile.requiredTitle'), t('profile.fullNameRequired'));
+      toast({
+        title: t('profile.requiredTitle'),
+        description: t('profile.fullNameRequired'),
+        action: 'error',
+      });
       return;
     }
 
@@ -154,7 +160,7 @@ export default function CreateProfile() {
         avatarUrl = upload.url;
         setImage(upload.url);
       }
-      
+
       const locationDetails = await getUserLocationDetails();
       const city = locationDetails.city ?? storedUser?.city ?? null;
       const country = locationDetails.country ?? storedUser?.country ?? null;
@@ -174,15 +180,21 @@ export default function CreateProfile() {
       hydrateForm(refreshedUser);
       router.replace('/');
     } catch (error: any) {
-
-      if (error.code === "DUPLICATE_ENTRY") {
-       Alert.alert(t('profile.duplicatePhoneTitle'), t('profile.duplicatePhoneMessage'));
+      if (error.code === 'DUPLICATE_ENTRY') {
+        toast({
+          title: t('profile.duplicatePhoneTitle'),
+          description: t('profile.duplicatePhoneMessage'),
+          action: 'warning',
+        });
         return;
       }
 
       console.error(error);
-      Alert.alert(t('common.error'), error?.message ?? t('profile.genericErrorMessage'));
-      
+      toast({
+        title: t('common.error'),
+        description: error?.message ?? t('profile.genericErrorMessage'),
+        action: 'error',
+      });
     } finally {
       setSaving(false);
     }
@@ -198,14 +210,16 @@ export default function CreateProfile() {
 
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: bg }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
           <Text style={[styles.modalTitle, { color: fg }]}>{t('profile.createTitle')}</Text>
           <Text style={[styles.modalSubtitle, { color: sub }]}>{t('profile.createSubtitle')}</Text>
 
           <View style={styles.avatarWrapper}>
-            <View style={[styles.avatarContainer, { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0' }]}>
+            <View
+              style={[styles.avatarContainer, { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0' }]}>
               <Avatar uri={image || ''} size={96} borderRadius={48} isDark={isDark} />
               <TouchableOpacity style={styles.cameraBtn} onPress={chooseImage}>
                 <Camera size={18} color="white" />
@@ -219,7 +233,6 @@ export default function CreateProfile() {
               value={fullName}
               onChangeText={setFullName}
               placeholder="Jean Dupont"
-              isDark={isDark}
             />
 
             <FormField
@@ -229,11 +242,10 @@ export default function CreateProfile() {
               placeholder="+243821606126"
               keyboardType="phone-pad"
               showInfo={true}
-              isDark={isDark}
             />
 
             <View className="mb-6">
-              <View className="flex-row items-center mb-2">
+              <View className="mb-2 flex-row items-center">
                 <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                   {t('profile.gender')}
                 </Text>
@@ -243,16 +255,17 @@ export default function CreateProfile() {
               </View>
 
               <Select
-                value={{ value: gender, label: localizedGenderOptions.find((option) => option.value === gender)?.label ?? t('common.select') }}
+                value={{
+                  value: gender,
+                  label:
+                    localizedGenderOptions.find((option) => option.value === gender)?.label ??
+                    t('common.select'),
+                }}
                 onValueChange={(option) => {
                   setGender(option?.value ?? '');
-                }}
-              >
-                <SelectTrigger className={isDark ? 'bg-neutral-800' : 'bg-gray-100'}>
-                  <SelectValue
-                    className={isDark ? 'text-white' : 'text-gray-900'}
-                    placeholder={t('common.select')}
-                  />
+                }}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('common.select')} />
                 </SelectTrigger>
                 <SelectContent>
                   {localizedGenderOptions.map((option) => (
@@ -265,12 +278,12 @@ export default function CreateProfile() {
             </View>
 
             <Button
+              action="primary"
+              variant="solid"
+              size="control"
               onPress={handleSaveProfile}
-              className="bg-orange-500 h-12 rounded-lg mt-8 mb-4"
-            >
-              <Text className="text-white font-bold text-base">
-                {saving ? t('profile.saving') : t('profile.continue')}
-              </Text>
+              className="mb-4 mt-8 w-full rounded-md">
+              <ButtonText>{saving ? t('profile.saving') : t('profile.continue')}</ButtonText>
             </Button>
           </View>
         </ScrollView>
@@ -313,7 +326,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f97316',
+    backgroundColor: color.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

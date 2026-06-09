@@ -1,23 +1,18 @@
-
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  useColorScheme,
-  Alert,
-} from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
-import { DateField } from '@/components/my-ui/DateField';
+import { useRouter } from 'expo-router';
+
+import { formatBookingDateTime, ModalDateSelector } from '@/components/my-ui/ModalDateSelector';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
+import { color } from '@/constants/colors';
 import { Location } from '@/constants/constants';
-import { useRouter } from 'expo-router';
-import { LocationDocTA } from '@/constants/dataInterface';
 import { ResType } from '@/constants/databaseEnum';
+import { LocationDocTA } from '@/constants/dataInterface';
+import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { useMyStateUser } from '@/store/user-state';
@@ -27,34 +22,43 @@ type TripType = 'one-way' | 'round-trip';
 const TripOption = ({
   label,
   value,
-isDark,
   selected,
   onSelect,
 }: {
   label: string;
   value: TripType;
-  isDark: boolean;
   selected: TripType;
   onSelect: (v: TripType) => void;
 }) => {
   const isSelected = selected === value;
   return (
     <TouchableOpacity
-      style={styles.optionContainer}
+      className="flex-1 flex-row items-center justify-center"
       onPress={() => onSelect(value)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.circle, isSelected && styles.circleSelected]}>
-        {isSelected && <Text style={styles.check}>✓</Text>}
+      activeOpacity={0.7}>
+      <View
+        className="mr-2 h-[22px] w-[22px] items-center justify-center rounded-full border-2"
+        style={{
+          borderColor: color.primary,
+          backgroundColor: isSelected ? color.primary : 'transparent',
+        }}>
+        {isSelected ? <Text className="text-sm font-bold text-white">✓</Text> : null}
       </View>
-      <Text style={[styles.label, { color: isDark ? '#fff' : '#000' }]}>{label}</Text>
+      <Text className="text-typography-900 text-base">{label}</Text>
     </TouchableOpacity>
   );
 };
 
 const AIRPORT_KEYWORDS = [
-  'aéroport', 'aeroport', 'airport', 'charles de gaulle', 'cdg',
-  'orly', 'roissy', 'beauvais', 'le bourget',
+  'aéroport',
+  'aeroport',
+  'airport',
+  'charles de gaulle',
+  'cdg',
+  'orly',
+  'roissy',
+  'beauvais',
+  'le bourget',
 ];
 
 function containsAirport(location: Location | null): boolean {
@@ -65,15 +69,16 @@ function containsAirport(location: Location | null): boolean {
 
 export function Airport() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { appLocale, t } = useI18n();
   const [tripType, setTripType] = useState<TripType>('one-way');
   const [locationDepart, setLocationDepart] = useState<Location | null>(null);
   const [locationDest, setLocationDest] = useState<Location | null>(null);
   const [visibleDepart, setVisibleDepart] = useState(false);
   const [visibleDest, setVisibleDest] = useState(false);
+  const [visibleDateStart, setVisibleDateStart] = useState(false);
+  const [visibleDateReturn, setVisibleDateReturn] = useState(false);
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateReturn, setDateReturn] = useState<Date | null>(null);
-  const isDarkMode = useColorScheme() === 'dark';
   const analytics = useAnalytics();
   const userPhone = useMyStateUser((state) => state.user?.phone?.trim() ?? '');
 
@@ -81,21 +86,17 @@ export function Airport() {
     if (!locationDepart || !locationDest || !dateStart) return;
 
     if (!userPhone) {
-      Alert.alert(
-        t('booking.phoneRequiredTitle'),
-        t('booking.phoneRequiredMessage'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('booking.addNow'),
-            onPress: () =>
-              router.push({
-                pathname: '/edit-profile',
-                params: { focusField: 'phone', returnToBooking: '1' },
-              }),
-          },
-        ]
-      );
+      Alert.alert(t('booking.phoneRequiredTitle'), t('booking.phoneRequiredMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('booking.addNow'),
+          onPress: () =>
+            router.push({
+              pathname: '/edit-profile',
+              params: { focusField: 'phone', returnToBooking: '1' },
+            }),
+        },
+      ]);
       return;
     }
 
@@ -143,89 +144,78 @@ export function Airport() {
     airportError === null;
 
   return (
-    <View style={{ flex: 1, paddingTop: 8 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-
-        {/* Sélecteur Aller simple / Aller retour */}
-        <View style={styles.selectorContainer}>
-          <TripOption label={t('booking.oneWay')} value="one-way" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
-          <TripOption label={t('booking.roundTrip')} value="round-trip" selected={tripType} onSelect={setTripType} isDark={isDarkMode} />
-        </View>
-
-        {/* Départ */}
-        <View style={{ paddingTop: 4, paddingBottom: 10, paddingHorizontal: 20 }}>
-          <TouchableOpacity onPress={() => setVisibleDepart(true)}>
-            <ModuleReservation
-              icon={"location-outline"}
-              title={locationDepart ? locationDepart.description : t('booking.departure')}
-              isDarkMode={isDarkMode}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Destination */}
-        <View style={{ paddingTop: 4, paddingBottom: 8, paddingHorizontal: 20 }}>
-          <TouchableOpacity onPress={() => setVisibleDest(true)}>
-            <ModuleReservation
-              icon={"navigate-outline"}
-              title={locationDest ? locationDest.description : t('booking.destination')}
-              isDarkMode={isDarkMode}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Message d'erreur aéroport */}
-        {airportError && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="warning-outline" size={16} color="#ef4444" />
-            <Text style={{ color: '#ef4444', fontSize: 13, flex: 1 }}>{airportError}</Text>
-          </View>
-        )}
-
-        {/* Date de départ */}
-        <View style={{ paddingTop: 8, paddingBottom: 8, paddingHorizontal: 20 }}>
-          <DateField
-            label={t('booking.departureDateTime')}
-            value={dateStart}
-            minDate={new Date()}
-            onChange={handleDateStartChange}
-            isStartTime={true}
+    <View className="flex-1">
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: bookingSpacing.scrollPaddingBottom }}
+        showsVerticalScrollIndicator={false}>
+        <View className="flex-row px-5" style={{ marginBottom: bookingSpacing.sectionGap }}>
+          <TripOption
+            label={t('booking.oneWay')}
+            value="one-way"
+            selected={tripType}
+            onSelect={setTripType}
+          />
+          <TripOption
+            label={t('booking.roundTrip')}
+            value="round-trip"
+            selected={tripType}
+            onSelect={setTripType}
           />
         </View>
 
-        {/* Date de retour — visible uniquement en aller retour */}
-        {tripType === 'round-trip' && (
-          <View style={{ paddingTop: 10, paddingBottom: 30, paddingHorizontal: 20 }}>
-            <DateField
-              label={t('booking.returnDateTime')}
-              value={dateReturn}
-              minDate={dateStart ?? new Date()}
-              onChange={setDateReturn}
-              isStartTime={false}
-            />
-          </View>
-        )}
+        <View className="gap-3 px-5">
+          <ModuleReservation
+            icon={'location-outline'}
+            title={locationDepart?.description ?? ''}
+            placeholder={t('booking.departure')}
+            onPress={() => setVisibleDepart(true)}
+          />
 
-        {/* Bouton */}
-        <TouchableOpacity
-          style={{ padding: 20 }}
-          disabled={!isValid}
-        
-        >
+          <ModuleReservation
+            icon={'navigate-outline'}
+            title={locationDest?.description ?? ''}
+            placeholder={t('booking.destination')}
+            onPress={() => setVisibleDest(true)}
+          />
+
+          {airportError ? (
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons name="warning-outline" size={16} color="#ef4444" />
+              <Text className="text-error-500 flex-1 text-sm">{airportError}</Text>
+            </View>
+          ) : null}
+
+          <ModuleReservation
+            icon={'calendar-outline'}
+            title={dateStart ? formatBookingDateTime(dateStart, appLocale) : ''}
+            placeholder={t('booking.departureDateTime')}
+            onPress={() => setVisibleDateStart(true)}
+          />
+
+          {tripType === 'round-trip' ? (
+            <ModuleReservation
+              icon={'calendar-outline'}
+              title={dateReturn ? formatBookingDateTime(dateReturn, appLocale) : ''}
+              placeholder={t('booking.returnDateTime')}
+              onPress={() => setVisibleDateReturn(true)}
+            />
+          ) : null}
+        </View>
+
+        <TouchableOpacity className="mt-4 px-5" disabled={!isValid}>
           <Button
-            disabled={!isValid}
-            className="bg-orange-500 h-12 rounded-lg mb-20"
-            onPress={handleSubmit}
-          >
-            <Text className="text-white font-bold text-base">
-              {t('booking.viewOffers')}
-            </Text>
+            action="primary"
+            variant="solid"
+            size="control"
+            isDisabled={!isValid}
+            className="w-full rounded-md"
+            style={{ marginBottom: bookingSpacing.buttonMarginBottom }}
+            onPress={handleSubmit}>
+            <ButtonText>{t('booking.viewOffers')}</ButtonText>
           </Button>
         </TouchableOpacity>
-
       </ScrollView>
 
-      {/* Modal départ */}
       <ModalLocationSelector
         visible={visibleDepart}
         onDismiss={() => setVisibleDepart(false)}
@@ -235,7 +225,6 @@ export function Airport() {
         }}
       />
 
-      {/* Modal destination */}
       <ModalLocationSelector
         visible={visibleDest}
         onDismiss={() => setVisibleDest(false)}
@@ -245,43 +234,29 @@ export function Airport() {
         }}
       />
 
+      <ModalDateSelector
+        visible={visibleDateStart}
+        onDismiss={() => setVisibleDateStart(false)}
+        onConfirm={(date) => {
+          handleDateStartChange(date);
+          setVisibleDateStart(false);
+        }}
+        value={dateStart}
+        minDate={new Date()}
+        isStartTime
+      />
+
+      <ModalDateSelector
+        visible={visibleDateReturn}
+        onDismiss={() => setVisibleDateReturn(false)}
+        onConfirm={(date) => {
+          setDateReturn(date);
+          setVisibleDateReturn(false);
+        }}
+        value={dateReturn}
+        minDate={dateStart ?? new Date()}
+        isStartTime={false}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  selectorContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 30,
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  optionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  circle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#FF6A00',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  circleSelected: {
-    backgroundColor: '#FF6A00',
-  },
-  check: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  label: {
-    fontSize: 16,
-    color: '#000',
-  },
-});

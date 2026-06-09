@@ -93,8 +93,9 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       data={slides}
       onDone={onDone}
       onSkip={onDone}
+      onSlideChange={setActiveIndex}
       showSkipButton
-      activeDotStyle={{ backgroundColor: '#FE5900', width: 28 }}
+      activeDotStyle={{ backgroundColor: color.primary, width: 28 }}
       dotStyle={{ backgroundColor: isDark ? '#3F3F46' : '#D4D4D8' }}
       renderSkipButton={() => (
         activeIndex < slides.length - 1 ? (
@@ -113,29 +114,37 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
           <Text style={styles.doneText}>{t('onboarding.start')}</Text>
         </View>
       )}
-      onSlideChange={(index) => setActiveIndex(index)}
-      
       renderItem={({ item }) => (
-        <View style={[styles.slide, { backgroundColor: isDark ? color.appDarkBackground : '#FFF7ED' }]}>
+        <View
+          style={[styles.slide, { backgroundColor: isDark ? color.appDarkBackground : '#FFF7ED' }]}>
           <View style={[styles.glow, isDark ? styles.glowDark : styles.glowLight]} />
-          <View style={[styles.heroCard, { backgroundColor: isDark ? '#171A21' : '#FFFFFF' }]}> 
+          <View style={[styles.heroCard, { backgroundColor: isDark ? '#171A21' : '#FFFFFF' }]}>
             <View style={styles.topRow}>
               <View style={[styles.brandPill, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
                 <Text style={styles.brandPillText}>AFICAB</Text>
               </View>
               <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>{t('booking.kinshasa')}</Text>
+              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>{t('booking.kinshasa')}</Text>
             </View>
 
-             <View style={styles.visualArea}>
-              <View style={[styles.visualHalo, { backgroundColor: isDark ? 'rgba(254, 89, 0, 0.18)' : 'rgba(254, 89, 0, 0.12)' }]} />
+            <View style={styles.visualArea}>
+              <View
+                style={[
+                  styles.visualHalo,
+                  { backgroundColor: isDark ? 'rgba(255, 87, 5, 0.18)' : 'rgba(255, 87, 5, 0.12)' },
+                ]}
+              />
               <View style={[styles.iconWrap, { backgroundColor: isDark ? '#22252D' : '#FFF1E8' }]}>
                 <SlideIcon icon={item.icon} />
               </View>
-             
             </View>
 
-            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>{item.title}</Text>
-            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563' }]}>{item.text}</Text>
+            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+              {item.title}
+            </Text>
+            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563' }]}>
+              {item.text}
+            </Text>
 
             <View style={styles.footerRow}>
               <View style={[styles.footerPill, { backgroundColor: isDark ? '#20150F' : '#FFF1E8', borderColor: isDark ? '#5F321B' : '#F3C4A8' }]}>
@@ -169,10 +178,10 @@ const styles = StyleSheet.create({
     right: -60,
   },
   glowDark: {
-    backgroundColor: 'rgba(254, 89, 0, 0.12)',
+    backgroundColor: 'rgba(255, 87, 5, 0.12)',
   },
   glowLight: {
-    backgroundColor: 'rgba(254, 89, 0, 0.10)',
+    backgroundColor: 'rgba(255, 87, 5, 0.10)',
   },
   heroCard: {
     borderRadius: 28,
@@ -186,7 +195,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 4,
     borderWidth: 1,
-    borderColor: 'rgba(254, 89, 0, 0.12)',
+    borderColor: 'rgba(255, 87, 5, 0.12)',
   },
   topRow: {
     flexDirection: 'row',
@@ -238,7 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(254, 89, 0, 0.18)',
+    borderColor: 'rgba(255, 87, 5, 0.18)',
   },
   metricCard: {
     width: '100%',
@@ -266,7 +275,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     textAlign: 'center',
-    color: '#FE5900',
+    color: color.primary,
     marginBottom: 10,
   },
   title: {
@@ -297,15 +306,14 @@ const styles = StyleSheet.create({
   footerPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FE5900',
+    color: color.primary,
   },
   skipButton: {
     paddingHorizontal: 8,
     paddingVertical: 10,
   },
   skipPlaceholder: {
-    width: 72,
-    height: 40,
+    width: 76,
   },
   skipText: {
     fontSize: 15,
@@ -323,7 +331,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     borderRadius: 999,
-    backgroundColor: '#FE5900',
+    backgroundColor: color.primary,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
