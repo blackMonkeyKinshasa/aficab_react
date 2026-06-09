@@ -10,11 +10,13 @@ export function ModuleReservation({
   title,
   placeholder,
   onPress,
+  isDarkMode,
 }: {
   icon: IoniconName;
   title: string;
   placeholder: string;
   onPress?: () => void;
+  isDarkMode : boolean;
 }) {
-  return <SoftField icon={icon} value={title} placeholder={placeholder} onPress={onPress} />;
+  return <SoftField icon={icon} value={title} placeholder={placeholder} onPress={onPress} isDarkMode={isDarkMode} />; 
 }

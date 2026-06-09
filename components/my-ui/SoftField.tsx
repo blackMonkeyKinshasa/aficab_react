@@ -34,6 +34,7 @@ interface SoftFieldProps {
   onChangeText?: (text: string) => void;
   className?: string;
   autoFocus?: boolean;
+  isDarkMode: boolean;
 }
 
 export function SoftField({
@@ -45,6 +46,7 @@ export function SoftField({
   onChangeText,
   className,
   autoFocus,
+  isDarkMode,
 }: SoftFieldProps) {
   const themeColors = useFieldThemeColors();
   const hasValue = value.trim().length > 0;
@@ -52,7 +54,7 @@ export function SoftField({
 
   const content = (
     <>
-      <Ionicons name={icon} size={20} color={color.primary} style={softFieldStyle.icon} />
+      <Ionicons name={icon} size={20} color={isDarkMode ? 'white' : 'black'} style={softFieldStyle.icon} />
       {editable ? (
         <TextInput
           style={softFieldStyle.input}

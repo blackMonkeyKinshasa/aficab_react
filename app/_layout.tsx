@@ -333,7 +333,7 @@ function RootLayoutInner() {
         }
 
         if (refreshedUser.deviceToken) {
-         /* showPushTokenTrace('manuel', [
+          /* showPushTokenTrace('manuel', [
             'profil recharge',
             'token deja present sur le compte',
           ], 'aucune regeneration necessaire');
@@ -341,20 +341,22 @@ function RootLayoutInner() {
           return;
         }
 
-        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(authUser.id, refreshedUser.deviceToken);
+        const { expoPushToken, errorMessage, trace, backendMessage } = await syncExpoPushToken(
+          authUser.id,
+          refreshedUser.deviceToken
+        );
 
         if (!expoPushToken) {
-        //  showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
+          //  showPushTokenTrace('manuel', ['profil recharge', 'aucun token sur le compte', ...trace], errorMessage);
           return;
         }
 
-      /*  showPushTokenTrace(
+        /*  showPushTokenTrace(
           'manuel',
           ['profil recharge', 'aucun token sur le compte', ...trace],
           backendMessage ?? 'token disponible et synchronise'
         );
         */
-       
       }
     } catch (error) {
       console.error('profile_manual_sync_failed', error);
@@ -370,7 +372,10 @@ function RootLayoutInner() {
 
   // Centralise l'ouverture de l'ecran cible depuis une notification,
   // en evitant une navigation inutile si l'utilisateur est deja sur la bonne route.
-  const openNotificationRoute = (notification: NotificationLike, options?: { seedHistory?: boolean }) => {
+  const openNotificationRoute = (
+    notification: NotificationLike,
+    options?: { seedHistory?: boolean }
+  ) => {
     const targetRoute = getNotificationTargetRoute(notification);
 
     if (pathnameRef.current === targetRoute) {

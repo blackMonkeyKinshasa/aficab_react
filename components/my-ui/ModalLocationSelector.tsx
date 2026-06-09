@@ -57,7 +57,7 @@ export function ModalLocationSelector({
       visible={!!visible}
       onDismiss={onDismiss}
       title={t('booking.searchAddress')}
-      footerActions={footerActions}>
+      >
       <View className="w-full py-2" style={{ paddingHorizontal: bookingSpacing.screenPaddingX }}>
         <LocationSelector
           onSelect={(selectedLocation) => {
@@ -72,7 +72,7 @@ export function ModalLocationSelector({
               style={[modalLocationStyles.divider, { backgroundColor: themeColors.separator }]}
             />
             <LocationSectionLabel>{t('booking.recentLocations')}</LocationSectionLabel>
-            {recentLocations.map((loc) => (
+            {recentLocations.map((loc: Location) => (
               <LocationSearchRow
                 key={loc.description}
                 title={loc.description}

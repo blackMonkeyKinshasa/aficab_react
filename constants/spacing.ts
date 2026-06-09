@@ -16,7 +16,7 @@ export function withControlHeight(style?: StyleProp<ViewStyle>): StyleProp<ViewS
 }
 
 export const bookingSpacing = {
-  screenPaddingX: 20,
+  screenPaddingX: 10,
   fieldGap: 12,
   sectionGap: 16,
   scrollPaddingBottom: 120,

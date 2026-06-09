@@ -363,7 +363,9 @@ function NotificationItem({
 
           {canOpenBooking ? (
             <View style={[styles.linkChip, { backgroundColor: isDark ? '#26272b' : '#f3f4f6' }]}>
-              <Text style={[styles.linkChipText, { color: meta.tone }]}>{t('notifications.openBooking')}</Text>
+              <Text style={[styles.linkChipText, { color: meta.tone }]}>
+                {t('notifications.openBooking')}
+              </Text>
             </View>
           ) : null}
         </View>

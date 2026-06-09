@@ -36,7 +36,7 @@ import { useI18n } from '@/lib/i18n';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
-import { useMyStateUser } from '@/store/user-state';
+import { useMyStateUser, type UserState } from '@/store/user-state';
 
 export default function CreateProfile() {
   const { colorScheme } = useColorScheme();
@@ -49,9 +49,9 @@ export default function CreateProfile() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const storedUser = useMyStateUser((state) => state.user);
-  const setStoredUser = useMyStateUser((state) => state.setUser);
-  const clearStoredUser = useMyStateUser((state) => state.clearUser);
+  const storedUser = useMyStateUser((state: UserState) => state.user);
+  const setStoredUser = useMyStateUser((state: UserState) => state.setUser);
+  const clearStoredUser = useMyStateUser((state: UserState) => state.clearUser);
   const { t } = useI18n();
   const toast = useAppToast();
   const localizedGenderOptions = genderOptions.map((option) => ({

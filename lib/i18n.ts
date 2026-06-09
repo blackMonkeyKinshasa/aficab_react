@@ -106,6 +106,7 @@ const translations = {
       'Les frais de carburant couvrent le trajet prévu pendant toute la location.',
     'booking.fuelIncluded': 'Les frais de carburant inclus',
     'booking.fuelAtClientExpense': 'Le carburant est à la charge du client.',
+    'booking.extraOptionsIntro': 'Personnalisez votre réservation avec les options disponibles.',
     'booking.flexExtraHours': 'Heures supplémentaires flex',
     'booking.flexExtraHoursDescription': "Chauffeur disponible jusqu'à 23 h 30",
     'booking.flexHoursSummary': 'Heure supp. Flex : jusqu’à 23h30',
@@ -139,8 +140,17 @@ const translations = {
     'booking.commentOptional': 'Commentaire (optionnel)',
     'booking.commentPlaceholder': "Ex : Merci d'arriver 15 minutes avant...",
     'booking.bookForOtherPersonOptional': 'Je réserve pour une autre personne (optionnel)',
+    'booking.importFromContacts': 'Importer depuis les contacts',
+    'booking.contactImportUnsupported':
+      'L’import des contacts n’est pas disponible sur cette plateforme.',
+    'booking.contactImportPermissionDenied':
+      'Autorisez l’accès aux contacts pour importer un numéro.',
+    'booking.contactImportPhoneMissing':
+      'Ce contact ne contient aucun numéro de téléphone exploitable.',
+    'booking.contactImportFailed': 'Impossible d’importer le contact pour le moment.',
     'booking.fullName': 'Nom complet',
     'booking.phoneNumber': 'Numéro de téléphone',
+    'booking.email': 'E-mail',
     'booking.unselected': 'Non sélectionné',
     'booking.noVehicle': 'Aucun véhicule',
     'booking.addressUnavailable': 'Adresse indisponible',
@@ -377,12 +387,16 @@ const translations = {
     'reservations.empty.past.title': 'Aucun historique pour le moment',
     'reservations.empty.past.description':
       'Vos courses terminées, annulées ou archivées seront affichées dans cet onglet.',
+    'reservations.highlightBadge': 'Prioritaire',
+    'reservations.cancelLoading': 'Annulation...',
+    'reservations.cancelAction': 'Annuler la réservation',
     'notifications.title': 'Notifications',
     'notifications.loadError': 'Impossible de charger les notifications.',
     'notifications.empty': 'Aucune notification.',
     'notifications.empty.title': 'Aucune notification pour le moment',
     'notifications.empty.description':
       'Les confirmations, changements de réservation et alertes importantes apparaîtront ici.',
+    'notifications.openBooking': 'Ouvrir la réservation',
     'notifications.action.carApproved.title': 'Véhicule approuvé',
     'notifications.action.carApproved.body': 'Le véhicule',
     'notifications.action.carApproved.message': 'Le véhicule "{target}" a été approuvé.',
@@ -431,6 +445,26 @@ const translations = {
       'Merci d’avoir choisi notre service ! Vous recevrez bientôt un e-mail de confirmation à {email}.',
     'confirmation.myBookings': 'Mes réservations',
     'confirmation.contactUs': 'Nous contacter',
+    'onboarding.slide1.title': 'Une expérience premium',
+    'onboarding.slide1.text':
+      'Des chauffeurs professionnels et des véhicules soignés pour un confort absolu.',
+    'onboarding.slide1.eyebrow': 'Confort et discrétion',
+    'onboarding.slide1.caption': 'Chauffeurs sélectionnés et véhicules soignés',
+    'onboarding.slide2.title': 'Réservation fluide',
+    'onboarding.slide2.text':
+      'Réservez un chauffeur en quelques secondes grâce à un parcours simple et rapide.',
+    'onboarding.slide2.eyebrow': 'Réservation fluide',
+    'onboarding.slide2.caption': 'Un parcours simple pensé pour aller droit au départ',
+    'onboarding.slide3.title': 'Maîtrisez votre trajet',
+    'onboarding.slide3.text':
+      'Une visibilité totale avant, pendant et jusqu’à la fin de votre course.',
+    'onboarding.slide3.eyebrow': 'Trajet sous contrôle',
+    'onboarding.slide3.caption': 'Visibilité complète avant et pendant la course',
+    'onboarding.skip': 'Ignorer',
+    'onboarding.next': 'Suivant',
+    'onboarding.start': 'Commencer',
+    'onboarding.footer.premiumMobility': 'Mobilité premium',
+    'onboarding.footer.service247': 'Service 24/7',
     'role.accountCheck': 'Vérification du compte',
     'role.notClientTitle': 'Ce compte n’est pas un compte client',
     'role.notClientDescription':
@@ -548,6 +582,7 @@ const translations = {
     'booking.fuelInfo': 'Fuel fees cover the planned trip for the full rental period.',
     'booking.fuelIncluded': 'Fuel costs included',
     'booking.fuelAtClientExpense': "Fuel is at the client's expense.",
+    'booking.extraOptionsIntro': 'Customize your booking with the available options.',
     'booking.flexExtraHours': 'Flexible extra hours',
     'booking.flexExtraHoursDescription': 'Driver available until 11:30 PM',
     'booking.flexHoursSummary': 'Flex extra hours: until 11:30 PM',
@@ -580,8 +615,14 @@ const translations = {
     'booking.commentOptional': 'Comment (optional)',
     'booking.commentPlaceholder': 'Example: Please arrive 15 minutes early...',
     'booking.bookForOtherPersonOptional': 'I am booking for someone else (optional)',
+    'booking.importFromContacts': 'Import from contacts',
+    'booking.contactImportUnsupported': 'Contact import is not available on this platform.',
+    'booking.contactImportPermissionDenied': 'Allow contact access to import a phone number.',
+    'booking.contactImportPhoneMissing': 'This contact does not contain a usable phone number.',
+    'booking.contactImportFailed': 'Unable to import this contact right now.',
     'booking.fullName': 'Full name',
     'booking.phoneNumber': 'Phone number',
+    'booking.email': 'Email',
     'booking.unselected': 'Not selected',
     'booking.noVehicle': 'No vehicle',
     'booking.addressUnavailable': 'Address unavailable',
@@ -811,12 +852,16 @@ const translations = {
     'reservations.empty.past.title': 'No history yet',
     'reservations.empty.past.description':
       'Your completed, canceled, or archived rides will appear in this tab.',
+    'reservations.highlightBadge': 'Priority',
+    'reservations.cancelLoading': 'Cancelling...',
+    'reservations.cancelAction': 'Cancel booking',
     'notifications.title': 'Notifications',
     'notifications.loadError': 'Unable to load notifications.',
     'notifications.empty': 'No notifications.',
     'notifications.empty.title': 'No notifications yet',
     'notifications.empty.description':
       'Booking confirmations, updates, and important alerts will appear here.',
+    'notifications.openBooking': 'Open booking',
     'notifications.action.carApproved.title': 'Vehicle approved',
     'notifications.action.carApproved.body': 'The vehicle',
     'notifications.action.carApproved.message': 'The vehicle "{target}" was approved.',
@@ -865,6 +910,24 @@ const translations = {
       'Thank you for choosing our service! You will soon receive a confirmation email at {email}.',
     'confirmation.myBookings': 'My bookings',
     'confirmation.contactUs': 'Contact us',
+    'onboarding.slide1.title': 'A premium experience',
+    'onboarding.slide1.text':
+      'Professional drivers and carefully maintained vehicles for absolute comfort.',
+    'onboarding.slide1.eyebrow': 'Comfort and discretion',
+    'onboarding.slide1.caption': 'Selected drivers and carefully maintained vehicles',
+    'onboarding.slide2.title': 'Smooth booking',
+    'onboarding.slide2.text': 'Book a driver in seconds with a simple and fast flow.',
+    'onboarding.slide2.eyebrow': 'Smooth booking',
+    'onboarding.slide2.caption': 'A streamlined flow built to get you moving fast',
+    'onboarding.slide3.title': 'Stay in control of your ride',
+    'onboarding.slide3.text': 'Complete visibility before, during, and until the end of your trip.',
+    'onboarding.slide3.eyebrow': 'Ride under control',
+    'onboarding.slide3.caption': 'Full visibility before and during the ride',
+    'onboarding.skip': 'Skip',
+    'onboarding.next': 'Next',
+    'onboarding.start': 'Get started',
+    'onboarding.footer.premiumMobility': 'Premium mobility',
+    'onboarding.footer.service247': '24/7 service',
     'role.accountCheck': 'Account check',
     'role.notClientTitle': 'This account is not a client account',
     'role.notClientDescription':
@@ -910,8 +973,12 @@ export function getPlacesLanguage(language: AppLanguage) {
   return language;
 }
 
+type AppLanguageStoreState = {
+  language: AppLanguage;
+};
+
 export function useI18n() {
-  const language = useAppLanguageState((state) => state.language);
+  const language = useAppLanguageState((state: AppLanguageStoreState) => state.language);
 
   return {
     language,

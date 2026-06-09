@@ -18,11 +18,11 @@ import {
   useKeyboardVisibility,
 } from '@/lib/use-keyboard-visibility';
 
-/** Same surface token as ActionsheetContent (`bg-background-0` in actionsheet). */
-export const bookingSheetContentClassName = 'bg-background-0';
+/** Same surface token as ActionsheetContent (`bg-background` in actionsheet). */
+export const bookingSheetContentClassName = 'bg-background';
 
 /** Card on sheet surface — border matches sheet (`border-outline-100`). */
-export const bookingSheetCardClassName = 'rounded-2xl border border-outline-100 bg-background-0';
+export const bookingSheetCardClassName = 'rounded-2xl border border-outline-100 bg-transparent';
 
 export type SheetFooterAction = {
   label: string;
@@ -63,7 +63,7 @@ export function BookingSheetLayout({
 
   const footer = hasFooter ? (
     <View
-      className="border-outline-200 w-full flex-row gap-3 pt-3"
+      className="w-full flex-row gap-3 border-outline-200 pt-3"
       style={{
         paddingHorizontal: bookingSpacing.screenPaddingX,
         paddingBottom: footerBottomPadding,
@@ -91,7 +91,7 @@ export function BookingSheetLayout({
       {...(fitContent ? {} : { snapPoints: snapPoints })}>
       <ActionsheetBackdrop />
       <ActionsheetContent>
-        <ActionsheetDragIndicatorWrapper className="py-3">
+        <ActionsheetDragIndicatorWrapper className="py-3  ">
           <ActionsheetDragIndicator className="h-1.5 w-20" />
         </ActionsheetDragIndicatorWrapper>
 
@@ -99,7 +99,7 @@ export function BookingSheetLayout({
           <View
             className="w-full pb-3"
             style={{ paddingHorizontal: bookingSpacing.screenPaddingX }}>
-            <Text className="text-typography-900 text-center text-lg font-bold">{title}</Text>
+            <Text className="text-center text-lg font-bold text-typography-900">{title}</Text>
           </View>
         ) : null}
 

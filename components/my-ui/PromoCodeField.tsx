@@ -6,7 +6,7 @@ import { Input, InputField } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
-const filledInputClassName = 'rounded-md border-0 bg-background-100';
+const filledInputClassName = 'rounded-md border border-outline-100 bg-background-100';
 
 type PromoCodeFieldProps = {
   label: string;

@@ -7,7 +7,10 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { AppConfiguration, getAppConfiguration } from '@/api/mobileConfig';
 
-interface AppConfigState {
+type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
+type StoreGetter<T> = () => T;
+
+export interface AppConfigState {
   appConfig: AppConfiguration | null;
   lastUpdatePhone: string | null;
   appIsLock: boolean;
@@ -41,20 +44,20 @@ function getLocalClientVersion() {
 
 export const useAppConfigState = create<AppConfigState>()(
   persist(
-    (set, get) => ({
+    (set: StoreSetter<AppConfigState>, get: StoreGetter<AppConfigState>) => ({
       appConfig: null,
       lastUpdatePhone: null,
       appIsLock: false,
       refreshing: false,
       localClientVersion: getLocalClientVersion(),
 
-      setAppConfig: (appConfig, appIsLock) =>
+      setAppConfig: (appConfig: AppConfiguration, appIsLock: boolean) =>
         set({
           appConfig,
           appIsLock,
         }),
 
-      setLastUpdatePhone: (lastUpdatePhone) =>
+      setLastUpdatePhone: (lastUpdatePhone: string) =>
         set({
           lastUpdatePhone,
         }),

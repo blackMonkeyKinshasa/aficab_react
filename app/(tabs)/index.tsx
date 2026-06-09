@@ -16,6 +16,8 @@ import { useMyStateUser } from '@/store';
 import { useAppConfigState } from '@/store/app-config-state';
 
 type ApiUserError = Error & { status?: number; code?: string };
+type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
+type AppConfigStoreState = ReturnType<typeof useAppConfigState.getState>;
 
 const SCREEN_OPTIONS = (isDark: boolean, onPress: () => void) =>
   buildStackScreenOptions({
@@ -55,12 +57,16 @@ export default function HomeScreen() {
   const analytics = useAnalytics();
 
   const [loading, setLoading] = useState(false);
-  const storedUser = useMyStateUser((state) => state.user);
-  const setStoredUser = useMyStateUser((state) => state.setUser);
-  const clearStoredUser = useMyStateUser((state) => state.clearUser);
-  const appIsLock = useAppConfigState((state) => state.appIsLock);
-  const shouldFetchAppConfig = useAppConfigState((state) => state.shouldFetchAppConfig);
-  const refreshAppConfig = useAppConfigState((state) => state.refreshAppConfig);
+  const storedUser = useMyStateUser((state: UserStoreState) => state.user);
+  const setStoredUser = useMyStateUser((state: UserStoreState) => state.setUser);
+  const clearStoredUser = useMyStateUser((state: UserStoreState) => state.clearUser);
+  const appIsLock = useAppConfigState((state: AppConfigStoreState) => state.appIsLock);
+  const shouldFetchAppConfig = useAppConfigState(
+    (state: AppConfigStoreState) => state.shouldFetchAppConfig
+  );
+  const refreshAppConfig = useAppConfigState(
+    (state: AppConfigStoreState) => state.refreshAppConfig
+  );
 
   useEffect(() => {
     if (storedUser?.id && !storedUser.full_name?.trim()) {

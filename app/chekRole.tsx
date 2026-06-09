@@ -17,9 +17,11 @@ import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 
+type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
+
 export default function ChekRole() {
-  const setStoredUser = useMyStateUser((state) => state.updateUser);
-  const storedUser = useMyStateUser((state) => state.user);
+  const setStoredUser = useMyStateUser((state: UserStoreState) => state.updateUser);
+  const storedUser = useMyStateUser((state: UserStoreState) => state.user);
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [remoteUser, setRemoteUser] = useState<User | null>(null);

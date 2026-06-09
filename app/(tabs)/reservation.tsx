@@ -23,7 +23,7 @@ import {
   pawapayPay,
 } from '@/api/booking';
 import { createReview } from '@/api/review';
-import { BookingDetailSheet, canClientCancelBooking } from '@/components/my-ui/BookingDetailSheet';
+import { BookingDetailSheet } from '@/components/my-ui/BookingDetailSheet';
 import { BookingListCard } from '@/components/my-ui/BookingListCard';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
@@ -46,8 +46,9 @@ import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 import { BookingDetailModal } from '@/components/reservation/BookingDetailModal';
-import { BookingListTab } from '@/components/reservation/BookingListTab';
 import { canClientCancelBooking } from '@/components/reservation/reservation-helpers';
+
+type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ export default function Reservation() {
   const { t, appLocale } = useI18n();
   const toast = useAppToast();
   const analytics = useAnalytics();
-  const storedUser = useMyStateUser((state) => state.user);
+  const storedUser = useMyStateUser((state: UserStoreState) => state.user);
   const showBadgeId = Array.isArray(rawShowBadgeId) ? rawShowBadgeId[0] : rawShowBadgeId;
   const highlightBookingId = Array.isArray(rawHighlightBookingId)
     ? rawHighlightBookingId[0]
@@ -543,23 +544,19 @@ export default function Reservation() {
           ? paymentTarget.arrival
           : undefined;
 
-      const resolvedClientPhone = normalizePhone(phoneNumber)
-        ?? normalizePhone(paymentTarget.clientPhone)
-        ?? normalizePhone(storedUser?.phone)
-        ?? normalizePhone(session?.user?.phone)
-        ?? normalizePhone(session?.user?.user_metadata?.phone)
-        ?? '';
+      const resolvedClientPhone =
+        normalizePhone(phoneNumber) ??
+        normalizePhone(paymentTarget.clientPhone) ??
+        normalizePhone(storedUser?.phone) ??
+        normalizePhone(session?.user?.phone) ??
+        normalizePhone(session?.user?.user_metadata?.phone) ??
+        '';
 
       const createBookingPayload: CreateBookingInput = {
         id: paymentTarget.id,
         carId: paymentTarget.carId ?? '',
         clientId,
-        clientPhone:
-          normalizePhone(phoneNumber) ??
-          normalizePhone(paymentTarget.clientPhone) ??
-          normalizePhone(storedUser?.phone) ??
-          normalizePhone(session?.user?.phone) ??
-          normalizePhone(session?.user?.user_metadata?.phone),
+        clientPhone: resolvedClientPhone,
         currency: 'USD',
         departure: paymentTarget.departure,
         departureAt: paymentTarget.departureAt,
@@ -586,14 +583,15 @@ export default function Reservation() {
       const bookingDetails = (await createNewBooking(
         createBookingPayload
       )) as CreateBookingResponse;
-      const resolvedClientPhone =
+      const resolvedPaymentClientPhone =
         normalizePhone(phoneNumber) ??
         normalizePhone(paymentTarget.clientPhone) ??
         normalizePhone(storedUser?.phone) ??
         normalizePhone(bookingDetails.clientPhone) ??
-        normalizePhone(bookingDetails.client?.phone);
+        normalizePhone(bookingDetails.client?.phone) ??
+        resolvedClientPhone;
 
-      if (isMobileMoneyPayment(paymentMethod) && !resolvedBookingClientPhone) {
+      if (isMobileMoneyPayment(paymentMethod) && !resolvedPaymentClientPhone) {
         analytics.trackPaymentValidationFailed({
           bookingId: paymentTarget.id,
           reservationType: paymentTarget.type,
@@ -605,14 +603,14 @@ export default function Reservation() {
 
       const patchedBookingDetails: CreateBookingResponse = {
         ...bookingDetails,
-        clientPhone: resolvedClientPhone ?? bookingDetails.clientPhone,
+        clientPhone: resolvedPaymentClientPhone || bookingDetails.clientPhone,
         payments:
           bookingDetails.payments?.map((payment) =>
             isMobileMoneyPayment(paymentMethod)
               ? {
                   ...payment,
                   paymentMethod,
-                  paymentNumber: resolvedClientPhone ?? payment.paymentNumber,
+                  paymentNumber: resolvedPaymentClientPhone || payment.paymentNumber,
                   paymentProvider: PaymentProvider.mobileMoney,
                 }
               : paymentMethod === PaymentMethod.card
@@ -649,7 +647,7 @@ export default function Reservation() {
 
   const focusedBookingId = openBookingId ?? highlightBookingId ?? null;
   const confirmedBooking = bookings.find((booking) => booking.status === ResStatus.STARTED) ?? null;
-  console.log('Confirmed booking:', confirmedBooking);
+  //console.log('Confirmed booking:', confirmedBooking);
   const focusedBooking =
     (focusedBookingId ? bookings.find((booking) => booking.id === focusedBookingId) : null) ??
     confirmedBooking;

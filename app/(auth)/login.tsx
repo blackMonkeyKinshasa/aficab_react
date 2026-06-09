@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  TurboModuleRegistry,
   View,
 } from 'react-native';
 
@@ -35,7 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import { FormControl, FormControlLabel, FormControlLabelText } from '@/components/ui/form-control';
 import { Input, InputField } from '@/components/ui/input';
-import { InputOTP } from '@/components/ui/input-otp';
+import { OtpInput as InputOTP } from 'react-native-otp-entry';
 import { Text } from '@/components/ui/text';
 import { color } from '@/constants/colors';
 import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
@@ -46,6 +47,7 @@ import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { StyleSheet } from 'react-native';
 
 type GoogleSigninModule = {
   GoogleSignin: {
@@ -98,11 +100,7 @@ function formatAppleFullName(
 WebBrowser.maybeCompleteAuthSession();
 
 function hasNativeGoogleSigninModule() {
-  const turboModuleRegistry =
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime probe for optional native module
-    require('react-native/Libraries/TurboModule/TurboModuleRegistry').default;
-
-  return Boolean(NativeModules?.RNGoogleSignin || turboModuleRegistry?.get?.('RNGoogleSignin'));
+  return Boolean(NativeModules?.RNGoogleSignin || TurboModuleRegistry?.get?.('RNGoogleSignin'));
 }
 
 function loadNativeGoogleSigninModule(): GoogleSigninModule {
@@ -165,6 +163,7 @@ export default function LoginScreen() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   const router = useRouter();
   const { colorScheme } = useColorScheme();
+  const isDarkMode = colorScheme === 'dark';
   const [dialogOpen, setDialogOpen] = useState(false);
   const [token, setToken] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(0);
@@ -656,10 +655,7 @@ export default function LoginScreen() {
                   {t('auth.emailLabel')}
                 </FormControlLabelText>
               </FormControlLabel>
-              <Input
-                variant="outline"
-                size="control"
-                className="bg-background-100 rounded-md border-0">
+              <Input variant="outline" size="control" className="rounded-md ">
                 <InputField
                   placeholder={t('auth.emailPlaceholder')}
                   value={email}
@@ -706,6 +702,7 @@ export default function LoginScreen() {
                 verify: t('auth.verify'),
                 otpRequired: t('auth.otpRequired'),
               }}
+              isDarkMode={isDarkMode}
             />
 
             {/* Divider */}
@@ -732,9 +729,8 @@ export default function LoginScreen() {
               ) : (
                 <Button
                   action="primary"
-                  variant="outline"
                   size="control"
-                  className="w-full rounded-md"
+                  className="h-12 w-full flex-row items-center justify-center rounded-lg bg-gray-100 dark:bg-neutral-800"
                   onPress={handleGoogleLogin}
                   isDisabled={loading}>
                   <View className="flex-row items-center justify-center">
@@ -742,7 +738,7 @@ export default function LoginScreen() {
                       source={require('@/assets/images/logo_google.png')}
                       style={{ width: 34, height: 34, resizeMode: 'contain' }}
                     />
-                    <ButtonText className="text-typography-900 ml-3 text-base font-semibold">
+                    <ButtonText className="ml-3 text-base font-semibold text-typography-900">
                       {t('auth.googleContinue')}
                     </ButtonText>
                   </View>
@@ -754,9 +750,8 @@ export default function LoginScreen() {
             {Platform.OS === 'ios' && (
               <Button
                 action="primary"
-                variant="outline"
                 size="control"
-                className="mb-8 rounded-md"
+                className=" mb-8 h-12 flex-row items-center justify-center rounded-lg bg-gray-100 dark:bg-neutral-800"
                 onPress={handleAppleLogin}
                 isDisabled={loading}>
                 <View className="flex-row items-center justify-center">
@@ -765,7 +760,7 @@ export default function LoginScreen() {
                     size={24}
                     color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
                   />
-                  <ButtonText className="text-typography-900 ml-3 text-base font-semibold">
+                  <ButtonText className="ml-3 text-base font-semibold text-typography-900">
                     {t('auth.appleContinue')}
                   </ButtonText>
                 </View>
@@ -818,6 +813,7 @@ function GetButtonDialog({
   handleResendOTP,
   isOtpCooldownActive,
   labels,
+  isDarkMode,
 }: {
   dialogOpen: boolean;
   setDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -843,6 +839,7 @@ function GetButtonDialog({
     verify: string;
     otpRequired: string;
   };
+  isDarkMode: boolean;
 }) {
   const minutes = Math.floor((otpCountdown ?? 0) / 60);
   const seconds = (otpCountdown ?? 0) % 60;
@@ -870,61 +867,63 @@ function GetButtonDialog({
     }
   }, [loading]);
 
-  const handleSignInPress = () => {
-    void signInWithOTP();
-  };
-
   return (
-    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <Dialog open={dialogOpen} onOpenChange={email ? setDialogOpen : undefined}>
       <DialogTrigger asChild>
         <Button
           action="primary"
           variant="solid"
           size="control"
-          onPress={handleSignInPress}
+          onPress={email ? signInWithOTP : undefined}
           isDisabled={loading || !email || isOtpCooldownActive}
           className="mb-6 w-full rounded-md">
-          <ButtonText>
+          <ButtonText className=" text-black dark:text-white">
             {loading ? resolvedLabels.connecting : resolvedLabels.signUpOrLogin}
           </ButtonText>
         </Button>
       </DialogTrigger>
-      <DialogContent className="gap-6">
+      <DialogContent className="gap-6 border-border bg-background ">
         <DialogHeader className="items-center">
           <DialogTitle className="text-center text-xl font-bold">
             {resolvedLabels.otpTitle}
           </DialogTitle>
-          <DialogDescription className="text-center">
-            {resolvedLabels.otpDescription}
-          </DialogDescription>
-          {email ? (
-            <Text className="text-center text-sm font-medium text-primary">{email}</Text>
-          ) : null}
-          {(otpCountdown ?? 0) > 0 ? (
-            <>
-              <Text className="text-center text-sm font-medium text-primary">
-                {resolvedLabels.otpTimeRemaining} : {formattedCountdown}
-              </Text>
-              <Text className="text-center text-xs text-muted-foreground">
-                {resolvedLabels.otpResendHint}
-              </Text>
-            </>
-          ) : null}
         </DialogHeader>
 
         <View className="mx-auto w-full items-center gap-4">
+          <Text className="text-center">
+            {resolvedLabels.otpDescription}{' '}
+            {email ? (
+              <Text className="text-center text-sm font-medium text-primary">{email}</Text>
+            ) : null}
+          </Text>
+
+          {(otpCountdown ?? 0) > 0 ? (
+            <>
+              <Text className="text-center text-sm font-medium ">
+                {resolvedLabels.otpTimeRemaining} : {formattedCountdown}
+              </Text>
+            </>
+          ) : null}
+
           <InputOTP
-            value={token}
             disabled={loading}
-            onChange={(text) => {
+            numberOfDigits={6}
+            onTextChange={(text) => {
               setValidationError('');
               setButtonEnabled(true);
               setToken?.(text);
+              if (text.length === 6) {
+                setButtonEnabled(false);
+                Keyboard.dismiss();
+                verifyOTP?.(text);
+              }
             }}
-            onComplete={(text) => {
-              setButtonEnabled(false);
-              Keyboard.dismiss();
-              verifyOTP?.(text);
+            theme={{
+              pinCodeTextStyle: {
+                color: isDarkMode ? 'white' : 'black',
+              },
+              focusStickStyle: styles.focusStick,
+              focusedPinCodeContainerStyle: styles.activePinCodeContainer,
             }}
           />
           {validationError ? (
@@ -942,7 +941,7 @@ function GetButtonDialog({
                 <Text
                   className={cn(
                     'text-center text-sm font-semibold underline',
-                    canResend ? 'text-primary' : 'text-muted-foreground opacity-50'
+                    canResend ? 'text-black dark:text-white' : 'text-muted-foreground opacity-50'
                   )}>
                   {resolvedLabels.otpResendCode}
                 </Text>
@@ -968,10 +967,24 @@ function GetButtonDialog({
                 setButtonEnabled(true);
               }
             }}>
-            <ButtonText>{resolvedLabels.verify}</ButtonText>
+            <ButtonText className="text-black dark:text-white">{resolvedLabels.verify}</ButtonText>
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+const styles = StyleSheet.create({
+  pinCodeText: {
+    fontSize: 20,
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  focusStick: {
+    backgroundColor: color.primary,
+  },
+  activePinCodeContainer: {
+    borderColor: color.primary,
+  },
+});

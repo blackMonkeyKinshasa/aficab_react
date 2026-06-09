@@ -12,7 +12,7 @@ import { Text } from '@/components/ui/text';
 import { getStoreUrl } from '@/constants/app-links';
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
-import { useAppConfigState } from '@/store/app-config-state';
+import { useAppConfigState, type AppConfigState } from '@/store/app-config-state';
 
 function getLocalBuildVersion() {
   if (Application.nativeBuildVersion) {
@@ -30,10 +30,10 @@ export default function UpdateAppScreen() {
   const router = useRouter();
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const appConfig = useAppConfigState((state) => state.appConfig);
-  const appIsLock = useAppConfigState((state) => state.appIsLock);
-  const refreshAppConfig = useAppConfigState((state) => state.refreshAppConfig);
-  const refreshing = useAppConfigState((state) => state.refreshing);
+  const appConfig = useAppConfigState((state: AppConfigState) => state.appConfig);
+  const appIsLock = useAppConfigState((state: AppConfigState) => state.appIsLock);
+  const refreshAppConfig = useAppConfigState((state: AppConfigState) => state.refreshAppConfig);
+  const refreshing = useAppConfigState((state: AppConfigState) => state.refreshing);
   const { t } = useI18n();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

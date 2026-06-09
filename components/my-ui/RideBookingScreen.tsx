@@ -159,9 +159,9 @@ export const RideBookingScreen: React.FC<RideBookingScreenProps> = () => {
           className="absolute top-44 h-full w-full rounded-t-[24px] bg-white dark:bg-transparent"
           style={isDark ? { backgroundColor: color.appDarkBackground } : undefined}>
           {/* Tabs container */}
-          <View className="mt-4 flex-1 items-center">
+          <View className="mt-4  flex-1 items-center">
             {/*  container header tab*/}
-            <View className="relative ml-4 mr-4 mt-1 flex-row items-center justify-center rounded-[42px] bg-muted p-2">
+            <View className="relative ml-4 mb-4 mr-4 mt-1 flex-row items-center justify-center  p-2">
               <Animated.View
                 pointerEvents="none"
                 style={[

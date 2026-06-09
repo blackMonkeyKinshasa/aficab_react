@@ -29,6 +29,7 @@ export default function TabsLayout() {
 
           tabBarIcon: (props: { color: string }) => <Home size={24} color={props.color} />,
           headerShown: true,
+        
         }}
       />
       <Tabs.Screen

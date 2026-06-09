@@ -4,7 +4,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { Location } from '@/constants/constants';
 
-interface LocationState {
+type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
+
+export interface LocationState {
   recentLocations: Location[];
   addLocation: (location: Location) => void;
   removeLocation: (location: Location) => void;
@@ -13,15 +15,15 @@ interface LocationState {
 
 export const useMyStateLocation = create<LocationState>()(
   persist(
-    (set) => ({
+    (set: StoreSetter<LocationState>) => ({
       recentLocations: [],
 
-      addLocation: (location) =>
-        set((state) => {
+      addLocation: (location: Location) =>
+        set((state: LocationState) => {
           const normalizedDescription = location.description.trim().toLowerCase();
 
           const exists = state.recentLocations.some(
-            (item) => item.description.trim().toLowerCase() === normalizedDescription
+            (item: Location) => item.description.trim().toLowerCase() === normalizedDescription
           );
 
           if (exists) {
@@ -33,12 +35,11 @@ export const useMyStateLocation = create<LocationState>()(
           };
         }),
 
-      removeLocation: (location) =>
-        set((state) => ({
+      removeLocation: (location: Location) =>
+        set((state: LocationState) => ({
           recentLocations: state.recentLocations.filter(
-            (item) =>
-              item.description.trim().toLowerCase() !==
-              location.description.trim().toLowerCase()
+            (item: Location) =>
+              item.description.trim().toLowerCase() !== location.description.trim().toLowerCase()
           ),
         })),
 

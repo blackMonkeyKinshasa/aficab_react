@@ -122,33 +122,23 @@ export function ModalDateSelector({
           onPress: () => setStep('date'),
           variant: 'outline' as const,
         },
-        {
-          label: t('common.save'),
-          onPress: handleSave,
-          disabled: !canSave,
-        },
+       
       ];
     }
 
-    return [
-      {
-        label: t('common.cancel'),
-        onPress: onDismiss,
-        variant: 'outline' as const,
-      },
-    ];
+   
   }, [canSave, handleSave, onDismiss, step, t]);
 
   const sheetTitle = step === 'date' ? t('booking.chooseDate') : t('booking.selectTime');
 
   return (
     <BookingSheetLayout
-      visible={visible}
+      visible={visible} 
       onDismiss={onDismiss}
       title={sheetTitle}
-      footerActions={footerActions}
-      snapPoints={[65]}>
-      <View className="w-full flex-1 pt-2">
+      snapPoints={[75]}
+      >
+      <View className="w-full flex-1 pt-2 ">
         {step === 'date' ? (
           <DateTimePicker
             mode="single"
@@ -160,7 +150,7 @@ export function ModalDateSelector({
             onChange={handleDateStepChange}
           />
         ) : (
-          <BookingTimePicker value={draftDateTime} onChange={handleTimeChange} />
+          <BookingTimePicker value={draftDateTime} onChange={handleTimeChange} onGoback={() => setStep('date')} onConfirm={handleSave} />
         )}
       </View>
     </BookingSheetLayout>

@@ -35,12 +35,12 @@ const toastStyle = tva({
       warning: 'bg-warning-700',
       success: 'bg-success-700',
       info: 'bg-info-700',
-      muted: 'bg-background-800',
+      muted: 'bg-background800',
     },
 
     variant: {
       solid: '',
-      outline: 'border bg-background-0',
+      outline: 'border bg-background',
     },
   },
 });

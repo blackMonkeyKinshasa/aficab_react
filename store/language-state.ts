@@ -4,16 +4,18 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 export type AppLanguage = 'fr' | 'en';
 
-interface AppLanguageState {
+type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
+
+export interface AppLanguageState {
   language: AppLanguage;
   setLanguage: (language: AppLanguage) => void;
 }
 
 export const useAppLanguageState = create<AppLanguageState>()(
   persist(
-    (set) => ({
+    (set: StoreSetter<AppLanguageState>) => ({
       language: 'fr',
-      setLanguage: (language) => set({ language }),
+      setLanguage: (language: AppLanguage) => set({ language }),
     }),
     {
       name: 'my-state-app-language',

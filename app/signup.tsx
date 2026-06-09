@@ -30,7 +30,6 @@ export default function Signup() {
     { label: t('signup.driver'), value: 'driver' },
   ];
 
- 
   const handleSave = async () => {
     if (!fullName || !phoneNumber || !status) {
       toast({
@@ -145,8 +144,9 @@ export default function Signup() {
               className="flex-row items-center justify-between rounded-xl bg-muted px-4 py-4">
               <Text className={`text-base ${status ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {status
-                  ? statusOptions.find((opt: { label: string; value: string }) => opt.value === status)
-                      ?.label
+                  ? statusOptions.find(
+                      (opt: { label: string; value: string }) => opt.value === status
+                    )?.label
                   : t('signup.statusPlaceholder')}
               </Text>
               <ChevronDown size={24} color={isDark ? '#666666' : '#999999'} />

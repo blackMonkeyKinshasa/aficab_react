@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { View ,Text, TouchableOpacity} from 'react-native';
 
 import { Provider as PaperProvider } from 'react-native-paper';
 import { TimePicker } from 'react-native-paper-dates';
@@ -7,6 +7,7 @@ import { TimePicker } from 'react-native-paper-dates';
 import { useI18n } from '@/lib/i18n';
 import { usePaperPickerTheme } from '@/lib/paper-picker-theme';
 import { snapMinutesToStep } from '@/lib/time-utils';
+import {color} from '@/constants/colors';
 
 type PossibleClockTypes = 'hours' | 'minutes';
 
@@ -23,9 +24,11 @@ export interface BookingTimePickerProps {
   value: Date;
   onChange: (date: Date) => void;
   use12Hours?: boolean;
+  onGoback?: () => void;
+  onConfirm?: () => void;
 }
 
-export function BookingTimePicker({ value, onChange, use12Hours = false }: BookingTimePickerProps) {
+export function BookingTimePicker({ value, onChange, use12Hours = false, onGoback, onConfirm }: BookingTimePickerProps) {
   const theme = usePaperPickerTheme();
   const { paperDateLocale } = useI18n();
   const [focused, setFocused] = useState<PossibleClockTypes>(clockTypes.hours);
@@ -47,7 +50,7 @@ export function BookingTimePicker({ value, onChange, use12Hours = false }: Booki
 
   return (
     <PaperProvider theme={theme}>
-      <View className="w-full items-center justify-center py-4" style={{ minHeight: 320 }}>
+      <View className="w-full items-center justify-center py-4" style={{ minHeight: 350 }}>
         <TimePicker
           locale={paperDateLocale}
           inputType={inputTypes.picker}
@@ -59,6 +62,23 @@ export function BookingTimePicker({ value, onChange, use12Hours = false }: Booki
           use24HourClock={!use12Hours}
           inputFontSize={52}
         />
+        
+          <View style={{ flexDirection: 'row', marginTop: 24 , gap: 12 }}>
+            <TouchableOpacity
+              onPress={onGoback}
+            className='flex-1 items-center justify-center rounded-lg border border-gray-300 px-4 py-3'
+            >
+              <Text className=' dark:text-white text-black '>Retour</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onConfirm}
+              className='flex-1 items-center justify-center rounded-lg border  px-4 py-3'
+              style={{borderColor : color.primary }}
+            
+            >
+              <Text style={{ color: color.primary }}>Confirmer</Text>  
+            </TouchableOpacity>
+          </View>
       </View>
     </PaperProvider>
   );

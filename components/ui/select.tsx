@@ -31,7 +31,7 @@ function SelectValue({
     <SelectPrimitive.Value
       ref={ref}
       className={cn(
-        'text-typography-900 line-clamp-1 flex flex-1 flex-row items-center text-base',
+        'line-clamp-1 flex flex-1 flex-row items-center text-base text-typography-900',
         !value && 'text-typography-500',
         className
       )}
@@ -52,15 +52,22 @@ function SelectTrigger({
     children?: React.ReactNode;
     size?: 'control' | 'default' | 'sm';
   }) {
+  const triggerStyle =
+    size !== 'control'
+      ? style
+      : typeof style === 'function'
+        ? (state: Parameters<NonNullable<typeof style>>[0]) => [controlHeightStyle, style(state)]
+        : [controlHeightStyle, style];
+
   return (
     <SelectPrimitive.Trigger
       ref={ref}
-      style={size === 'control' ? [controlHeightStyle, style] : style}
+      style={triggerStyle}
       className={cn(
-        'border-background-300 bg-background-100 flex w-full flex-row items-center justify-between gap-2 rounded-md border-0 px-3',
+        'flex w-full flex-row items-center justify-between gap-2 rounded-md border-0 border-background-300 bg-background-100 px-3',
         size === 'control' ? '' : 'h-10 py-2 sm:h-9',
         Platform.select({
-          web: 'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive focus-visible:border-primary-700 focus-visible:ring-indicator-primary whitespace-nowrap text-base outline-none transition-[color,box-shadow] focus-visible:ring-1 focus-visible:ring-inset disabled:cursor-not-allowed data-[disabled=true]:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+          web: 'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive whitespace-nowrap text-base outline-none transition-[color,box-shadow] focus-visible:border-primary-700 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-indicator-primary disabled:cursor-not-allowed data-[disabled=true]:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0',
         }),
         props.disabled && 'opacity-40',
         size === 'sm' && 'h-8 py-2 sm:py-1.5',
@@ -68,7 +75,7 @@ function SelectTrigger({
       )}
       {...props}>
       <>{children}</>
-      <Icon as={ChevronDown} aria-hidden={true} className="text-typography-500 size-4" />
+      <Icon as={ChevronDown} aria-hidden={true} className="size-4 text-typography-500" />
     </SelectPrimitive.Trigger>
   );
 }

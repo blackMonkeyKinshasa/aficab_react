@@ -29,7 +29,7 @@ import { useI18n } from '@/lib/i18n';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
-import { useMyStateUser } from '@/store/user-state';
+import { useMyStateUser, type UserState } from '@/store/user-state';
 
 export default function EditProfile() {
   const { colorScheme } = useColorScheme();
@@ -53,8 +53,8 @@ export default function EditProfile() {
   const [city, setCity] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const [phoneFieldY, setPhoneFieldY] = useState(0);
-  const storedUser = useMyStateUser((state) => state.user);
-  const setStoredUser = useMyStateUser((state) => state.setUser);
+  const storedUser = useMyStateUser((state: UserState) => state.user);
+  const setStoredUser = useMyStateUser((state: UserState) => state.setUser);
   const shouldHighlightPhone = focusField === 'phone';
   const shouldReturnToBooking = returnToBooking === '1';
   const { t } = useI18n();

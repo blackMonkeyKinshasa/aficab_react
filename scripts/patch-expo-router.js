@@ -876,6 +876,8 @@ function patchTailwindVariants() {
     return;
   }
 
+  const nestedTailwindMergeDir = path.join(packageDir, 'node_modules', 'tailwind-merge');
+
   const changed = patchJsonFile(packageJsonPath, (mutablePackageJson) => {
     const defaultExport = mutablePackageJson.exports?.['.'];
 
@@ -899,6 +901,93 @@ function patchTailwindVariants() {
     fs.copyFileSync(distTypesPath, brokenTypesPath);
     console.log('Restored tailwind-variants types/index.d.ts from dist/index.d.ts.');
   }
+
+  const nestedTailwindMergePackageJsonPath = path.join(nestedTailwindMergeDir, 'package.json');
+
+  if (!fs.existsSync(nestedTailwindMergePackageJsonPath)) {
+    return;
+  }
+
+  const nestedTailwindMergePackageJson = JSON.parse(
+    fs.readFileSync(nestedTailwindMergePackageJsonPath, 'utf8')
+  );
+  const missingNestedEntries = [
+    ...getPackageEntryCandidates(nestedTailwindMergePackageJson),
+    ...getPackageTypeCandidates(nestedTailwindMergePackageJson),
+  ].filter((entry) => !tryResolveModulePath(path.join(nestedTailwindMergeDir, entry)));
+
+  if (missingNestedEntries.length === 0) {
+    return;
+  }
+
+  const restoreEntries = new Set([
+    'package.json',
+    ...getRestoreEntries(nestedTailwindMergePackageJson, missingNestedEntries),
+  ]);
+  const packageSpec = `tailwind-merge@${nestedTailwindMergePackageJson.version}`;
+
+  withPackedPackage(packageSpec, (packedPackageDir) => {
+    const restoredEntries = [];
+
+    for (const entry of restoreEntries) {
+      if (
+        copyMissingPath(
+          path.join(packedPackageDir, entry),
+          path.join(nestedTailwindMergeDir, entry)
+        )
+      ) {
+        restoredEntries.push(entry);
+      }
+    }
+
+    const unresolvedEntries = missingNestedEntries.filter(
+      (entry) => !tryResolveModulePath(path.join(nestedTailwindMergeDir, entry))
+    );
+
+    if (unresolvedEntries.length > 0) {
+      throw new Error(
+        `Unable to restore tailwind-variants nested tailwind-merge entries: ${unresolvedEntries.join(', ')}`
+      );
+    }
+
+    console.log(
+      `Restored tailwind-variants nested tailwind-merge package contents from published package: ${restoredEntries.join(', ')}.`
+    );
+  });
+}
+
+function patchZustandReactNativeTypes() {
+  const zustandDir = path.join(process.cwd(), 'node_modules', 'zustand');
+  const packageJsonPath = path.join(zustandDir, 'package.json');
+
+  if (!fs.existsSync(packageJsonPath)) {
+    console.warn('zustand package not found in node_modules. Skipping react-native types patch.');
+    return;
+  }
+
+  const changed = patchJsonFile(packageJsonPath, (mutablePackageJson) => {
+    const wildcardExport = mutablePackageJson.exports?.['./*'];
+
+    if (!wildcardExport?.['react-native']) {
+      return false;
+    }
+
+    if (wildcardExport['react-native'].types === './esm/*.d.mts') {
+      return false;
+    }
+
+    wildcardExport['react-native'].types = './esm/*.d.mts';
+    return true;
+  });
+
+  if (changed) {
+    console.log(
+      'Patched zustand package.json to use existing ESM type declarations for react-native subpaths.'
+    );
+    return;
+  }
+
+  console.log('zustand react-native type exports already patched, no patch needed.');
 }
 
 function patchMissingTypeDeclarations() {
@@ -1341,6 +1430,7 @@ patchExpoCliBundledNativeModulesFallback();
 patchBrokenDirectDependencies();
 patchExpoLocalMavenRepos();
 patchTailwindVariants();
+patchZustandReactNativeTypes();
 patchMissingTypeDeclarations();
 patchReactNativeSafeAreaContext();
 patchGorhomPortal();

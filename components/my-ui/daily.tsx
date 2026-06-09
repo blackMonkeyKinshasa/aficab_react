@@ -3,6 +3,7 @@ import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
+import { useColorScheme } from 'nativewind';
 import { formatBookingDateTime, ModalDateSelector } from '@/components/my-ui/ModalDateSelector';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
@@ -16,8 +17,12 @@ import { useI18n } from '@/lib/i18n';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
+type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
+
 export function Daily() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const { appLocale, t } = useI18n();
   const toast = useAppToast();
   const [visible, setVisible] = useState(false);
@@ -28,7 +33,7 @@ export function Daily() {
   const [dateEnd, setDateEnd] = useState<Date | null>(null);
   const [hasEarlyStartSelection, setHasEarlyStartSelection] = useState(false);
   const analytics = useAnalytics();
-  const userPhone = useMyStateUser((state) => state.user?.phone?.trim() ?? '');
+  const userPhone = useMyStateUser((state: UserStoreState) => state.user?.phone?.trim() ?? '');
   const hasLateEndSelection =
     dateEnd !== null &&
     (dateEnd.getHours() > 20 || (dateEnd.getHours() === 20 && dateEnd.getMinutes() > 0));
@@ -122,6 +127,7 @@ export function Daily() {
             title={location?.description ?? ''}
             placeholder={t('booking.departure')}
             onPress={() => setVisible(true)}
+            isDarkMode={isDark}
           />
 
           <ModuleReservation
@@ -129,6 +135,7 @@ export function Daily() {
             title={dateStart ? formatBookingDateTime(dateStart, appLocale) : ''}
             placeholder={t('booking.startDateTime')}
             onPress={() => setVisibleDateStart(true)}
+            isDarkMode={isDark}
           />
 
           <ModuleReservation
@@ -136,10 +143,11 @@ export function Daily() {
             title={dateEnd ? formatBookingDateTime(dateEnd, appLocale) : ''}
             placeholder={t('booking.endDateTime')}
             onPress={() => setVisibleDateEnd(true)}
+            isDarkMode={isDark}
           />
         </View>
 
-        <TouchableOpacity className="px-5">
+        <TouchableOpacity className="px-5 mt-4">
           <Button
             action="primary"
             variant="solid"
@@ -148,7 +156,7 @@ export function Daily() {
             className="w-full rounded-md"
             style={{ marginBottom: bookingSpacing.buttonMarginBottom }}
             onPress={handleSubmit}>
-            <ButtonText>{t('booking.viewOffers')} →</ButtonText>
+            <ButtonText className="text-white">{t('booking.viewOffers')} →</ButtonText>
           </Button>
         </TouchableOpacity>
       </ScrollView>
@@ -172,7 +180,7 @@ export function Daily() {
         }}
         value={dateStart}
         minDate={new Date()}
-        isStartTime
+        isStartTime={true}
       />
 
       <ModalDateSelector

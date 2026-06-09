@@ -281,7 +281,7 @@ export default function SettingsScreen() {
           {/* Paramètres généraux */}
           <View className="ml-3 mt-4">
             <MenuItem icon={Languages} label={t('language.label')} onPress={() => {}} />
-            <View className="px-4 pb-3">
+            <View className="px-4 pb-3 ">
               <Select
                 value={{
                   value: language,

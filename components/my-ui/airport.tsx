@@ -3,7 +3,7 @@ import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
+import {useColorScheme} from 'nativewind';
 import { formatBookingDateTime, ModalDateSelector } from '@/components/my-ui/ModalDateSelector';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
@@ -15,7 +15,7 @@ import { LocationDocTA } from '@/constants/dataInterface';
 import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
-import { useMyStateUser } from '@/store/user-state';
+import { useMyStateUser, type UserState } from '@/store/user-state';
 
 type TripType = 'one-way' | 'round-trip';
 
@@ -69,6 +69,8 @@ function containsAirport(location: Location | null): boolean {
 
 export function Airport() {
   const router = useRouter();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const { appLocale, t } = useI18n();
   const [tripType, setTripType] = useState<TripType>('one-way');
   const [locationDepart, setLocationDepart] = useState<Location | null>(null);
@@ -80,7 +82,7 @@ export function Airport() {
   const [dateStart, setDateStart] = useState<Date | null>(null);
   const [dateReturn, setDateReturn] = useState<Date | null>(null);
   const analytics = useAnalytics();
-  const userPhone = useMyStateUser((state) => state.user?.phone?.trim() ?? '');
+  const userPhone = useMyStateUser((state: UserState) => state.user?.phone?.trim() ?? '');
 
   const handleSubmit = () => {
     if (!locationDepart || !locationDest || !dateStart) return;
@@ -169,6 +171,7 @@ export function Airport() {
             title={locationDepart?.description ?? ''}
             placeholder={t('booking.departure')}
             onPress={() => setVisibleDepart(true)}
+            isDarkMode={isDark}
           />
 
           <ModuleReservation
@@ -176,6 +179,7 @@ export function Airport() {
             title={locationDest?.description ?? ''}
             placeholder={t('booking.destination')}
             onPress={() => setVisibleDest(true)}
+            isDarkMode={isDark}
           />
 
           {airportError ? (
@@ -190,6 +194,7 @@ export function Airport() {
             title={dateStart ? formatBookingDateTime(dateStart, appLocale) : ''}
             placeholder={t('booking.departureDateTime')}
             onPress={() => setVisibleDateStart(true)}
+            isDarkMode={isDark}
           />
 
           {tripType === 'round-trip' ? (
@@ -198,6 +203,7 @@ export function Airport() {
               title={dateReturn ? formatBookingDateTime(dateReturn, appLocale) : ''}
               placeholder={t('booking.returnDateTime')}
               onPress={() => setVisibleDateReturn(true)}
+              isDarkMode={isDark}
             />
           ) : null}
         </View>
@@ -211,7 +217,9 @@ export function Airport() {
             className="w-full rounded-md"
             style={{ marginBottom: bookingSpacing.buttonMarginBottom }}
             onPress={handleSubmit}>
-            <ButtonText>{t('booking.viewOffers')}</ButtonText>
+            <ButtonText  
+            className='text-white'
+           >{t('booking.viewOffers')}</ButtonText>
           </Button>
         </TouchableOpacity>
       </ScrollView>

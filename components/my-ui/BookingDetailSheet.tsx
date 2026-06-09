@@ -125,6 +125,7 @@ export function BookingDetailSheet({
       return [];
     }
 
+    // Construit les actions contextuelles affichées dans le pied de la feuille.
     const actions: SheetFooterAction[] = [];
     const isStandardClient = booking.client?.clientType !== ClientType.PREMIUM;
     const canPayBooking = isStandardClient && !booking.isPaid;
@@ -186,12 +187,14 @@ export function BookingDetailSheet({
           paddingTop: bookingSpacing.sectionGap,
           paddingBottom: 16,
         }}>
+        {/* Visuel principal du vehicule associe a la reservation. */}
         <Image
           source={{ uri: getCarImage(booking) }}
           style={detailStyles.carImage}
           resizeMode="cover"
         />
 
+        {/* Badge de statut pour donner l'etat courant en un coup d'oeil. */}
         <View
           className="w-full flex-row items-center justify-center self-center rounded-full p-4 text-center"
           style={{
@@ -208,6 +211,7 @@ export function BookingDetailSheet({
         </View>
 
         <View className="mt-2">
+          {/* Resume principal: identite, type, vehicule et horaires de la course. */}
           <DetailRow label={t('reservations.field.id')} value={booking.id} />
           <DetailRow
             label={t('reservations.field.type')}
@@ -248,6 +252,7 @@ export function BookingDetailSheet({
 
           <SolidDivider className="my-4" />
 
+          {/* Lieux de prise en charge et de destination, plus les infos de vol si besoin. */}
           <DetailRow
             label={t('reservations.field.departure')}
             value={booking.departure?.label ?? '—'}
@@ -263,6 +268,7 @@ export function BookingDetailSheet({
           {showDriver ? (
             <>
               <SolidDivider />
+              {/* Informations chauffeur et raccourcis de contact lorsque la course est affectee. */}
               <View className="py-3">
                 <View className="flex-row items-center">
                   <Image
@@ -306,6 +312,7 @@ export function BookingDetailSheet({
           {booking.client ? (
             <>
               <SolidDivider className="my-4" />
+              {/* Coordonnees du client rattache a la reservation. */}
               <DetailRow
                 label={t('reservations.field.name')}
                 value={booking.client.full_name ?? '—'}
@@ -321,6 +328,7 @@ export function BookingDetailSheet({
           {booking.review ? (
             <>
               <SolidDivider className="my-4" />
+              {/* Notes et commentaire laisses apres la course. */}
               <DetailRow
                 label={t('reservations.field.driving')}
                 value={`${booking.review.ratingDriving}/5`}
@@ -349,6 +357,7 @@ export function BookingDetailSheet({
           {booking.status === ResStatus.ENDED && !booking.review && booking.driverId ? (
             <>
               <SolidDivider className="my-4" />
+              {/* Invitation a laisser un avis quand la course est terminee. */}
               <View className="py-3">
                 <Text className="text-typography-900 text-sm font-bold">
                   {t('reservations.reviewForm.ctaTitle')}
@@ -363,6 +372,7 @@ export function BookingDetailSheet({
           {booking.coupon ? (
             <>
               <SolidDivider className="my-4" />
+              {/* Detail de la remise appliquee sur la reservation. */}
               <DetailRow
                 label={t('reservations.field.discount')}
                 value={`-${booking.coupon.discountAmount} j`}
@@ -377,6 +387,7 @@ export function BookingDetailSheet({
           {booking.commentaire ? (
             <>
               <SolidDivider className="my-4" />
+              {/* Commentaire libre saisi au moment de la reservation. */}
               <View className="py-3">
                 <Text className="text-typography-500 text-sm">{booking.commentaire}</Text>
               </View>
@@ -385,14 +396,12 @@ export function BookingDetailSheet({
 
           <SolidDivider className="my-4" />
 
+          {/* Recapitulatif financier affiche en bas de la fiche. */}
           <DetailRow label={t('reservations.field.total')} value={totalValue} />
 
           <DashedDivider />
 
-          <View className="flex-row items-center justify-between py-3">
-            <Text className="text-typography-500 text-sm">{t('booking.total')}</Text>
-            <Text className="text-typography-900 text-sm font-bold">{totalValue}</Text>
-          </View>
+          
         </View>
       </View>
     </BookingSheetLayout>

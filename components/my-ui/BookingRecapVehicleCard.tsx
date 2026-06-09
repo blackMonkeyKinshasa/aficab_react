@@ -70,7 +70,7 @@ export function BookingRecapVehicleCard({
           <SpecBadge icon="briefcase" value={baggage} badgeClassName="bg-warning-200" />
 
           <View className="ml-auto flex-row items-baseline">
-            <Text className="text-base font-semibold">{priceAmount}</Text>
+            <Text className="text-base font-semibold dark:text-white text-black">{priceAmount}</Text>
             {priceUnit ? (
               <Text className="text-typography-500 ml-0.5 text-sm">{priceUnit}</Text>
             ) : null}

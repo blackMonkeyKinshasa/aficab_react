@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { BookingRecapDetailRow } from '@/components/my-ui/BookingRecapDetailRow';
+import { BookingRecapDetailRow } from '@/components/my-ui/BookingRecapDetail';
 import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
 
 export interface BookingRecapPriceLine {
@@ -28,11 +28,11 @@ export function BookingRecapPriceSection({
         <BookingRecapDetailRow key={line.label} label={line.label} value={line.value} />
       ))}
 
-      <View className="border-outline-100 my-3 border-t" />
+      <View className="my-3 border-t border-outline-100" />
 
       <View className="flex-row items-center justify-between">
-        <Text className="text-typography-900 text-base font-bold">{totalLabel}</Text>
-        <Text className="text-typography-900 text-base font-bold">{totalValue}</Text>
+        <Text className="text-base font-bold text-typography-900">{totalLabel}</Text>
+        <Text className="text-base font-bold text-typography-900">{totalValue}</Text>
       </View>
     </BookingRecapSection>
   );
