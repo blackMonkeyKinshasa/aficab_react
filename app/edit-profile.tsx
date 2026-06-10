@@ -286,7 +286,7 @@ export default function EditProfile() {
               console.log(fullName);
               update || setUpdate(true);
             }}
-            placeholder="User 54452"
+            placeholder={t('profile.fullNamePlaceholder')}
           />
 
           {/* Phone Number */}
@@ -360,7 +360,7 @@ export default function EditProfile() {
             label={t('profile.email')}
             value={email}
             onChangeText={() => {}}
-            placeholder="adresse@email.com"
+            placeholder={t('profile.emailPlaceholder')}
             editable={false}
           />
 

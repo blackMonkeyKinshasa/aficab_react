@@ -125,6 +125,7 @@ export default Sentry.wrap(function RootLayout() {
 function RootLayoutInner() {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [themeReady, setThemeReady] = useState(false);
   const [isSyncingUser, setIsSyncingUser] = useState(false);
   const [pushSyncNonce, setPushSyncNonce] = useState(0);
   const { t } = useI18n();
@@ -360,9 +361,7 @@ function RootLayoutInner() {
       }
     } catch (error) {
       console.error('profile_manual_sync_failed', error);
-      showPushTokenSnackbar(
-        'Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.'
-      );
+      showPushTokenSnackbar(t('notifications.profileSyncError'));
       syncedDeviceTokenRef.current = null;
       await runPushTokenSync('manual');
     } finally {
@@ -402,6 +401,24 @@ function RootLayoutInner() {
   }, [pathname]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    void (async () => {
+      if (!isMounted) {
+        return;
+      }
+
+      await getThemePreference();
+      setColorScheme('light');
+      setThemeReady(true);
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setColorScheme]);
+
+  useEffect(() => {
     if (!authReady) {
       return;
     }
@@ -413,7 +430,7 @@ function RootLayoutInner() {
     SplashScreen.hideAsync().catch((error) => {
       reportStartupError('splash_hide_failed', error);
     });
-  }, [authReady]);
+  }, [authReady, themeReady]);
 
   useEffect(() => {
     Sentry.setTag('platform', Platform.OS);
@@ -669,7 +686,7 @@ function RootLayoutInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- notification listeners are mounted once per route context
   }, [pathname, router]);
 
-  if (!authReady) {
+  if (!authReady || !themeReady) {
     // Evite d'afficher une UI transitoire avant de savoir si une session existe.
     return null;
   }

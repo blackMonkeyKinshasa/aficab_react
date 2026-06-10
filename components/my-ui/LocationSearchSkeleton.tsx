@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { Skeleton } from '@/components/ui/skeleton';
+import { translateCurrent } from '@/lib/i18n';
 
 const SKELETON_ROW_COUNT = 3;
 
@@ -18,7 +19,9 @@ function LocationSearchSkeletonRow() {
 
 export function LocationSearchSkeleton() {
   return (
-    <View accessibilityLabel="Loading search results" accessibilityRole="progressbar">
+    <View
+      accessibilityLabel={translateCurrent('notifications.loadingSearchResults')}
+      accessibilityRole="progressbar">
       {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
         <LocationSearchSkeletonRow key={`location-skeleton-${index}`} />
       ))}

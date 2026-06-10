@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 
 import { color } from '@/constants/colors';
+import { useI18n } from '@/lib/i18n';
 
 export const HEADER_SIDE_WIDTH = 48;
 
@@ -30,6 +31,7 @@ export function CircularHeaderBackButton({
   onPress?: () => void;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
 
   return (
     <TouchableOpacity
@@ -37,7 +39,7 @@ export function CircularHeaderBackButton({
       style={[styles.backButton, { borderColor: isDark ? '#3f3f46' : '#e5e7eb' }]}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel="Back">
+      accessibilityLabel={t('common.back')}>
       <ArrowLeft size={20} color={isDark ? '#ffffff' : '#111827'} />
     </TouchableOpacity>
   );

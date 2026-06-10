@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 
 import { updateDeviceToken } from '@/api/user';
 import { resolveAppHref } from '@/lib/deep-linking';
+import { translateCurrent } from '@/lib/i18n';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -110,7 +111,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     reportPushTokenStage('web', { platform: Platform.OS });
     return {
       token: null,
-      errorMessage: 'Les notifications push ne sont pas disponibles sur le web.',
+      errorMessage: translateCurrent('notifications.push.webUnavailable'),
       stage: 'web',
       trace,
     };
@@ -125,7 +126,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     reportPushTokenStage('notifications-module-unavailable', { platform: Platform.OS });
     return {
       token: null,
-      errorMessage: 'Les notifications push distantes ne sont pas prises en charge dans Expo Go.',
+      errorMessage: translateCurrent('notifications.push.expoGoUnavailable'),
       stage: 'notifications-module-unavailable',
       trace,
     };
@@ -135,7 +136,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   trace.push('configuration du canal android');
 
   await notifications.setNotificationChannelAsync('default', {
-    name: 'Aficab Notifications',
+    name: translateCurrent('notifications.push.channelName'),
     importance: notifications.AndroidImportance.MAX,
     sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
@@ -151,7 +152,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     reportPushTokenStage('not-physical-device', { platform: Platform.OS });
     return {
       token: null,
-      errorMessage: 'Les notifications push necessitent un appareil physique.',
+      errorMessage: translateCurrent('notifications.push.physicalDeviceRequired'),
       stage: 'not-physical-device',
       trace,
     };
@@ -179,7 +180,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     });
     return {
       token: null,
-      errorMessage: 'La permission des notifications a ete refusee.',
+      errorMessage: translateCurrent('notifications.push.permissionDenied'),
       stage: 'permission-denied',
       trace,
     };
@@ -193,7 +194,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     reportPushTokenStage('missing-project-id', { platform: Platform.OS });
     return {
       token: null,
-      errorMessage: 'EAS projectId manquant pour enregistrer le token push.',
+      errorMessage: translateCurrent('notifications.push.projectIdMissing'),
       stage: 'missing-project-id',
       trace,
     };
@@ -215,7 +216,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     const errorMessage =
       error instanceof Error
         ? error.message
-        : 'Erreur inconnue lors de la generation du token push.';
+        : translateCurrent('notifications.push.unknownTokenError');
 
     trace.push(`erreur fcm: ${errorMessage}`);
     reportPushTokenStage('fcm-token-error', {

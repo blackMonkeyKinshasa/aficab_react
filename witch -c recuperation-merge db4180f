@@ -1,0 +1,57 @@
+[33mcommit db4180fbf4b7eee0cb041439a575557b7b46466f[m
+Author: blackMonkeyKinshasa <50703102+blackMonkeyKinshasa@users.noreply.github.com>
+Date:   Tue Jun 9 12:37:15 2026 +0200
+
+    merge  complet
+
+ .vscode/settings.json                         |    1 [32m+[m
+ app/(auth)/login.tsx                          |  101 [32m+[m[31m-[m
+ app/(tabs)/_layout.tsx                        |    1 [32m+[m
+ app/(tabs)/index.tsx                          |   18 [32m+[m[31m-[m
+ app/(tabs)/reservation.tsx                    |   40 [32m+[m[31m-[m
+ app/(tabs)/settings.tsx                       |    2 [32m+[m[31m-[m
+ app/_layout.tsx                               |   17 [32m+[m[31m-[m
+ app/chekRole.tsx                              |    6 [32m+[m[31m-[m
+ app/create-profile.tsx                        |    8 [32m+[m[31m-[m
+ app/edit-profile.tsx                          |    6 [32m+[m[31m-[m
+ app/notificationsPage.tsx                     |    4 [32m+[m[31m-[m
+ app/signup.tsx                                |    6 [32m+[m[31m-[m
+ app/update-app.tsx                            |   10 [32m+[m[31m-[m
+ components/my-ui/AuthOnboardingSlider.tsx     |   94 [32m+[m[31m-[m
+ components/my-ui/BookingDetailSheet.tsx       |   17 [32m+[m[31m-[m
+ components/my-ui/BookingRecapDetail.tsx       |   24 [32m+[m
+ components/my-ui/BookingRecapDetailRow.tsx    |   15 [31m-[m
+ components/my-ui/BookingRecapLayout.tsx       |    2 [32m+[m[31m-[m
+ components/my-ui/BookingRecapPriceSection.tsx |    8 [32m+[m[31m-[m
+ components/my-ui/BookingRecapVehicleCard.tsx  |    2 [32m+[m[31m-[m
+ components/my-ui/BookingSheetLayout.tsx       |   12 [32m+[m[31m-[m
+ components/my-ui/BookingTimePicker.tsx        |   26 [32m+[m[31m-[m
+ components/my-ui/LocAirport.tsx               | 1520 [32m+++++++++[m[31m----------------[m
+ components/my-ui/LocDaily.tsx                 | 1426 [32m+++++++++[m[31m--------------[m
+ components/my-ui/ModalDateSelector.tsx        |   24 [32m+[m[31m-[m
+ components/my-ui/ModalLocationSelector.tsx    |    4 [32m+[m[31m-[m
+ components/my-ui/ModuleReservation.tsx        |    4 [32m+[m[31m-[m
+ components/my-ui/PromoCodeField.tsx           |    2 [32m+[m[31m-[m
+ components/my-ui/RideBookingScreen.tsx        |    4 [32m+[m[31m-[m
+ components/my-ui/SoftField.tsx                |    4 [32m+[m[31m-[m
+ components/my-ui/airport.tsx                  |   16 [32m+[m[31m-[m
+ components/my-ui/daily.tsx                    |   16 [32m+[m[31m-[m
+ components/ui/actionsheet/index.tsx           |    8 [32m+[m[31m-[m
+ components/ui/button/index.tsx                |   13 [32m+[m[31m-[m
+ components/ui/select.tsx                      |   17 [32m+[m[31m-[m
+ components/ui/toast/index.tsx                 |    4 [32m+[m[31m-[m
+ constants/spacing.ts                          |    2 [32m+[m[31m-[m
+ global.css                                    |    2 [32m+[m[31m-[m
+ lib/date-picker-theme.ts                      |   35 [32m+[m[31m-[m
+ lib/i18n.ts                                   |   69 [32m+[m[31m-[m
+ package-lock.json                             | 1301 [32m++++++++++++++++[m[31m-----[m
+ package.json                                  |   15 [32m+[m[31m-[m
+ scripts/patch-expo-router.js                  |   90 [32m++[m
+ store/app-config-state.ts                     |   13 [32m+[m[31m-[m
+ store/language-state.ts                       |   10 [32m+[m[31m-[m
+ store/location-state.ts                       |   23 [32m+[m[31m-[m
+ store/notification-state.ts                   |   21 [32m+[m[31m-[m
+ store/user-state.ts                           |   13 [32m+[m[31m-[m
+ tsconfig.json                                 |   11 [32m+[m[31m-[m
+ types/module-shims.d.ts                       |   42 [32m+[m[31m-[m
+ 50 files changed, 2730 insertions(+), 2399 deletions(-)

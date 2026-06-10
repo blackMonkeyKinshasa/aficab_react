@@ -12,10 +12,8 @@ import {
   LogOut,
   type LucideIcon,
   MessageCircle,
-  MoonStarIcon,
   Share2,
   Shield,
-  SunIcon,
   Trash2,
   Users,
 } from 'lucide-react-native';
@@ -39,7 +37,6 @@ import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/consta
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
-import { setThemePreference } from '@/lib/theme-preference';
 import { useAppToast } from '@/lib/toast';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 import { useAppConfigState } from '@/store/app-config-state';
@@ -60,10 +57,10 @@ type AppLanguageStoreState = ReturnType<typeof useAppLanguageState.getState>;
 type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
 
 export default function SettingsScreen() {
-  const { colorScheme, setColorScheme } = useColorScheme();
+  const { colorScheme } = useColorScheme();
   const router = useRouter();
   const isDark = colorScheme === 'dark';
-  const { language, t } = useI18n();
+  const { language, t, tf } = useI18n();
   const toast = useAppToast();
   const setLanguage = useAppLanguageState((state: AppLanguageStoreState) => state.setLanguage);
   const [loading, setLoading] = useState(false);
@@ -78,11 +75,6 @@ export default function SettingsScreen() {
     { label: t('language.optionEnglish'), value: 'en' },
   ];
   const { refreshAppConfig, localClientVersion } = useAppConfigState();
-
-  const THEME_ICONS = {
-    light: SunIcon,
-    dark: MoonStarIcon,
-  };
 
   const handleOpenLink = async (url: string, channel?: 'whatsapp' | 'phone' | 'email') => {
     if (channel && cachedUser?.id) {
@@ -304,17 +296,6 @@ export default function SettingsScreen() {
                 </SelectContent>
               </Select>
             </View>
-
-            <MenuItem
-              icon={THEME_ICONS[colorScheme ?? 'light']}
-              label={t('settings.theme')}
-              onPress={() => {
-                const nextTheme = colorScheme === 'dark' ? 'light' : 'dark';
-                setColorScheme(nextTheme);
-                void setThemePreference(nextTheme);
-              }}
-            />
-
             <Link href="https://aficab.com/politique-de-confidentialite" asChild>
               <MenuItem
                 icon={Shield}
@@ -427,7 +408,7 @@ export default function SettingsScreen() {
             }}
             className="flex-row items-center justify-center">
             <Text className="text-center text-sm text-gray-500">
-              Build version : {localClientVersion}
+              {tf('settings.buildVersion', { version: localClientVersion })}
             </Text>
           </TouchableOpacity>
           <View className="h-8" />

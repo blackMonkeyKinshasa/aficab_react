@@ -9,6 +9,9 @@ const translations = {
     'common.information': 'Information',
     'common.next': 'Suivant',
     'common.no': 'Non',
+    'common.back': 'Retour',
+    'common.confirm': 'Confirmer',
+    'common.moreInformation': "Plus d'informations",
     'common.save': 'Enregistrer',
     'common.select': 'Sélectionner...',
     'common.yes': 'Oui',
@@ -42,6 +45,7 @@ const translations = {
       'Cette action est irréversible. Toutes vos données seront supprimées.',
     'settings.deleteError': 'Une erreur est survenue',
     'settings.openLinkError': 'Impossible d’ouvrir ce lien pour le moment.',
+    'settings.buildVersion': 'Version de build : {version}',
     'tabs.home': 'Accueil',
     'tabs.bookings': 'Mes réservations',
     'tabs.settings': 'Paramètres',
@@ -294,6 +298,7 @@ const translations = {
     'profile.fullNameRequired': 'Veuillez entrer votre nom et prénom.',
     'profile.genericErrorMessage': 'Une erreur est survenue.',
     'profile.fullName': 'Nom et prénom',
+    'profile.fullNamePlaceholder': 'Utilisateur 54452',
     'profile.phoneNumber': 'Numéro de téléphone',
     'profile.phoneHintBooking':
       'Ajoutez votre numéro de téléphone ici pour continuer votre réservation.',
@@ -301,11 +306,13 @@ const translations = {
     'profile.genderMale': 'Homme',
     'profile.genderFemale': 'Femme',
     'profile.email': 'E-mail',
+    'profile.emailPlaceholder': 'adresse@email.com',
     'profile.saving': 'Enregistrement...',
     'profile.saveChanges': 'Sauvegarder les modifications',
     'profile.createTitle': 'Complétez votre profil',
     'profile.createSubtitle': 'Dites-nous comment vous appeler pour continuer.',
     'profile.fullNameRequiredLabel': 'Nom et prénom *',
+    'profile.fullNameExample': 'Jean Dupont',
     'profile.continue': 'Continuer',
     'profile.duplicatePhoneTitle': 'Numéro déjà utilisé',
     'profile.duplicatePhoneMessage':
@@ -388,6 +395,7 @@ const translations = {
     'reservations.empty.past.description':
       'Vos courses terminées, annulées ou archivées seront affichées dans cet onglet.',
     'reservations.highlightBadge': 'Prioritaire',
+    'reservations.newBookingBadge': 'Nouvelle réservation',
     'reservations.cancelLoading': 'Annulation...',
     'reservations.cancelAction': 'Annuler la réservation',
     'notifications.title': 'Notifications',
@@ -418,6 +426,23 @@ const translations = {
     'notifications.action.bookingDriverCancel.title': 'Réservation annulée',
     'notifications.action.bookingDriverCancel.body': 'La course de',
     'notifications.action.bookingDriverCancel.message': 'La course de "{target}" a été annulée.',
+    'notifications.push.webUnavailable':
+      'Les notifications push ne sont pas disponibles sur le web.',
+    'notifications.push.expoGoUnavailable':
+      'Les notifications push distantes ne sont pas prises en charge dans Expo Go.',
+    'notifications.push.channelName': 'Notifications Aficab',
+    'notifications.push.physicalDeviceRequired':
+      'Les notifications push nécessitent un appareil physique.',
+    'notifications.push.permissionDenied': 'La permission des notifications a été refusée.',
+    'notifications.push.projectIdMissing':
+      'Le projectId EAS est manquant pour enregistrer le token push.',
+    'notifications.push.unknownTokenError':
+      'Une erreur inconnue est survenue lors de la génération du token push.',
+    'notifications.profileSyncError':
+      'Une erreur est survenue lors de la synchronisation de votre profil. Veuillez réessayer.',
+    'notifications.loadingSearchResults': 'Chargement des résultats de recherche',
+    'booking.editTrip': 'Modifier le trajet',
+    'payment.phoneFormatError': 'Format attendu : 9 chiffres après +243 (ex. : 826685235)',
     'update.requiredTitle': 'Mise à jour requise',
     'update.requiredMessage':
       'Une version plus récente de l’application est disponible. Mettez l’application à jour pour continuer.',
@@ -480,6 +505,16 @@ const translations = {
     'role.manager': 'gestionnaire',
     'role.driver': 'chauffeur',
     'role.client': 'client',
+    'web.redirect.metaTitle': 'Aficab - Redirection...',
+    'web.redirect.metaDescription':
+      'Aficab est une plateforme de location de véhicules avec chauffeur.',
+    'web.redirect.ogTitle': 'Aficab - Louez en toute simplicité, roulez avec discrétion',
+    'web.redirect.ogDescription':
+      'Aficab est une plateforme de location de véhicules avec chauffeur, spécialisée dans la location journalière et les transferts aéroport, avec réservation en ligne simple et sécurisée.',
+    'web.redirect.tagline': 'Louez en toute simplicité, roulez avec discrétion',
+    'web.redirect.message': 'Redirection vers l’emplacement approprié...',
+    'web.redirect.manualPrompt': 'Pas de redirection ? ',
+    'web.redirect.manualLink': 'Cliquez ici',
   },
   en: {
     'common.cancel': 'Cancel',
@@ -489,6 +524,9 @@ const translations = {
     'common.information': 'Information',
     'common.next': 'Next',
     'common.no': 'No',
+    'common.back': 'Back',
+    'common.confirm': 'Confirm',
+    'common.moreInformation': 'More information',
     'common.save': 'Save',
     'common.select': 'Select...',
     'common.yes': 'Yes',
@@ -521,6 +559,7 @@ const translations = {
     'settings.deleteConfirmMessage': 'This action cannot be undone. All your data will be deleted.',
     'settings.deleteError': 'An error occurred',
     'settings.openLinkError': 'Unable to open this link right now.',
+    'settings.buildVersion': 'Build version: {version}',
     'tabs.home': 'Home',
     'tabs.bookings': 'My bookings',
     'tabs.settings': 'Settings',
@@ -761,17 +800,20 @@ const translations = {
     'profile.fullNameRequired': 'Please enter your full name.',
     'profile.genericErrorMessage': 'An error occurred.',
     'profile.fullName': 'Full name',
+    'profile.fullNamePlaceholder': 'User 54452',
     'profile.phoneNumber': 'Phone number',
     'profile.phoneHintBooking': 'Add your phone number here to continue your booking.',
     'profile.gender': 'Gender',
     'profile.genderMale': 'Male',
     'profile.genderFemale': 'Female',
     'profile.email': 'Email',
+    'profile.emailPlaceholder': 'email@example.com',
     'profile.saving': 'Saving...',
     'profile.saveChanges': 'Save changes',
     'profile.createTitle': 'Complete your profile',
     'profile.createSubtitle': 'Tell us how we should address you to continue.',
     'profile.fullNameRequiredLabel': 'Full name *',
+    'profile.fullNameExample': 'John Doe',
     'profile.continue': 'Continue',
     'profile.duplicatePhoneTitle': 'Phone number already used',
     'profile.duplicatePhoneMessage':
@@ -853,6 +895,7 @@ const translations = {
     'reservations.empty.past.description':
       'Your completed, canceled, or archived rides will appear in this tab.',
     'reservations.highlightBadge': 'Priority',
+    'reservations.newBookingBadge': 'New booking',
     'reservations.cancelLoading': 'Cancelling...',
     'reservations.cancelAction': 'Cancel booking',
     'notifications.title': 'Notifications',
@@ -883,6 +926,21 @@ const translations = {
     'notifications.action.bookingDriverCancel.title': 'Booking canceled',
     'notifications.action.bookingDriverCancel.body': 'The ride for',
     'notifications.action.bookingDriverCancel.message': 'The trip for "{target}" was canceled.',
+    'notifications.push.webUnavailable': 'Push notifications are not available on the web.',
+    'notifications.push.expoGoUnavailable':
+      'Remote push notifications are not supported in Expo Go.',
+    'notifications.push.channelName': 'Aficab notifications',
+    'notifications.push.physicalDeviceRequired': 'Push notifications require a physical device.',
+    'notifications.push.permissionDenied': 'Notification permission was denied.',
+    'notifications.push.projectIdMissing':
+      'The EAS projectId is missing to register the push token.',
+    'notifications.push.unknownTokenError':
+      'An unknown error occurred while generating the push token.',
+    'notifications.profileSyncError':
+      'An error occurred while syncing your profile. Please try again.',
+    'notifications.loadingSearchResults': 'Loading search results',
+    'booking.editTrip': 'Edit trip',
+    'payment.phoneFormatError': 'Expected format: 9 digits after +243 (example: 826685235)',
     'update.requiredTitle': 'Update required',
     'update.requiredMessage':
       'A newer version of the app is available. Update the app to continue.',
@@ -942,6 +1000,15 @@ const translations = {
     'role.manager': 'manager',
     'role.driver': 'driver',
     'role.client': 'client',
+    'web.redirect.metaTitle': 'Aficab - Redirecting...',
+    'web.redirect.metaDescription': 'Aficab is a chauffeur-driven vehicle booking platform.',
+    'web.redirect.ogTitle': 'Aficab - Rent with ease, ride with discretion',
+    'web.redirect.ogDescription':
+      'Aficab is a chauffeur-driven vehicle booking platform specialized in daily rentals and airport transfers, with a simple and secure online booking experience.',
+    'web.redirect.tagline': 'Rent with ease, ride with discretion',
+    'web.redirect.message': 'Redirecting to the appropriate destination...',
+    'web.redirect.manualPrompt': 'No redirect? ',
+    'web.redirect.manualLink': 'Click here',
   },
 } as const;
 
@@ -989,4 +1056,8 @@ export function useI18n() {
     paperDateLocale: getPaperDateLocale(language),
     placesLanguage: getPlacesLanguage(language),
   };
+}
+
+export function translateCurrent(key: TranslationKey) {
+  return translate(useAppLanguageState.getState().language, key);
 }

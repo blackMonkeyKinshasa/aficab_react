@@ -10,6 +10,8 @@ import {
   PLAY_STORE_URL,
   WEBSITE_URL,
 } from '@/constants/app-links';
+import { translateCurrent } from '@/lib/i18n';
+import { useAppLanguageState } from '@/store/language-state';
 
 const redirectScript = `(function() {
   const currentPath = window.location.pathname + window.location.search + window.location.hash;
@@ -107,26 +109,27 @@ const redirectScript = `(function() {
 // The contents of this function only run in Node.js environments and
 // do not have access to the DOM or browser APIs.
 export default function Root({ children }: PropsWithChildren) {
+  const language = useAppLanguageState.getState().language;
+  const metaTitle = translateCurrent('web.redirect.metaTitle');
+  const metaDescription = translateCurrent('web.redirect.metaDescription');
+  const ogTitle = translateCurrent('web.redirect.ogTitle');
+  const ogDescription = translateCurrent('web.redirect.ogDescription');
+  const tagline = translateCurrent('web.redirect.tagline');
+  const redirectMessage = translateCurrent('web.redirect.message');
+  const manualPrompt = translateCurrent('web.redirect.manualPrompt');
+  const manualLink = translateCurrent('web.redirect.manualLink');
+
   return (
-    <html lang="fr" className="bg-background">
+    <html lang={language} className="bg-background">
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-        <title>Aficab - Redirecting...</title>
-        <meta
-          name="description"
-          content="Aficab est une plateforme de location de vehicules avec chauffeur"
-        />
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDescription} />
         <meta property="og:type" content="website" />
-        <meta
-          property="og:title"
-          content="Aficab - Louez en toute simplicite, roulez avec discretion"
-        />
-        <meta
-          property="og:description"
-          content="Aficab est une plateforme de location de vehicules avec chauffeur, specialisee dans la location journaliere et les transferts aeroport. Elle permet de reserver en ligne facilement un vehicule pour tous types de besoins, avec un service professionnel, flexible et securise."
-        />
+        <meta property="og:title" content={ogTitle} />
+        <meta property="og:description" content={ogDescription} />
         <meta
           property="og:image"
           content="https://firebasestorage.googleapis.com/v0/b/maps-tracking-cuq2vl.firebasestorage.app/o/aficab-icon-white.png?alt=media&token=fa8dbd05-004c-4546-965f-df85fe39394d"
@@ -234,13 +237,13 @@ export default function Root({ children }: PropsWithChildren) {
         <div id="deep-link-redirect">
           <div className="container">
             <h1>Aficab</h1>
-            <h3>Louez en toute simplicite, roulez avec discretion</h3>
-            <p>Redirection vers l&apos;emplacement approprie...</p>
+            <h3>{tagline}</h3>
+            <p>{redirectMessage}</p>
             <div className="spinner" />
             <div className="manual-link">
-              Pas de redirection ?{' '}
+              {manualPrompt}
               <a href="https://aficab.com" id="manual-redirect">
-                Cliquez ici
+                {manualLink}
               </a>
             </div>
           </div>

@@ -203,9 +203,7 @@ export function PaymentModal({
                 </Text>
 
                 {showPhoneError && (
-                  <Text style={styles.phoneErrorText}>
-                    Format attendu : 9 chiffres apres +243 (ex : 826685235)
-                  </Text>
+                  <Text style={styles.phoneErrorText}>{t('payment.phoneFormatError')}</Text>
                 )}
 
                 <View style={styles.phoneInputWrapper}>

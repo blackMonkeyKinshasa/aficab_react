@@ -99,7 +99,7 @@ export function BookingListCard({
       activeOpacity={0.85}>
       {highlighted && badgeIsShow ? (
         <View style={[styles.highlightBadge, { backgroundColor: highlightColor }]}>
-          <Text style={styles.highlightBadgeText}>Nouvelle reservation</Text>
+          <Text style={styles.highlightBadgeText}>{t('reservations.newBookingBadge')}</Text>
         </View>
       ) : null}
 

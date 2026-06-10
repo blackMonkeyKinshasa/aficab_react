@@ -122,7 +122,7 @@ export default function Signup() {
         <View className="space-y-6 px-6">
           <FormField
             label={t('signup.fullName')}
-            placeholder="User 54452"
+            placeholder={t('profile.fullNamePlaceholder')}
             value={fullName}
             onChangeText={setFullName}
             editable={!loading}

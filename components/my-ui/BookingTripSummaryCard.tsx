@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { bookingSheetCardClassName } from '@/components/my-ui/BookingSheetLayout';
 import { useFieldThemeColors } from '@/lib/field-theme';
+import { translateCurrent } from '@/lib/i18n';
 
 interface BookingTripSummaryCardProps {
   children: ReactNode;
@@ -19,7 +20,7 @@ export function BookingTripSummaryCard({ children, onEditPress }: BookingTripSum
       <View className="min-w-0 flex-1 pr-3">{children}</View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Edit trip"
+        accessibilityLabel={translateCurrent('booking.editTrip')}
         onPress={onEditPress}
         hitSlop={8}
         className="active:opacity-70">

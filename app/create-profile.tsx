@@ -232,7 +232,7 @@ export default function CreateProfile() {
               label={t('profile.fullNameRequiredLabel')}
               value={fullName}
               onChangeText={setFullName}
-              placeholder="Jean Dupont"
+              placeholder={t('profile.fullNameExample')}
             />
 
             <FormField

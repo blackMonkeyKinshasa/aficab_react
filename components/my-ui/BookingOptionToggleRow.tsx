@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Switch } from '@/components/ui/switch';
 import { useFieldThemeColors } from '@/lib/field-theme';
+import { translateCurrent } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
 interface BookingOptionToggleRowProps {
@@ -28,15 +29,15 @@ export function BookingOptionToggleRow({
   const themeColors = useFieldThemeColors();
 
   return (
-    <View className={cn(showDivider && 'border-outline-100 mt-4 border-t pt-4')}>
+    <View className={cn(showDivider && 'mt-4 border-t border-outline-100 pt-4')}>
       <View className="flex-row items-center justify-between">
         <View className="mr-3 min-w-0 flex-1">
           <View className="flex-row items-center gap-1.5">
-            <Text className="text-typography-900 text-base font-medium">{title}</Text>
+            <Text className="text-base font-medium text-typography-900">{title}</Text>
             {onInfoPress ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="More information"
+                accessibilityLabel={translateCurrent('common.moreInformation')}
                 onPress={onInfoPress}
                 hitSlop={8}
                 className="active:opacity-70">
@@ -49,12 +50,12 @@ export function BookingOptionToggleRow({
             ) : null}
           </View>
           {description ? (
-            <Text className="text-typography-500 mt-1 text-sm">{description}</Text>
+            <Text className="mt-1 text-sm text-typography-500">{description}</Text>
           ) : null}
         </View>
 
         <View className="items-end gap-2">
-          <Text className="text-typography-900 text-base font-semibold">{priceLabel}</Text>
+          <Text className="text-base font-semibold text-typography-900">{priceLabel}</Text>
           <Switch checked={checked} onCheckedChange={onCheckedChange} />
         </View>
       </View>
