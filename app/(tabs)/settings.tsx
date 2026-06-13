@@ -41,6 +41,7 @@ import { useAppToast } from '@/lib/toast';
 import { resetUserSessionState, useMyStateUser } from '@/store';
 import { useAppConfigState } from '@/store/app-config-state';
 import { AppLanguage, useAppLanguageState } from '@/store/language-state';
+import { MenuItem } from '@/components/my-ui/MenuItem';
 
 const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) =>
   buildStackScreenOptions({
@@ -135,67 +136,9 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleDeleteAccount = async () => {
-    Alert.alert(t('settings.deleteConfirmTitle'), t('settings.deleteConfirmMessage'), [
-      { text: t('common.cancel'), onPress: () => {}, style: 'cancel' },
-      {
-        text: t('common.delete'),
-        onPress: async () => {
-          setLoading(true);
-          try {
-            const {
-              data: { user: authUser },
-            } = await supabase.auth.getUser();
-            const userId = cachedUser?.id ?? authUser?.id;
+ 
 
-            if (!userId) {
-              throw new Error('Utilisateur introuvable pour la suppression du compte.');
-            }
-
-            await deleteUserByID(userId);
-            await supabase.auth.signOut();
-            resetUserSessionState();
-            //  router.replace('/(auth)/login');
-          } catch {
-            toast({
-              title: t('common.error'),
-              description: t('settings.deleteError'),
-              action: 'error',
-            });
-          } finally {
-            setLoading(false);
-          }
-        },
-        style: 'destructive',
-      },
-    ]);
-  };
-
-  const MenuItem = ({
-    icon: Icon,
-    label,
-    onPress,
-    isDanger = false,
-  }: {
-    icon: LucideIcon;
-    label: string;
-    onPress: () => void | Promise<void>;
-    isDanger?: boolean;
-  }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      className={`flex-row items-center justify-between px-4 py-3`}>
-      <View className="flex-1 flex-row items-center">
-        <Icon size={20} color={isDanger ? '#ef4444' : isDark ? '#ffffff' : '#12151C'} />
-        <Text
-          className={`ml-4 text-sm font-semibold ${
-            isDanger ? 'text-red-500' : isDark ? 'text-white' : 'text-gray-900'
-          }`}>
-          {label}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  
 
   const SectionTitle = ({ title, isOrange = false }: { title: string; isOrange?: boolean }) => (
     <Text
@@ -391,12 +334,7 @@ export default function SettingsScreen() {
               isDanger={false}
             />
 
-            <MenuItem
-              icon={Trash2}
-              label={t('settings.deleteAccount')}
-              onPress={handleDeleteAccount}
-              isDanger
-            />
+          
           </View>
           {/* Espacement bas */}
           <View className="h-8" />

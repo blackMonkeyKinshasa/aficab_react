@@ -3,7 +3,7 @@ import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { usePreventRemove } from '@react-navigation/native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { Camera } from 'lucide-react-native';
+import { Camera, Trash2 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import { uploadAvatar } from '@/api/uploadFiles';
@@ -30,6 +30,17 @@ import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser, type UserState } from '@/store/user-state';
+import { deleteUserByID } from '@/api/user';
+import { resetUserSessionState } from '@/store';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { HelpCircle } from 'lucide-react-native';
+
+type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
 
 export default function EditProfile() {
   const { colorScheme } = useColorScheme();
@@ -49,6 +60,7 @@ export default function EditProfile() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('STANDARD');
   const [update, setUpdate] = useState(false);
+  const cachedUser = useMyStateUser((state: UserStoreState) => state.user);
   const [image, setImage] = useState<string | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
@@ -93,6 +105,7 @@ export default function EditProfile() {
   useEffect(() => {
     if (storedUser) {
       hydrateForm(storedUser);
+      console.log("hydrateForm avatar:", storedUser.avatar_url);
       return;
     }
 
@@ -174,16 +187,58 @@ export default function EditProfile() {
       {
         text: t('profile.gallery'),
         onPress: async () => {
-          let image = await pickImageToGallery();
-          if (image) {
-            setImage(image);
-            update || setUpdate(true);
+          let imageUploaded = await pickImageToGallery();
+            console.log("IMAGE RETOURNÉE :", imageUploaded);
+
+          if (imageUploaded) {
+            setImage(imageUploaded);
+            console.log("NOUVELLE IMAGE :", imageUploaded);
+           
+          update || setUpdate(true);
           }
+
+           console.log("image state", image);
         },
       },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
+
+   const handleDeleteAccount = async () => {
+      Alert.alert(t('settings.deleteConfirmTitle'), t('settings.deleteConfirmMessage'), [
+        { text: t('common.cancel'), onPress: () => {}, style: 'cancel' },
+        {
+          text: t('common.delete'),
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const {
+                data: { user: authUser },
+              } = await supabase.auth.getUser();
+              const userId = cachedUser?.id ?? authUser?.id;
+  
+              if (!userId) {
+                throw new Error('Utilisateur introuvable pour la suppression du compte.');
+              }
+  
+              await deleteUserByID(userId);
+              await supabase.auth.signOut();
+              resetUserSessionState();
+              //  router.replace('/(auth)/login');
+            } catch {
+              toast({
+                title: t('common.error'),
+                description: t('settings.deleteError'),
+                action: 'error',
+              });
+            } finally {
+              setLoading(false);
+            }
+          },
+          style: 'destructive',
+        },
+      ]);
+    };
 
   const handleSaveProfile = async () => {
     if (!fullName.trim()) {
@@ -314,6 +369,7 @@ export default function EditProfile() {
               placeholder="+243821606126"
               keyboardType="phone-pad"
               showInfo={true}
+              tootipMessage="Ce numéro sera utilisé pour vous contacter et vous envoyer des notifications importantes."
             />
             {shouldHighlightPhone ? (
               <Text className="mb-2 text-sm text-primary">{t('profile.phoneHintBooking')}</Text>
@@ -323,12 +379,18 @@ export default function EditProfile() {
           {/* Gender */}
           <View className="mb-6">
             <View className="mb-2 flex-row items-center">
-              <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              <Text className={`text-base font-semibold ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>
                 {t('profile.gender')}
               </Text>
-              <View className="ml-2">
-                <InfoIcon />
-              </View>
+              
+          <Tooltip className="ml-2">
+            <TooltipTrigger asChild> 
+                <HelpCircle size={16} color="#999999" />
+            </TooltipTrigger>
+            <TooltipContent  className="ml-6 mr-6">
+              <Text className="text-white text-sm font-normal ">Cette information nous aide à personnaliser votre profil et améliorer votre expérience.</Text>
+            </TooltipContent>
+          </Tooltip>
             </View>
 
             <Select
@@ -363,6 +425,19 @@ export default function EditProfile() {
             placeholder={t('profile.emailPlaceholder')}
             editable={false}
           />
+
+
+           {/* button DeleteAccount */}
+          <TouchableOpacity onPress={handleDeleteAccount} className="mt-6">
+            <View className='flex-row border bg-red-500 border-red-500 h-12 rounded-xl p-2 gap-4 items-center justify-center'>
+              <Ionicons name='trash-outline' size={18} color='white' />
+              <Text className='text-white text-base font-bold'>{t('settings.deleteAccount')}</Text>
+            </View>
+
+          </TouchableOpacity>
+
+
+
 
           {/* Save Button */}
 

@@ -91,8 +91,8 @@ export function BookingSheetLayout({
       {...(fitContent ? {} : { snapPoints: snapPoints })}>
       <ActionsheetBackdrop />
       <ActionsheetContent>
-        <ActionsheetDragIndicatorWrapper className="py-3  ">
-          <ActionsheetDragIndicator className="h-1.5 w-20" />
+        <ActionsheetDragIndicatorWrapper className="py-3 ">
+          <ActionsheetDragIndicator className="h-1.5 w-20  bg-background-200 rounded-full" />
         </ActionsheetDragIndicatorWrapper>
 
         {title ? (
