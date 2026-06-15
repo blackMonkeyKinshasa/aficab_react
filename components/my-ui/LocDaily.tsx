@@ -114,6 +114,38 @@ function getExtraTimePrice(value: unknown) {
   return typeof value === 'number' ? value : null;
 }
 
+function getDailyServiceEndDate(locationDoc: LocationDocLOC, flex: boolean, premium: boolean) {
+  const endDate = toDate(locationDoc.dateEnd);
+
+  if (Number.isNaN(endDate.getTime())) {
+    return endDate;
+  }
+
+  if (premium) {
+    const premiumEndDate = new Date(endDate);
+    premiumEndDate.setHours(5, 30, 0, 0);
+
+    if (premiumEndDate.getTime() <= endDate.getTime()) {
+      premiumEndDate.setDate(premiumEndDate.getDate() + 1);
+    }
+
+    return premiumEndDate;
+  }
+
+  if (flex) {
+    const flexEndDate = new Date(endDate);
+    flexEndDate.setHours(23, 30, 0, 0);
+
+    if (flexEndDate.getTime() <= endDate.getTime()) {
+      flexEndDate.setDate(flexEndDate.getDate() + 1);
+    }
+
+    return flexEndDate;
+  }
+
+  return endDate;
+}
+
 function formatBookingDateTime(value: Date | string, locale: string, unavailableLabel: string) {
   const date = toDate(value);
 
@@ -168,31 +200,19 @@ function toLocationPoint(locationDoc: LocationDocLOC) {
   };
 }
 
-function getCouponDiscountAmount(
-  coupon: CouponValidationValidResponse | null,
-  _orderTotal: number
-) {
-  if (!coupon) {
-    return 0;
-  }
-
-  if (typeof coupon.discountAmount === 'number') {
-    return coupon.discountAmount;
-  }
-
-  if (typeof coupon.originalAmount === 'number' && typeof coupon.finalAmount === 'number') {
+/** Extract discount amount from valid coupon response */
+function extractDiscountAmount(coupon: CouponValidationValidResponse | null): number {
+  if (!coupon) return 0;
+  if (typeof coupon.discountAmount === 'number') return coupon.discountAmount;
+  if (typeof coupon.finalAmount === 'number' && typeof coupon.originalAmount === 'number') {
     return Math.max(0, coupon.originalAmount - coupon.finalAmount);
   }
-
   return 0;
 }
 
-function getCouponFinalTotal(coupon: CouponValidationValidResponse | null, orderTotal: number) {
-  if (coupon && typeof coupon.finalAmount === 'number') {
-    return coupon.finalAmount;
-  }
-
-  return Math.max(0, orderTotal - getCouponDiscountAmount(coupon, orderTotal));
+/** Calculate total after discount */
+function calculateFinalTotal(baseTotal: number, discountAmount: number): number {
+  return Math.max(0, baseTotal - discountAmount);
 }
 
 type Props = {
@@ -258,8 +278,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const hasPremiumOption = premiumPrice !== null;
   const hasAnyOption = hasFuelOption || hasFlexOption || hasPremiumOption;
   const baseVehicleAmount = (selectedCar?.priceLOC ?? 0) * rentalDays;
-  const promoDiscountAmount = getCouponDiscountAmount(validatedCoupon, totalPrice);
-  const finalTotalPrice = getCouponFinalTotal(validatedCoupon, totalPrice);
+  // Coupon discount is fixed once validated; invalidates when options change via useEffect
+  const couponDiscountAmount = extractDiscountAmount(validatedCoupon);
+  const finalTotalPrice = calculateFinalTotal(totalPrice, couponDiscountAmount);
 
   const getOrCreateBookingId = async () => {
     if (bookingId) {
@@ -292,13 +313,16 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
 
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
+    const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
+    const originalTotal = totalPrice;
+    const finalTotal = finalTotalPrice;
 
     const selectedOptions = {
       fuel: fuel ? (fuelPrice ?? 0) : 0,
       flex: flex ? (flexPrice ?? 0) : 0,
       premium: premium ? (premiumPrice ?? 0) : 0,
       couponCode: appliedCouponCode,
-      couponDiscountAmount: promoDiscountAmount,
+      couponDiscountAmount: couponDiscountAmount,
       rentalDays,
     };
     const trimmedComment = comment.trim();
@@ -314,12 +338,15 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       clientPhone: trimmedGuestPhone || null,
       driverId: selectedCar.defaultDriverId,
       departureAt: toDate(locationDoc.dateStart).toISOString(),
-      arrivalAt: toDate(locationDoc.dateEnd).toISOString(),
+      arrivalAt: serviceEndDate.toISOString(),
       departure: toLocationPoint(locationDoc),
       arrival: null,
       commentaire: trimmedComment || null,
       isPaid: false,
-      total: finalTotalPrice,
+      couponCode: appliedCouponCode ?? undefined,
+      couponVehicleAmount: baseVehicleAmount,
+      originalTotal: appliedCouponCode ? originalTotal : undefined,
+      total: finalTotal,
       options: selectedOptions,
       guest:
         trimmedGuestName || trimmedGuestPhone
@@ -362,25 +389,28 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     setTotalPrice((carBasePrice + selectedOptionsTotal) * rentalDays);
   }, [selectedCar, fuel, fuelPrice, flex, flexPrice, premium, premiumPrice, rentalDays]);
 
+  // Invalidate coupon when options or vehicle change
   useEffect(() => {
     if (appliedCouponCode !== null) {
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [appliedCouponCode, selectedCar?.id, fuel, flex, premium, rentalDays]);
+  }, [selectedCar?.id, fuel, flex, premium, rentalDays]);
 
+  // Clear promo feedback if user manually edits code
   useEffect(() => {
     if (appliedCouponCode && code.trim() !== appliedCouponCode) {
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [code, appliedCouponCode]);
+  }, [code]);
 
+  // Reset auto-promo attempt flag when etape or vehicle changes
   useEffect(() => {
     autoPromoAttemptedRef.current = false;
-  }, [etape, selectedCar?.id, fuel, flex, premium, rentalDays]);
+  }, [etape, selectedCar?.id]);
 
   const loadCars = async (nextPage: number, replace = false) => {
     if (isLoadingCars) {
@@ -585,6 +615,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const handleApplyPromoCode = async (promoCodeOverride?: string) => {
     const normalizedCode = (promoCodeOverride ?? code).trim();
 
+    // Validate input
     if (!normalizedCode) {
       setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
       return;
@@ -596,7 +627,10 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
 
     setIsApplyingPromo(true);
-    setCode(normalizedCode);
+    // Only update code if not from override (auto-promo uses override)
+    if (!promoCodeOverride) {
+      setCode(normalizedCode);
+    }
 
     try {
       const response = await validateCoupon({
@@ -608,19 +642,25 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       });
 
       if (response.valid) {
+        // Build success message with fallback
+        let successMessage: string = t('booking.promoCodeApplied') as string;
+        if (typeof response.message === 'string' && response.message.trim()) {
+          successMessage = response.message as string;
+        } else if (normalizedCode === FIRST_BOOKING_PROMO_CODE) {
+          successMessage = t('booking.promoCodeWelcomeApplied') as string;
+        }
+
+        // Apply coupon
         setValidatedCoupon(response);
         setAppliedCouponCode(normalizedCode);
         setPromoFeedback({
           tone: 'success',
-          message:
-            response.message ??
-            (normalizedCode === FIRST_BOOKING_PROMO_CODE
-              ? t('booking.promoCodeWelcomeApplied')
-              : t('booking.promoCodeApplied')),
+          message: successMessage,
         });
         return;
       }
 
+      // Coupon not valid
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback({
@@ -628,6 +668,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         message: response.message || t('booking.promoCodeInvalid'),
       });
     } catch (error) {
+      // API error
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback({
@@ -640,24 +681,24 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
   };
 
+  // Auto-apply welcome promo only once per recap session if eligible
   useEffect(() => {
-    if (
-      etape !== EtapeReservation.RECAP ||
-      !selectedCar?.id ||
-      totalPrice <= 0 ||
-      baseVehicleAmount <= 0
-    ) {
+    // Guard: only run on recap step
+    if (etape !== EtapeReservation.RECAP) {
       return;
     }
 
-    if (autoPromoAttemptedRef.current) {
+    // Guard: booking data must be valid
+    if (!selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
       return;
     }
 
-    if (appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
+    // Guard: already attempted or already applied
+    if (autoPromoAttemptedRef.current || appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
       return;
     }
 
+    // Guard: user has manually entered a code
     if (code.trim() && code.trim() !== FIRST_BOOKING_PROMO_CODE) {
       return;
     }
@@ -665,37 +706,30 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     autoPromoAttemptedRef.current = true;
     let isMounted = true;
 
-    const applyWelcomePromoIfEligible = async () => {
+    const tryApplyWelcomePromo = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-
-        if (!user || !isMounted) {
-          return;
-        }
+        if (!user || !isMounted) return;
 
         const bookings = await getAllBookings(user.id);
+        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) return;
 
-        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) {
-          return;
-        }
-
+        // User is eligible: auto-apply welcome code silently
         await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE);
       } catch {
-        // L'auto-application reste silencieuse si la verification d'eligibilite echoue.
+        // Fail silently - user can still manually apply promo
       }
     };
 
-    void applyWelcomePromoIfEligible();
+    void tryApplyWelcomePromo();
 
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome promo runs once per recap context
-  }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
-
- 
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when entering recap
+  }, [etape, selectedCar?.id]);
 
   const selectCarsPage = () => {
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
@@ -897,7 +931,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
                       placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestPhone}
                       onChangeText={setGuestPhone}
-                      keyboardType='phone-pad'
+                      keyboardType="phone-pad"
                     />
                   </Input>
                 </CollapsibleContent>
@@ -909,11 +943,12 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     );
   };
 
-   const recap = () => {
+  const recap = () => {
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
     const trimmedComment = comment.trim();
     const trimmedGuestName = guestName.trim();
     const trimmedGuestPhone = guestPhone.trim();
+    const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
     const selectedOptions = [
       fuel && fuelPrice !== null ? t('booking.fuelIncluded') : null,
       flex && flexPrice !== null ? t('booking.flexHoursSummary') : null,
@@ -925,10 +960,15 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       t('booking.dailyDatesUnavailable')
     );
     const endDateLabel = formatBookingDateTime(
-      locationDoc.dateEnd,
+      serviceEndDate,
       appLocale,
       t('booking.dailyDatesUnavailable')
     );
+    const serviceHoursSummary = premium
+      ? t('booking.premiumHoursSummary')
+      : flex
+        ? t('booking.flexHoursSummary')
+        : t('booking.serviceHoursSummary');
     const hasSecondaryDetails =
       selectedOptions.length > 0 ||
       Boolean(trimmedComment) ||
@@ -963,11 +1003,11 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
             },
           ]
         : []),
-      ...(promoDiscountAmount > 0
+      ...(couponDiscountAmount > 0
         ? [
             {
               label: t('booking.discount'),
-              value: `- ${promoDiscountAmount} $`,
+              value: `- ${couponDiscountAmount} $`,
             },
           ]
         : []),
@@ -1004,7 +1044,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
           />
           <BookingRecapDetailColumn label={t('booking.startDateTime')} value={startDateLabel} />
           <BookingRecapDetailColumn label={t('booking.endDateTime')} value={endDateLabel} />
- 
+
           <View className="my-3 border-t border-outline-100" />
 
           <Text className="mt-1 text-sm text-typography-500">- {t('booking.driverIncluded')}</Text>
@@ -1016,9 +1056,6 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
           )}
 
           <Text className="mt-1 text-sm text-typography-500">
-            - {t('booking.serviceHoursSummary')}
-          </Text>
-          <Text className="mt-1 text-sm text-typography-500">
             - {t('booking.dailyCancellationSummary')}
           </Text>
           <Text className="mt-1 text-sm text-typography-500">
@@ -1027,12 +1064,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         </BookingRecapSection>
 
         {hasSecondaryDetails ? (
-          <BookingRecapSection>
+          <BookingRecapSection title={t('booking.optionsTitle')}>
             {selectedOptions.length > 0 ? (
-              <BookingRecapDetailColumn
-                label={t('booking.optionsTitle')}
-                value={selectedOptions.join('\n')}
-              />
+              <Text className="text-sm text-typography-500">- {selectedOptions.join('\n- ')}</Text>
             ) : null}
             {trimmedComment ? (
               <BookingRecapDetailColumn label={t('booking.comment')} value={trimmedComment} />

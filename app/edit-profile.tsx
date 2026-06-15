@@ -29,7 +29,7 @@ import { useI18n } from '@/lib/i18n';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
-import { useMyStateUser, type UserState } from '@/store/user-state';
+import { useMyStateUser, useUserStoreHydrated, type UserState } from '@/store/user-state';
 import { deleteUserByID } from '@/api/user';
 import { resetUserSessionState } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
@@ -65,8 +65,10 @@ export default function EditProfile() {
   const [city, setCity] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const [phoneFieldY, setPhoneFieldY] = useState(0);
+  const hasHydratedInitialUser = useRef(false);
   const storedUser = useMyStateUser((state: UserState) => state.user);
   const setStoredUser = useMyStateUser((state: UserState) => state.setUser);
+  const userStoreHydrated = useUserStoreHydrated();
   const shouldHighlightPhone = focusField === 'phone';
   const shouldReturnToBooking = returnToBooking === '1';
   const { t } = useI18n();
@@ -103,23 +105,24 @@ export default function EditProfile() {
   };
 
   useEffect(() => {
-    if (storedUser) {
-      hydrateForm(storedUser);
-      console.log("hydrateForm avatar:", storedUser.avatar_url);
+    if (!userStoreHydrated || hasHydratedInitialUser.current) {
       return;
     }
 
-    const loadLocation = async () => {
-      const locationDetails = await getUserLocationDetails();
-      const thisCity = locationDetails.city ?? null;
-      const thisCountry = locationDetails.country ?? null;
-      setCity(thisCity);
-      setCountry(thisCountry);
-    };
+    let isMounted = true;
 
     const loadUserData = async () => {
       try {
         setLoading(true);
+
+        if (storedUser) {
+          if (isMounted) {
+            hydrateForm(storedUser);
+            hasHydratedInitialUser.current = true;
+          }
+
+          return;
+        }
 
         const {
           data: { user },
@@ -132,22 +135,25 @@ export default function EditProfile() {
         const data = await getUserByID(user.id);
         console.log('userID :', user.id);
 
-        if (data) {
+        if (data && isMounted) {
           setStoredUser(data);
           hydrateForm(data);
+          hasHydratedInitialUser.current = true;
         }
       } catch (err) {
         console.error('Erreur lors du chargement du profil:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
-
-    loadLocation();
 
     loadUserData();
 
     return () => {
+      isMounted = false;
+
       if (update) {
         Alert.alert(t('profile.unsavedTitle'), t('profile.unsavedMessage'), [
           { text: t('common.cancel'), style: 'cancel' },
@@ -155,7 +161,7 @@ export default function EditProfile() {
         ]);
       }
     };
-  }, [router, setStoredUser, storedUser, t, update]);
+  }, [router, setStoredUser, storedUser, t, userStoreHydrated]);
 
   useEffect(() => {
     if (!shouldHighlightPhone) {
@@ -428,13 +434,13 @@ export default function EditProfile() {
 
 
            {/* button DeleteAccount */}
-          <TouchableOpacity onPress={handleDeleteAccount} className="mt-6">
-            <View className='flex-row border bg-red-500 border-red-500 h-12 rounded-xl p-2 gap-4 items-center justify-center'>
+         { ! update && (<TouchableOpacity onPress={handleDeleteAccount} className="mt-6">
+            <View className='flex-row border bg-red-500 border-red-500 h-14 rounded-md p-2 gap-4 items-center justify-center'>
               <Ionicons name='trash-outline' size={18} color='white' />
               <Text className='text-white text-base font-bold'>{t('settings.deleteAccount')}</Text>
             </View>
 
-          </TouchableOpacity>
+          </TouchableOpacity>)}
 
 
 

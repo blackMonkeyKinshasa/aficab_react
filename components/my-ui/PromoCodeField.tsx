@@ -90,9 +90,11 @@ export function PromoCodeField({
           </Button>
         </View>
 
-        {feedbackMessage ? (
-          <Text className={cn('mt-2 text-xs', feedbackClassName)}>{feedbackMessage}</Text>
-        ) : null}
+        <View className="mt-2 min-h-4">
+          {feedbackMessage ? (
+            <Text className={cn('text-xs', feedbackClassName)}>{feedbackMessage}</Text>
+          ) : null}
+        </View>
       </FormControl>
     </View>
   );

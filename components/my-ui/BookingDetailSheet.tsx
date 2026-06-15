@@ -375,11 +375,11 @@ export function BookingDetailSheet({
               {/* Detail de la remise appliquee sur la reservation. */}
               <DetailRow
                 label={t('reservations.field.discount')}
-                value={`-${booking.coupon.discountAmount} j`}
+                value={`-${booking.coupon.discountAmount} $`}
               />
               <DetailRow
                 label={t('reservations.field.beforeDiscount')}
-                value={`${booking.coupon.originalAmount} j`}
+                value={`${booking.coupon.originalAmount} $`}
               />
             </>
           ) : null}

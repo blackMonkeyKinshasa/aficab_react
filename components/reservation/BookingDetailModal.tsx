@@ -70,43 +70,62 @@ export function BookingDetailModal({
   const driverAvatar = driverUser?.avatar_url ?? null;
   const driverName = driverUser?.full_name ?? '—';
   const driverPhone = driverUser?.phone ?? null;
-  const guestName = typeof booking.guest?.fullName === 'string' && booking.guest.fullName.trim()
-    ? booking.guest.fullName.trim()
-    : null;
-  const guestPhone = typeof booking.guest?.phone === 'string' && booking.guest.phone.trim()
-    ? booking.guest.phone.trim()
-    : null;
-  const guestEmail = typeof booking.guest?.email === 'string' && booking.guest.email.trim()
-    ? booking.guest.email.trim()
-    : null;
+  const guestName =
+    typeof booking.guest?.fullName === 'string' && booking.guest.fullName.trim()
+      ? booking.guest.fullName.trim()
+      : null;
+  const guestPhone =
+    typeof booking.guest?.phone === 'string' && booking.guest.phone.trim()
+      ? booking.guest.phone.trim()
+      : null;
+  const guestEmail =
+    typeof booking.guest?.email === 'string' && booking.guest.email.trim()
+      ? booking.guest.email.trim()
+      : null;
   const hasGuestBooking = Boolean(guestName || guestPhone || guestEmail);
   const bookingOptions = booking.options ?? {};
   const optionItems = Array.isArray(bookingOptions.options) ? bookingOptions.options : [];
   const extraTimeName = bookingOptions.extraTime?.name?.trim().toLowerCase() ?? '';
-  const fuelOptionAmount = typeof bookingOptions.fuel === 'number'
-    ? bookingOptions.fuel
-    : optionItems.find((option) => option.name.toLowerCase().includes('fuel') || option.name.toLowerCase().includes('carburant'))?.price ?? 0;
-  const flexOptionAmount = typeof bookingOptions.flex === 'number'
-    ? bookingOptions.flex
-    : extraTimeName === 'flex'
-      ? bookingOptions.extraTime?.price ?? 0
-      : 0;
-  const premiumOptionAmount = typeof bookingOptions.premium === 'number'
-    ? bookingOptions.premium
-    : extraTimeName === 'premium'
-      ? bookingOptions.extraTime?.price ?? 0
-      : 0;
-  const dailyDetails = booking.type === ResType.LOC
-    ? [
-        t('booking.driverIncluded'),
-        t('booking.serviceHoursSummary'),
-        `${t('booking.city')}: ${t('booking.kinshasa')}`,
-        t('booking.dailyCancellationSummary'),
-        fuelOptionAmount > 0 ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense'),
-        flexOptionAmount > 0 ? t('booking.flexHoursSummary') : null,
-        premiumOptionAmount > 0 ? t('booking.premiumHoursSummary') : null,
-      ].filter(Boolean) as string[]
-    : [];
+  const fuelOptionAmount =
+    typeof bookingOptions.fuel === 'number'
+      ? bookingOptions.fuel
+      : (optionItems.find(
+          (option) =>
+            option.name.toLowerCase().includes('fuel') ||
+            option.name.toLowerCase().includes('carburant')
+        )?.price ?? 0);
+  const flexOptionAmount =
+    typeof bookingOptions.flex === 'number'
+      ? bookingOptions.flex
+      : extraTimeName === 'flex'
+        ? (bookingOptions.extraTime?.price ?? 0)
+        : 0;
+  const premiumOptionAmount =
+    typeof bookingOptions.premium === 'number'
+      ? bookingOptions.premium
+      : extraTimeName === 'premium'
+        ? (bookingOptions.extraTime?.price ?? 0)
+        : 0;
+  const couponDiscountAmount =
+    typeof booking.originalTotal === 'number' && typeof booking.total === 'number'
+      ? Math.max(0, booking.originalTotal - booking.total)
+      : null;
+  const dailyDetails =
+    booking.type === ResType.LOC
+      ? ([
+          t('booking.driverIncluded'),
+          t('booking.serviceHoursSummary'),
+          `${t('booking.city')}: ${t('booking.kinshasa')}`,
+          t('booking.dailyCancellationSummary'),
+          fuelOptionAmount > 0 ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense'),
+          flexOptionAmount > 0 ? t('booking.flexHoursSummary') : null,
+          premiumOptionAmount > 0 ? t('booking.premiumHoursSummary') : null,
+          booking.couponCode ? `${t('booking.promoCodeLabel')}: ${booking.couponCode}` : null,
+          couponDiscountAmount && couponDiscountAmount > 0
+            ? `${t('booking.discount')}: - ${couponDiscountAmount} $`
+            : null,
+        ].filter(Boolean) as string[])
+      : [];
   const isStandardClient = booking.client?.clientType !== ClientType.PREMIUM;
   const canPayBooking = isStandardClient && !booking.isPaid;
   const canCancelBooking = canClientCancelBooking(booking);
@@ -118,14 +137,15 @@ export function BookingDetailModal({
       onRequestClose={onClose}
       transparent={false}
       presentationStyle="formSheet"
-      statusBarTranslucent={!disableStatusBar}
-    >
+      statusBarTranslucent={!disableStatusBar}>
       <View style={[styles.modalContainer, { backgroundColor: modalBg }]}>
         <View style={[styles.modalHeader, { backgroundColor: modalBg }]}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Text style={{ color: fg, fontSize: 24 }}>× </Text>
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: fg, flex: 1, textAlign: 'center' }]}>{t('reservations.detailTitle')}</Text>
+          <Text style={[styles.modalTitle, { color: fg, flex: 1, textAlign: 'center' }]}>
+            {t('reservations.detailTitle')}
+          </Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.modalScroll} showsVerticalScrollIndicator={false}>
@@ -135,7 +155,11 @@ export function BookingDetailModal({
             resizeMode="cover"
           />
 
-          <View style={[styles.statusBadgeLarge, { backgroundColor: `${statusColor}22`, borderColor: statusColor }]}>
+          <View
+            style={[
+              styles.statusBadgeLarge,
+              { backgroundColor: `${statusColor}22`, borderColor: statusColor },
+            ]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={[styles.statusBadgeText, { color: statusColor }]}>
               {t(STATUS_LABELS[booking.status] ?? 'reservations.status.pending')}
@@ -143,31 +167,75 @@ export function BookingDetailModal({
           </View>
 
           <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-            <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.booking')}</Text>
+            <Text style={[styles.sectionTitle, { color: fg }]}>
+              {t('reservations.section.booking')}
+            </Text>
             <Row label={t('reservations.field.id')} value={booking.id} />
-            <Row label={t('reservations.field.type')} value={booking.type === ResType.LOC ? t('reservations.type.dailyRental') : t('reservations.type.airportTransfer')} />
-            <Row label={t('reservations.field.vehicle')} value={`${booking.car?.name ?? '—'} (${booking.car?.registrationId ?? '—'})`} />
-            <Row label={t('reservations.field.departure')} value={fmtDateTime(booking.departureAt, appLocale)} />
-            <Row label={t('reservations.field.return')} value={fmtDateTime(booking.arrivalAt, appLocale)} />
-            {booking.rideStartAt && <Row label={t('reservations.field.rideStart')} value={fmtDateTime(booking.rideStartAt, appLocale)} />}
-            {booking.rideEndAt && <Row label={t('reservations.field.rideEnd')} value={fmtDateTime(booking.rideEndAt, appLocale)} />}
-            <Row label={t('reservations.field.total')} value={booking.total != null ? `${booking.total} $` : '—'} />
-            <Row label={t('reservations.field.paid')} value={booking.isPaid ? t('common.yes') : t('common.no')} />
+            <Row
+              label={t('reservations.field.type')}
+              value={
+                booking.type === ResType.LOC
+                  ? t('reservations.type.dailyRental')
+                  : t('reservations.type.airportTransfer')
+              }
+            />
+            <Row
+              label={t('reservations.field.vehicle')}
+              value={`${booking.car?.name ?? '—'} (${booking.car?.registrationId ?? '—'})`}
+            />
+            <Row
+              label={t('reservations.field.departure')}
+              value={fmtDateTime(booking.departureAt, appLocale)}
+            />
+            <Row
+              label={t('reservations.field.return')}
+              value={fmtDateTime(booking.arrivalAt, appLocale)}
+            />
+            {booking.rideStartAt && (
+              <Row
+                label={t('reservations.field.rideStart')}
+                value={fmtDateTime(booking.rideStartAt, appLocale)}
+              />
+            )}
+            {booking.rideEndAt && (
+              <Row
+                label={t('reservations.field.rideEnd')}
+                value={fmtDateTime(booking.rideEndAt, appLocale)}
+              />
+            )}
+            <Row
+              label={t('reservations.field.total')}
+              value={booking.total != null ? `${booking.total} $` : '—'}
+            />
+            <Row
+              label={t('reservations.field.paid')}
+              value={booking.isPaid ? t('common.yes') : t('common.no')}
+            />
           </View>
 
-          {canPayBooking && (booking.status === ResStatus.PENDING || booking.status === ResStatus.PENDINGDRIVER) ? (
+          {canPayBooking &&
+          (booking.status === ResStatus.PENDING || booking.status === ResStatus.PENDINGDRIVER) ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Button className="h-11 rounded-xl bg-orange-500" onPress={() => onOpenPayment(booking)}>
+              <Button
+                className="h-11 rounded-xl bg-orange-500"
+                onPress={() => onOpenPayment(booking)}>
                 <Text style={styles.primaryButtonText}>{t('reservations.payment.open')}</Text>
               </Button>
             </View>
           ) : null}
 
           <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-            <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.places')}</Text>
-            <Row label={t('reservations.field.departure')} value={booking.departure?.label ?? '—'} />
+            <Text style={[styles.sectionTitle, { color: fg }]}>
+              {t('reservations.section.places')}
+            </Text>
+            <Row
+              label={t('reservations.field.departure')}
+              value={booking.departure?.label ?? '—'}
+            />
             <Row label={t('reservations.field.arrival')} value={booking.arrival?.label ?? '—'} />
-            {booking.taVolNumber && <Row label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />}
+            {booking.taVolNumber && (
+              <Row label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />
+            )}
           </View>
 
           {dailyDetails.length > 0 ? (
@@ -182,9 +250,12 @@ export function BookingDetailModal({
             </View>
           ) : null}
 
-          {booking.driver && (booking.status === ResStatus.CONFIRMED || booking.status === ResStatus.STARTED) ? (
+          {booking.driver &&
+          (booking.status === ResStatus.CONFIRMED || booking.status === ResStatus.STARTED) ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.driver')}</Text>
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.section.driver')}
+              </Text>
               <View style={styles.driverRow}>
                 <Image
                   source={{ uri: driverAvatar ?? CAR_PLACEHOLDER }}
@@ -204,14 +275,14 @@ export function BookingDetailModal({
                 <View style={styles.contactRow}>
                   <TouchableOpacity
                     style={[styles.contactBtn, { backgroundColor: '#25D366' }]}
-                    onPress={() => Linking.openURL(`https://wa.me/${driverPhone.replace(/\D/g, '')}`)}
-                  >
+                    onPress={() =>
+                      Linking.openURL(`https://wa.me/${driverPhone.replace(/\D/g, '')}`)
+                    }>
                     <Text style={styles.contactBtnText}>💬 {t('settings.whatsapp')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.contactBtn, { backgroundColor: '#2196F3' }]}
-                    onPress={() => Linking.openURL(`tel:${driverPhone}`)}
-                  >
+                    onPress={() => Linking.openURL(`tel:${driverPhone}`)}>
                     <Text style={styles.contactBtnText}>📞 {t('settings.call')}</Text>
                   </TouchableOpacity>
                 </View>
@@ -221,7 +292,9 @@ export function BookingDetailModal({
 
           {booking.client ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.client')}</Text>
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.section.client')}
+              </Text>
               <Row label={t('reservations.field.name')} value={booking.client.full_name ?? '—'} />
               <Row label={t('reservations.field.email')} value={booking.client.email} />
               <Row label={t('reservations.field.phone')} value={booking.client.phone ?? '—'} />
@@ -230,7 +303,9 @@ export function BookingDetailModal({
 
           {hasGuestBooking ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('booking.reservationFor')}</Text>
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('booking.reservationFor')}
+              </Text>
               {guestName ? <Row label={t('reservations.field.name')} value={guestName} /> : null}
               {guestPhone ? <Row label={t('reservations.field.phone')} value={guestPhone} /> : null}
               {guestEmail ? <Row label={t('reservations.field.email')} value={guestEmail} /> : null}
@@ -239,22 +314,42 @@ export function BookingDetailModal({
 
           {booking.review ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.review')}</Text>
-              <Row label={t('reservations.field.driving')} value={`${booking.review.ratingDriving}/5`} />
-              <Row label={t('reservations.field.punctuality')} value={`${booking.review.ratingPunctuality}/5`} />
-              <Row label={t('reservations.field.service')} value={`${booking.review.ratingService}/5`} />
-              <Row label={t('reservations.field.vehicle')} value={`${booking.review.ratingVehicle}/5`} />
-              {booking.review.comment ? <Row label={t('reservations.section.comment')} value={booking.review.comment} /> : null}
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.section.review')}
+              </Text>
+              <Row
+                label={t('reservations.field.driving')}
+                value={`${booking.review.ratingDriving}/5`}
+              />
+              <Row
+                label={t('reservations.field.punctuality')}
+                value={`${booking.review.ratingPunctuality}/5`}
+              />
+              <Row
+                label={t('reservations.field.service')}
+                value={`${booking.review.ratingService}/5`}
+              />
+              <Row
+                label={t('reservations.field.vehicle')}
+                value={`${booking.review.ratingVehicle}/5`}
+              />
+              {booking.review.comment ? (
+                <Row label={t('reservations.section.comment')} value={booking.review.comment} />
+              ) : null}
             </View>
           ) : null}
 
           {booking.status === ResStatus.ENDED && !booking.review && booking.driverId ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.reviewForm.ctaTitle')}</Text>
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.reviewForm.ctaTitle')}
+              </Text>
               <Text style={[styles.ctaDescription, { color: sub }]}>
                 {t('reservations.reviewForm.ctaDescription')}
               </Text>
-              <Button className="h-11 rounded-xl bg-orange-500" onPress={() => onOpenReview(booking)}>
+              <Button
+                className="h-11 rounded-xl bg-orange-500"
+                onPress={() => onOpenReview(booking)}>
                 <Text style={styles.primaryButtonText}>{t('reservations.reviewForm.open')}</Text>
               </Button>
             </View>
@@ -262,22 +357,35 @@ export function BookingDetailModal({
 
           {booking.coupon ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.coupon')}</Text>
-              <Row label={t('reservations.field.discount')} value={`-${booking.coupon.discountAmount} j`} />
-              <Row label={t('reservations.field.beforeDiscount')} value={`${booking.coupon.originalAmount} j`} />
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.section.coupon')}
+              </Text>
+              <Row
+                label={t('reservations.field.discount')}
+                value={`-${booking.coupon.discountAmount} j`}
+              />
+              <Row
+                label={t('reservations.field.beforeDiscount')}
+                value={`${booking.coupon.originalAmount} j`}
+              />
             </View>
           ) : null}
 
           {booking.commentaire ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
-              <Text style={[styles.sectionTitle, { color: fg }]}>{t('reservations.section.comment')}</Text>
+              <Text style={[styles.sectionTitle, { color: fg }]}>
+                {t('reservations.section.comment')}
+              </Text>
               <Text style={[styles.commentText, { color: sub }]}>{booking.commentaire}</Text>
             </View>
           ) : null}
 
           {canCancelBooking ? (
             <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
-              <Button className="h-11 rounded-xl bg-red-500" onPress={() => onClientCancelBooking(booking)} disabled={isCancelling}>
+              <Button
+                className="h-11 rounded-xl bg-red-500"
+                onPress={() => onClientCancelBooking(booking)}
+                disabled={isCancelling}>
                 {isCancelling ? (
                   <View style={styles.cancelButtonContent}>
                     <ActivityIndicator size="small" color="#ffffff" />
@@ -317,12 +425,32 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 17, fontWeight: '700' },
   modalScroll: { padding: 16, paddingBottom: 40 },
   detailCarImage: { width: '100%', height: 200, borderRadius: 14, marginBottom: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
   listRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   detailLabel: { fontSize: 13, flex: 1 },
   detailValue: { fontSize: 13, fontWeight: '500', flex: 2, textAlign: 'right' },
-  statusBadgeLarge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginVertical: 12 },
+  statusBadgeLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginVertical: 12,
+  },
   statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 5 },
   statusBadgeText: { fontSize: 13, fontWeight: '600' },
   driverRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
@@ -335,5 +463,10 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#ffffff', fontWeight: '700' },
   ctaDescription: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
   commentText: { fontSize: 13, lineHeight: 18 },
-  cancelButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  cancelButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
 });
