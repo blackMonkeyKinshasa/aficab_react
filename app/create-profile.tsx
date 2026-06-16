@@ -10,14 +10,13 @@ import {
 } from 'react-native';
 
 import { Stack, useRouter } from 'expo-router';
-import { Camera } from 'lucide-react-native';
+import { Camera, HelpCircle } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import { uploadAvatar } from '@/api/uploadFiles';
 import { getUserByID, updateUserByID } from '@/api/user';
 import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
-import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { Button, ButtonText } from '@/components/ui/button';
 import {
@@ -37,6 +36,11 @@ import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser, type UserState } from '@/store/user-state';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function CreateProfile() {
   const { colorScheme } = useColorScheme();
@@ -156,24 +160,27 @@ export default function CreateProfile() {
       let avatarUrl = image ?? null;
 
       if (image && !image.startsWith('http')) {
+        console.log("IMAGE :", image);
         const upload = await uploadAvatar(await uriToBlob(image));
         avatarUrl = upload.url;
         setImage(upload.url);
+        console.log("AVATAR URL :", avatarUrl);
+        console.log("UPLOAD :", true);
       }
 
       const locationDetails = await getUserLocationDetails();
       const city = locationDetails.city ?? storedUser?.city ?? null;
       const country = locationDetails.country ?? storedUser?.country ?? null;
-
+     
       await updateUserByID(user.id, {
         full_name: fullName.trim(),
         phone: phoneNumber.trim() || null,
         genre: gender || null,
-        avatar_url: avatarUrl || null,
         city,
         country,
       } as User);
 
+      await supabase.auth.updateUser({ data: { avatar_url: avatarUrl } });
       const refreshedUser = await getUserByID(user.id);
 
       setStoredUser(refreshedUser);
@@ -209,7 +216,7 @@ export default function CreateProfile() {
       <Stack.Screen options={{ title: '', headerBackVisible: false }} />
 
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: bg }}
+        style={{ flex: 1}}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -242,40 +249,48 @@ export default function CreateProfile() {
               placeholder="+243821606126"
               keyboardType="phone-pad"
               showInfo={true}
+              tootipMessage="Ce numéro sera utilisé pour vous contacter et vous envoyer des notifications importantes."
             />
 
-            <View className="mb-6">
-              <View className="mb-2 flex-row items-center">
-                <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  {t('profile.gender')}
-                </Text>
-                <View className="ml-2">
-                  <InfoIcon />
-                </View>
-              </View>
-
-              <Select
-                value={{
-                  value: gender,
-                  label:
-                    localizedGenderOptions.find((option) => option.value === gender)?.label ??
-                    t('common.select'),
-                }}
-                onValueChange={(option) => {
-                  setGender(option?.value ?? '');
-                }}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('common.select')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {localizedGenderOptions.map((option) => (
-                    <SelectItem key={option.value} label={option.label} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+               {/* Gender */}
+          <View className="mb-6">
+            <View className="mb-2 flex-row items-center">
+              <Text className={`text-base font-semibold ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>
+                {t('profile.gender')}
+              </Text>
+              
+          <Tooltip className="ml-2">
+            <TooltipTrigger asChild> 
+                <HelpCircle size={16} color="#999999" />
+            </TooltipTrigger>
+            <TooltipContent  className="ml-6 mr-6">
+              <Text className="text-white text-sm font-normal ">Cette information nous aide à personnaliser votre profil et améliorer votre expérience.</Text>
+            </TooltipContent>
+          </Tooltip>
             </View>
+
+            <Select
+              value={{
+                value: gender,
+                label:
+                  localizedGenderOptions.find((option) => option.value === gender)?.label ??
+                  t('common.select'),
+              }}
+              onValueChange={(option) => {
+                setGender(option?.value ?? '');
+              }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('common.select')} />
+              </SelectTrigger>
+              <SelectContent>
+                {localizedGenderOptions.map((option) => (
+                  <SelectItem key={option.value} label={option.label} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </View>
 
             <Button
               action="primary"

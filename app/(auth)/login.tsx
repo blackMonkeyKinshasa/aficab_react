@@ -877,7 +877,7 @@ function GetButtonDialog({
           onPress={email ? signInWithOTP : undefined}
           isDisabled={loading || !email || isOtpCooldownActive}
           className="mb-6 w-full rounded-md">
-          <ButtonText className=" text-black dark:text-white">
+          <ButtonText className="text-white">
             {loading ? resolvedLabels.connecting : resolvedLabels.signUpOrLogin}
           </ButtonText>
         </Button>
@@ -967,7 +967,7 @@ function GetButtonDialog({
                 setButtonEnabled(true);
               }
             }}>
-            <ButtonText className="text-black dark:text-white">{resolvedLabels.verify}</ButtonText>
+            <ButtonText className="text-white">{resolvedLabels.verify}</ButtonText>
           </Button>
         </DialogFooter>
       </DialogContent>

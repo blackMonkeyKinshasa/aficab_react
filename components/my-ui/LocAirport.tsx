@@ -35,7 +35,6 @@ import {
   LocationDocTA,
 } from '@/constants/dataInterface';
 import { bookingSpacing, controlHeightStyle } from '@/constants/spacing';
-import { getCouponFeedbackMessage } from '@/lib/coupon-messages';
 import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -200,7 +199,7 @@ function normalizeGuestPhone(phoneNumber: string | null | undefined) {
 export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
-  const { appLocale, t, tf } = useI18n();
+  const { appLocale, t } = useI18n();
   const toast = useAppToast();
   const fieldThemeColors = useFieldThemeColors();
   const emptyCarsTitleKey = 'booking.noVehicleAvailable';
@@ -405,25 +404,28 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     };
   }, [setEtape]);
 
+  // Invalidate coupon when trip context changes
   useEffect(() => {
     if (appliedCouponCode !== null) {
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [appliedCouponCode, selectedCar?.id, distanceKm, locationDoc.tripType]);
+  }, [selectedCar?.id, distanceKm, locationDoc.tripType]);
 
+  // Clear promo feedback if user manually edits code
   useEffect(() => {
     if (appliedCouponCode && code.trim() !== appliedCouponCode) {
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [code, appliedCouponCode]);
+  }, [code]);
 
+  // Reset auto-promo attempt flag when etape or vehicle changes
   useEffect(() => {
     autoPromoAttemptedRef.current = false;
-  }, [etape, selectedCar?.id, distanceKm, locationDoc.tripType]);
+  }, [etape, selectedCar?.id]);
 
   const handleNextEtape = async (car?: Car) => {
     if (etape === EtapeReservation.RECAP) {
@@ -544,9 +546,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     }
   };
 
-  const handleApplyPromoCode = async (promoCodeOverride?: string) => {
+  const handleApplyPromoCode = async (promoCodeOverride?: string, isFirstBooking?: boolean) => {
     const normalizedCode = (promoCodeOverride ?? code).trim();
-    Keyboard.dismiss();
 
     if (!normalizedCode) {
       setPromoFeedback({ tone: 'error', message: t('booking.promoCodeRequired') });
@@ -559,7 +560,9 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     }
 
     setIsApplyingPromo(true);
-    setCode(normalizedCode);
+    if (!promoCodeOverride) {
+      setCode(normalizedCode);
+    }
 
     try {
       const response = await validateCoupon({
@@ -571,68 +574,54 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
       });
 
       if (response.valid) {
+        let successMessage: string = t('booking.promoCodeApplied') as string;
+        if (typeof response.message === 'string' && response.message.trim()) {
+          successMessage = response.message as string;
+        } else if (normalizedCode === FIRST_BOOKING_PROMO_CODE) {
+          successMessage = t('booking.promoCodeWelcomeApplied') as string;
+        }
+
         setValidatedCoupon(response);
         setAppliedCouponCode(normalizedCode);
         setPromoFeedback({
           tone: 'success',
-          message:
-            normalizedCode === FIRST_BOOKING_PROMO_CODE
-              ? t('booking.promoCodeWelcomeApplied')
-              : t('booking.promoCodeApplied'),
+          message: successMessage,
         });
         return;
       }
 
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
-      setPromoFeedback({
-        tone: 'error',
-        message: getCouponFeedbackMessage(
-          {
-            code: response.code,
-            message: response.message,
-            minAmount: response.minAmount,
-          },
-          t,
-          tf
-        ),
-      });
+      if (!isFirstBooking) {
+        setPromoFeedback({
+          tone: 'error',
+          message: t('booking.promoCodeInvalid'),
+        });
+      }
     } catch (error) {
-      const apiError = error as Error & { code?: string; body?: { minAmount?: number } };
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback({
         tone: 'error',
-        message: getCouponFeedbackMessage(
-          {
-            code: apiError.code,
-            message: apiError.message,
-            minAmount: apiError.body?.minAmount,
-          },
-          t,
-          tf
-        ),
+        message:
+          error instanceof Error && error.message ? error.message : t('booking.promoCodeInvalid'),
       });
     } finally {
       setIsApplyingPromo(false);
     }
   };
 
+  // Auto-apply welcome promo only once per recap session if eligible
   useEffect(() => {
-    if (
-      etape !== EtapeReservation.RECAP ||
-      !selectedCar?.id ||
-      totalPrice <= 0 ||
-      baseVehicleAmount <= 0
-    ) {
+    if (etape !== EtapeReservation.RECAP) {
       return;
     }
 
-    if (autoPromoAttemptedRef.current) {
+    if (!selectedCar?.id || totalPrice <= 0 || baseVehicleAmount <= 0) {
       return;
     }
 
-    if (appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
+    if (autoPromoAttemptedRef.current || appliedCouponCode === FIRST_BOOKING_PROMO_CODE) {
       return;
     }
 
@@ -643,35 +632,29 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
     autoPromoAttemptedRef.current = true;
     let isMounted = true;
 
-    const applyWelcomePromoIfEligible = async () => {
+    const tryApplyWelcomePromo = async () => {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-
-        if (!user || !isMounted) {
-          return;
-        }
+        if (!user || !isMounted) return;
 
         const bookings = await getAllBookings(user.id);
+        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) return;
 
-        if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) {
-          return;
-        }
-
-        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE);
+        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE, true);
       } catch {
-        // L'auto-application reste silencieuse si la verification d'eligibilite echoue.
+        // Fail silently - user can still manually apply promo
       }
     };
 
-    void applyWelcomePromoIfEligible();
+    void tryApplyWelcomePromo();
 
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- welcome promo runs once per recap context
-  }, [appliedCouponCode, baseVehicleAmount, code, etape, selectedCar?.id, totalPrice]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when entering recap
+  }, [etape, selectedCar?.id]);
 
   const selectCarsPage = () => {
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
@@ -798,9 +781,7 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
               </Input>
             </BookingOptionSectionCard>
 
-            <BookingOptionSectionCard
-              title={t('booking.commentOptional')}
-              description={t('booking.commentDescription')}>
+            <BookingOptionSectionCard title={t('booking.commentOptional')}>
               <Input variant="outline" size="control" className={filledInputClassName}>
                 <InputField
                   placeholder={t('booking.commentPlaceholder')}

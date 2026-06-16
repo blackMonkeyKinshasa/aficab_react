@@ -612,7 +612,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     }
   };
 
-  const handleApplyPromoCode = async (promoCodeOverride?: string) => {
+  const handleApplyPromoCode = async (promoCodeOverride?: string, isFirstBooking?: boolean) => {
     const normalizedCode = (promoCodeOverride ?? code).trim();
 
     // Validate input
@@ -663,10 +663,12 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       // Coupon not valid
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
-      setPromoFeedback({
-        tone: 'error',
-        message: response.message || t('booking.promoCodeInvalid'),
-      });
+      if (!isFirstBooking) {
+        setPromoFeedback({
+          tone: 'error',
+          message: t('booking.promoCodeInvalid'),
+        });
+      }
     } catch (error) {
       // API error
       setValidatedCoupon(null);
@@ -717,7 +719,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         if (!isMounted || !Array.isArray(bookings) || bookings.length > 0) return;
 
         // User is eligible: auto-apply welcome code silently
-        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE);
+        await handleApplyPromoCode(FIRST_BOOKING_PROMO_CODE, true);
       } catch {
         // Fail silently - user can still manually apply promo
       }
@@ -1069,13 +1071,18 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
               <Text className="text-sm text-typography-500">- {selectedOptions.join('\n- ')}</Text>
             ) : null}
             {trimmedComment ? (
-              <BookingRecapDetailColumn label={t('booking.comment')} value={trimmedComment} />
+              <View className="my-3 " >                
+                <Text className="text-typography-900 mb-4 text-base font-bold">{t('booking.comment')}</Text> 
+                 <Text className="text-sm text-typography-500">- {trimmedComment}</Text>
+              </View>
             ) : null}
             {trimmedGuestName || trimmedGuestPhone ? (
-              <BookingRecapDetailColumn
-                label={t('booking.bookingFor')}
-                value={[trimmedGuestName, trimmedGuestPhone].filter(Boolean).join(' · ')}
-              />
+
+               <View className="my-3 " >                
+                <Text className="text-typography-900 mb-4 text-base font-bold">{t('booking.bookingFor')}</Text> 
+                 <Text className="text-sm text-typography-500">- {[trimmedGuestName, trimmedGuestPhone].filter(Boolean).join(' · ')}</Text>
+              </View>
+              
             ) : null}
           </BookingRecapSection>
         ) : null}

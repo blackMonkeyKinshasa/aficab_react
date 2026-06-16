@@ -2,12 +2,19 @@ import { useState } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { useRouter } from 'expo-router';
-import { Camera, ChevronDown } from 'lucide-react-native';
+import { Camera } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormField } from '@/components/my-ui/FormField';
 import { Button, ButtonText } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
 import { useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -22,7 +29,6 @@ export default function Signup() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const { t } = useI18n();
   const toast = useAppToast();
   const statusOptions: { label: string; value: string }[] = [
@@ -125,7 +131,6 @@ export default function Signup() {
             placeholder={t('profile.fullNamePlaceholder')}
             value={fullName}
             onChangeText={setFullName}
-            editable={!loading}
           />
 
           <FormField
@@ -134,39 +139,37 @@ export default function Signup() {
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
-            editable={!loading}
+            showInfo={false}
+            tootipMessage="Ce numéro sera utilisé pour vous contacter et vous envoyer des notifications importantes."
           />
 
-          <View>
-            <Text className="mb-2 text-sm text-muted-foreground">{t('signup.status')}</Text>
-            <TouchableOpacity
-              onPress={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="flex-row items-center justify-between rounded-xl bg-muted px-4 py-4">
-              <Text className={`text-base ${status ? 'text-foreground' : 'text-muted-foreground'}`}>
-                {status
-                  ? statusOptions.find(
-                      (opt: { label: string; value: string }) => opt.value === status
-                    )?.label
-                  : t('signup.statusPlaceholder')}
-              </Text>
-              <ChevronDown size={24} color={isDark ? '#666666' : '#999999'} />
-            </TouchableOpacity>
-
-            {showStatusDropdown ? (
-              <View className="mt-2 overflow-hidden rounded-lg border border-border bg-card">
+          <View className="mb-6">
+            <Text
+              className={`mb-2 text-base font-semibold ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>
+              {t('signup.status')}
+            </Text>
+            <Select
+              value={{
+                value: status,
+                label:
+                  statusOptions.find(
+                    (option: { label: string; value: string }) => option.value === status
+                  )?.label ?? t('signup.statusPlaceholder'),
+              }}
+              onValueChange={(option) => {
+                setStatus(option?.value ?? '');
+              }}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('signup.statusPlaceholder')} />
+              </SelectTrigger>
+              <SelectContent>
                 {statusOptions.map((option: { label: string; value: string }) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    onPress={() => {
-                      setStatus(option.value);
-                      setShowStatusDropdown(false);
-                    }}
-                    className="border-b border-border px-4 py-3">
-                    <Text className="text-base text-foreground">{option.label}</Text>
-                  </TouchableOpacity>
+                  <SelectItem key={option.value} label={option.label} value={option.value}>
+                    {option.label}
+                  </SelectItem>
                 ))}
-              </View>
-            ) : null}
+              </SelectContent>
+            </Select>
           </View>
           <Button
             action="primary"
