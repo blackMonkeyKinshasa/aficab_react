@@ -67,11 +67,11 @@ export function PromoCodeField({
             isDisabled={disabled || isApplying}>
             <InputField
               value={value}
-              onChangeText={onChangeText}
+              onChangeText={(text) => onChangeText(text.toUpperCase())}
               placeholder={placeholder}
               placeholderTextColor={subTextColor}
               editable={!disabled && !isApplying}
-              style={{ color: textColor }}
+              style={{ color: textColor,  textTransform: 'uppercase' }}
             />
           </Input>
 

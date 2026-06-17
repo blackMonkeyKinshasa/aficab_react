@@ -404,6 +404,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
+      console.log('code changed', code);
+      console.log('appliedCouponCode', appliedCouponCode);
+      console.log('code.trim() !== appliedCouponCode', code.trim() !== appliedCouponCode);
     }
   }, [code]);
 
@@ -1066,20 +1069,23 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         </BookingRecapSection>
 
         {hasSecondaryDetails ? (
-          <BookingRecapSection title={t('booking.optionsTitle')}>
+             <BookingRecapSection>
             {selectedOptions.length > 0 ? (
-              <Text className="text-sm text-typography-500">- {selectedOptions.join('\n- ')}</Text>
-            ) : null}
+               <View className="my-3 " >                
+               <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.optionsTitle')}</Text> 
+               <Text className="text-sm text-typography-500">- {selectedOptions.join('\n- ')}</Text>
+               </View>
+             ) : null}
             {trimmedComment ? (
               <View className="my-3 " >                
-                <Text className="text-typography-900 mb-4 text-base font-bold">{t('booking.comment')}</Text> 
+                <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.comment')}</Text> 
                  <Text className="text-sm text-typography-500">- {trimmedComment}</Text>
               </View>
             ) : null}
             {trimmedGuestName || trimmedGuestPhone ? (
 
                <View className="my-3 " >                
-                <Text className="text-typography-900 mb-4 text-base font-bold">{t('booking.bookingFor')}</Text> 
+                <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.bookingFor')}</Text> 
                  <Text className="text-sm text-typography-500">- {[trimmedGuestName, trimmedGuestPhone].filter(Boolean).join(' · ')}</Text>
               </View>
               
