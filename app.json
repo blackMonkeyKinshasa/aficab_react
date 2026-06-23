@@ -16,8 +16,9 @@
         "applinks:aficab.com",
         "applinks:www.aficab.com"
       ],
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "buildNumber": "128",
+      "buildNumber": "130",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
@@ -150,7 +151,18 @@
       ],
       "expo-web-browser",
       "expo-font",
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "forceStaticLinking": [
+              "RNFBApp"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
