@@ -18,7 +18,7 @@
       ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "buildNumber": "130",
+      "buildNumber": "135",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
@@ -141,17 +141,9 @@
           "contactsPermission": "Autoriser l'accès aux contacts pour ajouter rapidement un passager."
         }
       ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "organization": "aficab",
-          "project": "aficab-mobile"
-        }
-      ],
       "expo-web-browser",
       "expo-font",
-      "@react-native-firebase/app",
+      "./plugins/withReactNativeFirebaseApp",
       [
         "expo-build-properties",
         {

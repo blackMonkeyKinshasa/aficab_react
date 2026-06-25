@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "dev:clear": "expo start -c",
     "dev:clear:tunnel": "expo start -c --tunnel",
-    "postinstall": "node ./scripts/patch-expo-router.js",
+    "postinstall": "node ./scripts/patch-expo-router.js && node ./scripts/patch-supabase-tracing.js",
     "clean": "rimraf .expo node_modules",
     "lint": "expo lint",
     "lint:fix": "expo lint --fix"
@@ -53,6 +53,7 @@
     "clsx": "^2.1.1",
     "expo": "~54.0.35",
     "expo-apple-authentication": "~8.0.8",
+    "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-contacts": "~15.0.11",
     "expo-device": "~8.0.10",

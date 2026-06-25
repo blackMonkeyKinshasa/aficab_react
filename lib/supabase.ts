@@ -2,24 +2,16 @@ import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { isDev } from '@/constants/env';
+import {
+  isDev,
+  supabaseAnonKeyDev,
+  supabaseAnonKeyProd,
+  supabaseUrlDev,
+  supabaseUrlProd,
+} from '@/constants/env';
 
-function getRequiredEnv(name: 'EXPO_PUBLIC_SUPABASE_URL_DEV' | 'EXPO_PUBLIC_SUPABASE_URL_PROD' | 'EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV' | 'EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD') {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-const supabaseUrl = isDev
-  ? getRequiredEnv('EXPO_PUBLIC_SUPABASE_URL_DEV')
-  : getRequiredEnv('EXPO_PUBLIC_SUPABASE_URL_PROD');
-const supabaseAnonKey = isDev
-  ? getRequiredEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV')
-  : getRequiredEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD');
+const supabaseUrl = isDev ? supabaseUrlDev : supabaseUrlProd;
+const supabaseAnonKey = isDev ? supabaseAnonKeyDev : supabaseAnonKeyProd;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

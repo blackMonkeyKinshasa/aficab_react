@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    elevation: 1,
   },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   iconWrap: {
