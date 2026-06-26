@@ -16,6 +16,17 @@ const ROUTE_ALIASES: Record<string, string> = {
   '/settings': '/(tabs)/settings',
 };
 
+const ALLOWED_APP_ROUTES = new Set([
+  '/',
+  '/(tabs)/reservation',
+  '/(tabs)/settings',
+  '/notificationsPage',
+  '/edit-profile',
+  '/create-profile',
+  '/chekRole',
+  '/update-app',
+]);
+
 function safelyDecode(value: string) {
   try {
     return decodeURIComponent(value);
@@ -35,7 +46,13 @@ function normalizePathname(pathname: string) {
 }
 
 function buildHref(pathname: string, searchParams?: URLSearchParams) {
-  const normalizedPathname = ROUTE_ALIASES[normalizePathname(pathname)] ?? normalizePathname(pathname);
+  const normalizedPathname =
+    ROUTE_ALIASES[normalizePathname(pathname)] ?? normalizePathname(pathname);
+
+  if (!ALLOWED_APP_ROUTES.has(normalizedPathname)) {
+    return null;
+  }
+
   const search = searchParams?.toString();
 
   if (!search) {
@@ -46,12 +63,13 @@ function buildHref(pathname: string, searchParams?: URLSearchParams) {
 }
 
 function resolveRedirectTarget(searchParams: URLSearchParams) {
-  const nestedTarget = searchParams.get('path')
-    ?? searchParams.get('route')
-    ?? searchParams.get('screen')
-    ?? searchParams.get('link')
-    ?? searchParams.get('url')
-    ?? searchParams.get('pathname');
+  const nestedTarget =
+    searchParams.get('path') ??
+    searchParams.get('route') ??
+    searchParams.get('screen') ??
+    searchParams.get('link') ??
+    searchParams.get('url') ??
+    searchParams.get('pathname');
 
   if (!nestedTarget) {
     return '/';

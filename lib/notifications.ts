@@ -1,7 +1,8 @@
+import { Platform } from 'react-native';
+
+import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Sentry from '@sentry/react-native';
-import { Platform } from 'react-native';
 
 import { updateDeviceToken } from '@/api/user';
 import { resolveAppHref } from '@/lib/deep-linking';
@@ -96,7 +97,7 @@ export function getNotificationTargetRoute(notification: NotificationLike) {
   }
 
   if (typeof route === 'string' && route.trim()) {
-    return resolveAppHref(route) ?? route;
+    return resolveAppHref(route) ?? '/notificationsPage';
   }
 
   return '/notificationsPage';
@@ -131,17 +132,16 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   }
 
   if (Platform.OS === 'android') {
-  trace.push('configuration du canal android');
+    trace.push('configuration du canal android');
 
-  await notifications.setNotificationChannelAsync('default', {
-    name: translateCurrent('notifications.push.channelName'),
-    importance: notifications.AndroidImportance.MAX,
-    sound: 'default',
-    vibrationPattern: [0, 250, 250, 250],
-    lockscreenVisibility:
-      notifications.AndroidNotificationVisibility.PUBLIC,
-  });
-}
+    await notifications.setNotificationChannelAsync('default', {
+      name: translateCurrent('notifications.push.channelName'),
+      importance: notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      lockscreenVisibility: notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+  }
 
   trace.push('verification appareil physique');
   if (!Device.isDevice) {
