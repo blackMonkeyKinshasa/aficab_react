@@ -38,9 +38,9 @@ import { FormControl, FormControlLabel, FormControlLabelText } from '@/component
 import { Input, InputField } from '@/components/ui/input';
 import { OtpInput as InputOTP } from 'react-native-otp-entry';
 import { Text } from '@/components/ui/text';
+import { APP_AUTH_CALLBACK_URL } from '@/constants/app-links';
 import { color } from '@/constants/colors';
 import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/databaseEnum';
-import { googleIosClientId, googleWebClientId } from '@/constants/env';
 import { useAnalytics } from '@/lib/analytics';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
@@ -75,8 +75,10 @@ type OAuthCallbackParams = {
   error_description?: string;
 };
 
-const NATIVE_AUTH_CALLBACK_URL = 'mobile://aficab.com/auth/callback';
+const NATIVE_AUTH_CALLBACK_URL = APP_AUTH_CALLBACK_URL;
 const OTP_COOLDOWN_SECONDS = 120;
+const googleWebClientId = process.env.GOOGLE_WEB_CLIENT_ID ?? '';
+const googleIosClientId = process.env.GOOGLE_IOS_CLIENT_ID ?? '';
 
 type OtpRequestResult = {
   ok: boolean;
@@ -275,7 +277,7 @@ export default function LoginScreen() {
       email: email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: 'mobile://aficab.com/',
+        emailRedirectTo: NATIVE_AUTH_CALLBACK_URL,
       },
     });
 
@@ -584,7 +586,6 @@ export default function LoginScreen() {
         duration: 3500,
       });
       setLoading(false);
-      console.log('error:', error);
       return;
     }
 

@@ -133,7 +133,6 @@ export default function EditProfile() {
         }
 
         const data = await getUserByID(user.id);
-        console.log('userID :', user.id);
 
         if (data && isMounted) {
           setStoredUser(data);
@@ -194,16 +193,12 @@ export default function EditProfile() {
         text: t('profile.gallery'),
         onPress: async () => {
           let imageUploaded = await pickImageToGallery();
-            console.log("IMAGE RETOURNÉE :", imageUploaded);
 
           if (imageUploaded) {
             setImage(imageUploaded);
-            console.log("NOUVELLE IMAGE :", imageUploaded);
            
           update || setUpdate(true);
           }
-
-           console.log("image state", image);
         },
       },
       { text: t('common.cancel'), style: 'cancel' },
@@ -265,7 +260,6 @@ export default function EditProfile() {
       if (image && !image.startsWith('http')) {
         const res = await uploadAvatar(await uriToBlob(image));
         avatarUrl = res.url;
-        console.log('Avatar uploadé avec succès:', res);
         supabase.auth.updateUser({ data: { avatar_url: res.url } });
         setImage(avatarUrl);
       }
@@ -344,7 +338,6 @@ export default function EditProfile() {
             value={fullName}
             onChangeText={(text) => {
               setFullName(text);
-              console.log(fullName);
               update || setUpdate(true);
             }}
             placeholder={t('profile.fullNamePlaceholder')}

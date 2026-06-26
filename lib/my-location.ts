@@ -40,8 +40,6 @@ export async function getUserLocationDetails() {
       countryCode,
       indicatif,
     };
-  } catch (error) {
-    console.log('Localisation indisponible pour le profil:', error);
-    return { city: null, country: null, isoCountryCode: null, countryCode: null, indicatif: null };
+  } catch (error) {    return { city: null, country: null, isoCountryCode: null, countryCode: null, indicatif: null };
   }
 }

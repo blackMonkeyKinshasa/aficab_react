@@ -6,7 +6,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+       "environment": "development"
     },
     "ios-simulator": {
       "extends": "development",
@@ -15,7 +16,8 @@
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+       "environment": "preview"
     },
     "ios-preview": {
       "extends": "preview",
@@ -31,16 +33,7 @@
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
-        "SENTRY_ORG": "aficab",
-        "SENTRY_PROJECT": "aficab-mobile",
-        "EXPO_PUBLIC_SUPABASE_URL_DEV": "https://sepjdrscnqkcwgqsomnm.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_URL_PROD": "https://zbgzsejuyvtjwmgtigmx.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNlcGpkcnNjbnFrY3dncXNvbW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MjU3ODgsImV4cCI6MjA2ODAwMTc4OH0.4dHp_aV6X7CelavFBaty5-2qTtGswsjsX4QActqSYtE",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpiZ3pzZWp1eXZ0andtZ3RpZ214Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjUyOTA0NzEsImV4cCI6MjA0MDg2NjQ3MX0.MIZ-1UVqeel3dxoogCSirPrDhY3AlexWK2diLwMNhGo",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "727569581615-dikkr2240cah9svelj2sj1bt63rqj12d.apps.googleusercontent.com"
-      }
+      "environment": "production"
     },
     "ios-production": {
       "extends": "production"

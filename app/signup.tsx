@@ -97,7 +97,6 @@ export default function Signup() {
   };
 
   const handleContactSupport = () => {
-    console.log('Contact support');
   };
 
   return (

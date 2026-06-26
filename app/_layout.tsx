@@ -73,11 +73,12 @@ Sentry.init({
   environment: isDev ? 'development' : 'production',
   enabled: true,
   debug: __DEV__,
-  sendDefaultPii: true,
+  sendDefaultPii: false,
   enableLogs: false,
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.2,
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
+  
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
 });
 
@@ -272,13 +273,6 @@ function RootLayoutInner() {
         currentDeviceToken
       );
 
-      console.log('[push_token] sync', {
-        source,
-        stage,
-        expoPushToken,
-        currentDeviceToken,
-      });
-
       if (!expoPushToken) {
         if (__DEV__) {
           showPushTokenTrace_('auto', [`source=${source}`, ...trace], errorMessage);
@@ -295,7 +289,6 @@ function RootLayoutInner() {
       }
     } catch (error) {
       reportStartupError('push_token_sync_failed', error);
-      console.log('push token sync failed', error);
     } finally {
       pushTokenSyncInFlightRef.current = false;
     }
@@ -584,11 +577,8 @@ function RootLayoutInner() {
 
     if (!user) {
       syncedDeviceTokenRef.current = null;
-      console.log('no user, skipping push token sync');
       return;
     }
-
-    console.log('device token :', useMyStateUser.getState().user?.deviceToken);
 
     const timerId = setTimeout(() => {
       void runPushTokenSync('auto');
@@ -661,7 +651,6 @@ function RootLayoutInner() {
     // Listener passif: utile pour logger/observer les notifications recues pendant que l'app est ouverte.
     receivedListenerRef.current = addNotificationReceivedListener((notification) => {
       const targetRoute = getNotificationTargetRoute(notification);
-      console.log('Notification recue:', notification.request.identifier, targetRoute);
     });
 
     // Listener d'action: quand l'utilisateur touche la notification, on ouvre l'ecran associe.

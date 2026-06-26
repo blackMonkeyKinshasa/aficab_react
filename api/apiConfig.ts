@@ -2,7 +2,6 @@ import { isDev } from "@/constants/env";
 import { supabase } from '@/lib/supabase';
 
 const API_URL = isDev ? 'https://aficab.vercel.app/api' : 'https://aficab.com/api';
-const API_KEY = 'd6986743-516e-4a0b-bc92-479bbd5fb3a1';
 
 function shouldSkipErrorLog(endpoint: string, errorBody: any) {
   return Boolean(errorBody?.code === 'USER_NOT_FOUND' && endpoint.startsWith('/user/'));
@@ -114,6 +113,5 @@ export async function apiFetch(endpoint: string, options: any = {}) {
 
 export async function apiAuthFetch(endpoint: string, options: any = {}) {
   const resolvedToken = await getRequiredAccessToken();
-  //console.log('resolvedToken : ', resolvedToken);
   return apiFetch(endpoint, { ...options, headers: { ...options.headers, Authorization: `Bearer ${resolvedToken}` } });
 }

@@ -38,7 +38,6 @@ function getFallbackBuildVersion() {
 function getLocalClientVersion() {
   const rawVersion = Application.nativeBuildVersion ?? getFallbackBuildVersion();
   const parsedVersion = Number.parseInt(rawVersion ?? '0', 10);
-  console.log('Local client version:', parsedVersion);
   return Number.isFinite(parsedVersion) ? parsedVersion : 0;
 }
 

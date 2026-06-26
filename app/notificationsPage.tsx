@@ -385,7 +385,7 @@ export default function Notifications() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { clearCountNotif } = useMyStateNotif();
+  const { clearCountNotif, decrementCountNotif, setCountNotif } = useMyStateNotif();
 
   const navigation = useNavigation();
   const isMarkingAsReadRef = useRef(false);
@@ -430,10 +430,10 @@ export default function Notifications() {
       .getUser()
       .then(({ data: { user } }) => {
         if (user) {
-          console.log('user', user.id);
           getActivity({ userId: user.id })
             .then((data) => {
               setActivities(data);
+              setCountNotif(data.filter((activity: Activity) => !activity.isRead).length);
             })
             .catch(() => setError(t('notifications.loadError')))
             .finally(() => setLoading(false));
@@ -443,7 +443,7 @@ export default function Notifications() {
         setError(t('notifications.loadError'));
         setLoading(false);
       });
-  }, [t]);
+  }, [setCountNotif, t]);
 
   usePreventRemove(
     activities.some((activity) => !activity.isRead),
@@ -507,6 +507,8 @@ export default function Notifications() {
       return;
     }
 
+    decrementCountNotif();
+
     readNotification(selectedActivity.id)
       .then(openRelatedBooking)
       .catch(() => {
@@ -517,6 +519,7 @@ export default function Notifications() {
               : activityItem
           )
         );
+        setCountNotif(activities.filter((activity) => !activity.isRead).length);
       });
   };
 

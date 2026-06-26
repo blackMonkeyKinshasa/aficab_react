@@ -165,7 +165,6 @@ export function Daily() {
         visible={visible}
         onDismiss={() => setVisible(false)}
         onConfirm={(newLocation) => {
-          console.log('Location confirmée:', newLocation.description);
           setLocation(newLocation);
           setVisible(false);
         }}

@@ -132,7 +132,6 @@ export default function NewBooking() {
 
   const onSubmitDocBooking = (doc: Booking) => {
     Keyboard.dismiss();
-    console.log(doc);
     setBookingDoc(doc);
     analytics.trackPaymentModalOpened({
       bookingId: doc.id,
@@ -263,8 +262,6 @@ export default function NewBooking() {
         paymentProvider,
         paymentNumber: phoneNumber,
       });
-
-      console.log('Réservation créée :', response);
       confirmationDetails.bookingId = response.id ?? bookingDoc.id;
       analytics.trackBookingCreationSucceeded({
         bookingId: response.id ?? bookingDoc.id,
@@ -352,8 +349,6 @@ export default function NewBooking() {
         });
         throw error;
       }
-
-      console.log('Reponse Pawapay :', response);
       analytics.trackPaymentNetworkResponded({
         bookingId: booking.id,
         paymentMethod,

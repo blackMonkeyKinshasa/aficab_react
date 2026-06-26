@@ -54,7 +54,6 @@ export function reportPushTokenStage(stage: string, extra?: Record<string, unkno
     data: extra,
     level: stage.includes('error') || stage.includes('denied') ? 'warning' : 'info',
   });
-  console.log('[push_token]', stage, extra ?? '');
 }
 
 export function ensureNotificationsReady() {
@@ -121,7 +120,6 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   const notifications = ensureNotificationsReady();
 
   if (!notifications) {
-    console.log('Les notifications push distantes ne sont pas prises en charge dans Expo Go.');
     trace.push('blocage: module indisponible ou expo go');
     reportPushTokenStage('notifications-module-unavailable', { platform: Platform.OS });
     return {
@@ -147,7 +145,6 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
 
   trace.push('verification appareil physique');
   if (!Device.isDevice) {
-    console.log('Les notifications push necessitent un appareil physique.');
     trace.push('blocage: appareil non physique');
     reportPushTokenStage('not-physical-device', { platform: Platform.OS });
     return {

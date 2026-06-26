@@ -17,5 +17,5 @@ export {
 export function resetUserSessionState() {
   useMyStateUser.getState().clearUser();
   useMyStateLocation.getState().clearLocations();
-  useMyStateNotif.getState().clearCountNotif();
+  useMyStateNotif.getState().clearCountNotif({ resetUser: true });
 }

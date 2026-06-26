@@ -2,17 +2,16 @@ import { AppState, Platform } from 'react-native';
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import {
-  isDev,
-  supabaseAnonKeyDev,
-  supabaseAnonKeyProd,
-  supabaseUrlDev,
-  supabaseUrlProd,
-} from '@/constants/env';
+import { isDev } from '@/constants/env';
 
-const supabaseUrl = isDev ? supabaseUrlDev : supabaseUrlProd;
-const supabaseAnonKey = isDev ? supabaseAnonKeyDev : supabaseAnonKeyProd;
+const supabaseUrl = isDev
+  ? process.env.EXPO_PUBLIC_SUPABASE_URL_DEV!
+  : process.env.EXPO_PUBLIC_SUPABASE_URL_PROD!;
 
+const supabaseAnonKey = isDev
+  ? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV!
+  : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD!;
+  
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),

@@ -647,7 +647,6 @@ export default function Reservation() {
 
   const focusedBookingId = openBookingId ?? highlightBookingId ?? null;
   const confirmedBooking = bookings.find((booking) => booking.status === ResStatus.STARTED) ?? null;
-  //console.log('Confirmed booking:', confirmedBooking);
   const focusedBooking =
     (focusedBookingId ? bookings.find((booking) => booking.id === focusedBookingId) : null) ??
     confirmedBooking;

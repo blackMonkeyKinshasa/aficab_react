@@ -160,12 +160,9 @@ export default function CreateProfile() {
       let avatarUrl = image ?? null;
 
       if (image && !image.startsWith('http')) {
-        console.log("IMAGE :", image);
         const upload = await uploadAvatar(await uriToBlob(image));
         avatarUrl = upload.url;
         setImage(upload.url);
-        console.log("AVATAR URL :", avatarUrl);
-        console.log("UPLOAD :", true);
       }
 
       const locationDetails = await getUserLocationDetails();

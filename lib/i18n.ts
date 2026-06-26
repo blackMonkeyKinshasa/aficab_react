@@ -239,7 +239,7 @@ const translations = {
     'auth.checkEmailConfirm': 'Vérifiez votre e-mail pour confirmer votre compte',
     'auth.configMissingTitle': 'Configuration manquante',
     'auth.configMissingMessage':
-      'Ajoutez EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID dans votre .env pour activer Google Sign-In.',
+      'Ajoutez GOOGLE_WEB_CLIENT_ID et GOOGLE_IOS_CLIENT_ID dans votre .env pour activer Google Sign-In.',
     'auth.googleOpenError': 'Impossible d’ouvrir la connexion Google.',
     'auth.googleCancelled': 'Connexion Google annulée.',
     'auth.googleDenied': 'Connexion Google refusée.',
@@ -744,7 +744,7 @@ const translations = {
     'auth.checkEmailConfirm': 'Check your email to confirm your account',
     'auth.configMissingTitle': 'Missing configuration',
     'auth.configMissingMessage':
-      'Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to your .env to enable Google Sign-In.',
+      'Add GOOGLE_WEB_CLIENT_ID and GOOGLE_IOS_CLIENT_ID to your .env to enable Google Sign-In.',
     'auth.googleOpenError': 'Unable to open Google sign-in.',
     'auth.googleCancelled': 'Google sign-in was cancelled.',
     'auth.googleDenied': 'Google sign-in was denied.',

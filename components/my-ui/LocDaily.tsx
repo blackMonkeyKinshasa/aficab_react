@@ -404,9 +404,6 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       setValidatedCoupon(null);
       setAppliedCouponCode(null);
       setPromoFeedback(null);
-      console.log('code changed', code);
-      console.log('appliedCouponCode', appliedCouponCode);
-      console.log('code.trim() !== appliedCouponCode', code.trim() !== appliedCouponCode);
     }
   }, [code]);
 

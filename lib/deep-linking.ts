@@ -95,7 +95,7 @@ export function resolveAppHref(input: string | null | undefined): string | null 
       return null;
     }
 
-    if (!['http:', 'https:', 'mobile:'].includes(protocol)) {
+    if (!['http:', 'https:', 'aficab:', 'mobile:'].includes(protocol)) {
       return null;
     }
 
