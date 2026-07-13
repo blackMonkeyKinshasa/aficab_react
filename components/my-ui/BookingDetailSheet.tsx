@@ -223,14 +223,14 @@ export function BookingDetailSheet({
           />
           <DetailRow
             label={t('reservations.field.vehicle')}
-            value={`${booking.car?.name ?? '—'} (${booking.car?.registrationId ?? '—'})`}
+            value={`${booking.car?.name ?? '—'} ${showDriver ? `(${booking.car?.registrationId ?? '—'})` : ''}  `}
           />
           <DetailRow
-            label={t('reservations.field.departure')}
+            label={t('reservations.field.time.departure')}
             value={fmtDateTime(booking.departureAt, appLocale)}
           />
           <DetailRow
-            label={t('reservations.field.return')}
+            label={t('reservations.field.time.return')}
             value={fmtDateTime(booking.arrivalAt, appLocale)}
           />
           {booking.rideStartAt ? (
@@ -253,14 +253,19 @@ export function BookingDetailSheet({
           <SolidDivider className="my-4" />
 
           {/* Lieux de prise en charge et de destination, plus les infos de vol si besoin. */}
+
           <DetailRow
             label={t('reservations.field.departure')}
             value={booking.departure?.label ?? '—'}
+
           />
-          <DetailRow
-            label={t('reservations.field.arrival')}
-            value={booking.arrival?.label ?? '—'}
-          />
+          { booking.arrival?.label && (  
+                <DetailRow
+                label={t('reservations.field.return')}
+                value={booking.arrival?.label ?? '—'}
+              />)
+             }
+         
           {booking.taVolNumber ? (
             <DetailRow label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />
           ) : null}

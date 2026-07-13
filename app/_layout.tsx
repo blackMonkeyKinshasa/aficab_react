@@ -86,7 +86,7 @@ registerTranslation('en', en);
 registerTranslation('fr', fr);
 
 const accentColor = color.primary;
-const PUBLIC_ROUTES = new Set(['/login', '/signup', '/(auth)/login']);
+const PUBLIC_ROUTES = new Set(['/login', '/signup', '/(auth)/login', '/callback']);
 const POST_LOGIN_BOOTSTRAP_DELAY_MS = 600;
 
 function isPublicAuthRoute(pathname: string, segments: string[]) {

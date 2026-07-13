@@ -92,7 +92,7 @@ export function resolveAppHref(input: string | null | undefined): string | null 
   if (trimmedInput.startsWith('/')) {
     const [pathname, queryString = ''] = trimmedInput.split('?', 2);
 
-    if (normalizePathname(pathname) === '/auth/callback') {
+    if (normalizePathname(pathname) === '/callback') {
       return null;
     }
 
@@ -109,7 +109,7 @@ export function resolveAppHref(input: string | null | undefined): string | null 
     const host = url.host.toLowerCase();
     const pathname = normalizePathname(url.pathname);
 
-    if (pathname === '/auth/callback') {
+    if (pathname === '/callback') {
       return null;
     }
 

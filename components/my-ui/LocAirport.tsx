@@ -658,7 +658,8 @@ export function LocAirport({ locationDoc, isDarkMode, onSubmit, etape, setEtape 
 
   const selectCarsPage = () => {
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
-    const priceUnit = `$${t('booking.perTrip')}`;
+    const priceUnit = `$`;
+   // const priceUnit = `$${t('booking.perTrip')}`;
 
     return (
       <View style={[{ backgroundColor: theme.bg }, { flex: 1 }]}>

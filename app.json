@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/aficab-app-logo-white.png",
     "scheme": "aficab",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -18,7 +18,7 @@
       ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "buildNumber": "136",
+      "buildNumber": "141",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",

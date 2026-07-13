@@ -77,8 +77,8 @@ type OAuthCallbackParams = {
 
 const NATIVE_AUTH_CALLBACK_URL = APP_AUTH_CALLBACK_URL;
 const OTP_COOLDOWN_SECONDS = 120;
-const googleWebClientId = process.env.GOOGLE_WEB_CLIENT_ID ?? '';
-const googleIosClientId = process.env.GOOGLE_IOS_CLIENT_ID ?? '';
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
 
 type OtpRequestResult = {
   ok: boolean;
