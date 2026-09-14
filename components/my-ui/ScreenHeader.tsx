@@ -1,12 +1,13 @@
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, TouchableOpacity, View, Text} from 'react-native';
 
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from 'expo-router/native-stack';
 import { useRouter } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, ChevronLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
+import { getLayoutScale, useLayoutScale } from '@/lib/layout-scale';
 
 export const HEADER_SIDE_WIDTH = 48;
 
@@ -32,28 +33,31 @@ export function CircularHeaderBackButton({
 }) {
   const router = useRouter();
   const { t } = useI18n();
+  const { s, font } = useLayoutScale();
 
   return (
     <TouchableOpacity
       onPress={onPress ?? (() => router.back())}
-      style={[styles.backButton, { borderColor: isDark ? '#3f3f46' : '#e5e7eb' }]}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={t('common.back')}>
-      <ArrowLeft size={20} color={isDark ? '#ffffff' : '#111827'} />
+      className="flex-row items-center">
+      <ChevronLeft size={s(20)} color={isDark ? '#ffffff' : '#111827'} style={{ marginRight: 4 }} />
+      <Text className="font-medium" style={{ color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }}>
+        {t('common.back')}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 export function buildStackScreenOptions({
   title,
-  isDark,
+  isDark = false,
   canGoBack = false,
   onBack,
   headerLeft,
   headerRight,
 }: StackScreenHeaderOptions): NativeStackNavigationOptions {
   const backgroundColor = isDark ? color.appDarkBackground : '#ffffff';
+  const { width, height } = Dimensions.get('window');
+  const { font } = getLayoutScale(width, height);
 
   return {
     title,
@@ -61,7 +65,7 @@ export function buildStackScreenOptions({
     headerTitleAlign: 'center',
     headerTitleStyle: {
       fontWeight: '700',
-      fontSize: 18,
+      fontSize: font.lg,
       color: isDark ? '#ffffff' : '#111827',
     },
     headerShadowVisible: false,
@@ -70,22 +74,22 @@ export function buildStackScreenOptions({
     },
     headerBackVisible: false,
     headerLeft: () => {
-      if (headerLeft) {
-        return headerLeft();
-      }
-
       if (canGoBack) {
         return <CircularHeaderBackButton isDark={isDark} onPress={onBack} />;
       }
 
-      return <HeaderSideSpacer />;
+      if (headerLeft) {
+        return headerLeft();
+      }
+
+      return null;
     },
     headerRight: () => {
       if (headerRight) {
         return headerRight();
       }
 
-      return <HeaderSideSpacer />;
+      return null;
     },
   };
 }

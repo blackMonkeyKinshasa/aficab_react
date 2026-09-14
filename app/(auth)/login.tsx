@@ -44,6 +44,7 @@ import { SUPPORT_EMAIL_URL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/consta
 import { useAnalytics } from '@/lib/analytics';
 import { getAuthErrorMessage } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -174,6 +175,7 @@ export default function LoginScreen() {
   const analytics = useAnalytics();
   const { t, tf } = useI18n();
   const toast = useAppToast();
+  const { s, font } = useLayoutScale();
 
   const isOtpCooldownActive = dialogOpen && otpCountdown > 0;
 
@@ -639,13 +641,14 @@ export default function LoginScreen() {
                       ? require('@/assets/images/aficab-logo-white.png')
                       : require('@/assets/images/aficab-logo-black.png')
                   }
-                  style={{ width: 150, height: 60, resizeMode: 'contain', marginLeft: 10 }}
+                  style={{ width: s(150), height: s(60), marginLeft: 10 }}
+                  resizeMode="contain"
                 />
               </View>
             </View>
 
             {/* Description */}
-            <Text className="mb-8 text-center text-base text-muted-foreground">
+            <Text className="mb-8 text-center text-muted-foreground" style={{ fontSize: font.base }}>
               {t('auth.description')}
             </Text>
 
@@ -737,7 +740,8 @@ export default function LoginScreen() {
                   <View className="flex-row items-center justify-center">
                     <Image
                       source={require('@/assets/images/logo_google.png')}
-                      style={{ width: 34, height: 34, resizeMode: 'contain' }}
+                      style={{ width: s(34), height: s(34) }}
+                      resizeMode="contain"
                     />
                     <ButtonText className="ml-3 text-base font-semibold text-typography-900">
                       {t('auth.googleContinue')}

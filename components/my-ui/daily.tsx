@@ -10,7 +10,6 @@ import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Location } from '@/constants/constants';
 import { ResType } from '@/constants/databaseEnum';
-import { LocationDocLOC } from '@/constants/dataInterface';
 import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
@@ -78,12 +77,6 @@ export function Daily() {
       return;
     }
 
-    const doc: LocationDocLOC = {
-      type: ResType.LOC,
-      location,
-      dateStart,
-      dateEnd,
-    };
     analytics.trackBookingStarted(ResType.LOC, {
       origin: location.description,
       dateStart: dateStart.toISOString(),
@@ -91,7 +84,7 @@ export function Daily() {
     });
     router.push({
       pathname: '/new_booking/[doc]',
-      params: { doc: JSON.stringify(doc) },
+      params: { doc: ResType.LOC },
     });
   };
 

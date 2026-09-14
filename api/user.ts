@@ -1,14 +1,15 @@
-import { User } from '@/constants/dataInterface';
+import { Driver, User } from '@/constants/dataInterface';
+
 import { apiAuthFetch } from './apiConfig';
 
 // GET /user/:uid
-export function getUserByID(userId: string) {
-  return apiAuthFetch(`/user/${userId}`, { method: 'GET' });
+export function getUserByID(userId: string): Promise<User> {
+  return apiAuthFetch<User>(`/user/${userId}`, { method: 'GET' });
 }
 
 // PATCH /user/:uid
-export function updateUserByID(userId: string, updates: Partial<User>) {
-  return apiAuthFetch(`/user/${userId}`, {
+export function updateUserByID(userId: string, updates: Partial<User>): Promise<User> {
+  return apiAuthFetch<User>(`/user/${userId}`, {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
@@ -33,6 +34,14 @@ export function getUserDeviceToken(userId: string) {
 }
 
 // GET /driver/:uid
-export function getDriver(uid: string) {
-  return apiAuthFetch(`/driver/${uid}`, { method: 'GET' });
+export function getDriver(uid: string): Promise<Driver> {
+  return apiAuthFetch<Driver>(`/driver/${uid}`, { method: 'GET' });
+}
+
+export function getDriverByUserId(uid: string): Promise<Driver> {
+  return getDriver(uid);
+}
+
+export function getDriverById(uid: string): Promise<Driver> {
+  return getDriverByUserId(uid);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 
-import { usePreventRemove } from '@react-navigation/native';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Camera, Trash2 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
@@ -12,20 +12,15 @@ import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
 import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
+import { GenderDropdown } from '@/components/my-ui/GenderDropdown';
 import { Button, ButtonText } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
 import { color } from '@/constants/colors';
 import { genderOptions } from '@/constants/constants';
 import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
@@ -72,6 +67,7 @@ export default function EditProfile() {
   const shouldHighlightPhone = focusField === 'phone';
   const shouldReturnToBooking = returnToBooking === '1';
   const { t } = useI18n();
+  const { s } = useLayoutScale();
   const toast = useAppToast();
   const localizedGenderOptions = genderOptions.map((option) => ({
     ...option,
@@ -307,17 +303,19 @@ export default function EditProfile() {
         {/* Avatar Section */}
         <View className="mb-8 mt-8 items-center">
           <View
-            className={`relative h-24 w-24 items-center justify-center rounded-full ${
+            className={`relative items-center justify-center rounded-full ${
               isDark ? 'bg-gray-800' : 'bg-gray-100'
-            }`}>
+            }`}
+            style={{ width: s(96), height: s(96) }}>
             {/* User Icon */}
             <Avatar uri={image || ''} size={96} borderRadius={48} isDark={isDark} />
 
             {/* Camera Icon Button */}
             <TouchableOpacity
-              className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full bg-primary shadow-lg"
+              className="absolute bottom-0 right-0 items-center justify-center rounded-full bg-primary shadow-lg"
+              style={{ width: s(40), height: s(40) }}
               onPress={chooseImage}>
-              <Camera size={18} color="white" />
+              <Camera size={s(18)} color="white" />
             </TouchableOpacity>
           </View>
 
@@ -375,10 +373,10 @@ export default function EditProfile() {
             ) : null}
           </View>
 
-          {/* Gender */}
-          <View className="mb-6">
+         {/* Gender */}
+         <View className="mb-6">
             <View className="mb-2 flex-row items-center">
-              <Text className={`text-base font-semibold ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>
+              <Text className="text-sm font-medium text-gray-500">
                 {t('profile.gender')}
               </Text>
               
@@ -392,28 +390,16 @@ export default function EditProfile() {
           </Tooltip>
             </View>
 
-            <Select
-              value={{
-                value: gender,
-                label:
-                  localizedGenderOptions.find((option) => option.value === gender)?.label ??
-                  t('common.select'),
+            <GenderDropdown
+              data={localizedGenderOptions}
+              value={gender}
+              placeholder={t('common.select')}
+              isDark={isDark}
+              onChange={(value) => {
+                setGender(value);
+                setUpdate(true);
               }}
-              onValueChange={(option) => {
-                setGender(option?.value ?? '');
-                update || setUpdate(true);
-              }}>
-              <SelectTrigger>
-                <SelectValue placeholder={t('common.select')} />
-              </SelectTrigger>
-              <SelectContent>
-                {localizedGenderOptions.map((option) => (
-                  <SelectItem key={option.value} label={option.label} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </View>
 
           {/* Email (Read-only) */}

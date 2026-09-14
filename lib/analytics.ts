@@ -2,6 +2,12 @@ import { usePostHog } from 'posthog-react-native';
 import { Platform } from 'react-native';
 import { ResType } from '@/constants/databaseEnum';
 
+function logAnalyticsInvocation(eventName: string, data: Record<string, unknown> = {}) {
+  // #region agent log
+  fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H3',location:'lib/analytics.ts:logAnalyticsInvocation',message:'PostHog business event invoked',data:{eventName,...data},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 export function useAnalytics() {
@@ -11,6 +17,7 @@ export function useAnalytics() {
     // ── Authentification ──────────────────────────────────────────────────
 
     trackLogin(userId: string, email: string, phone: string | null) {
+      logAnalyticsInvocation('auth_login_succeeded', { hasUserId: Boolean(userId) });
       posthog.capture('auth_login_succeeded', {
         user_id: userId,
         email,
@@ -32,6 +39,7 @@ export function useAnalytics() {
       dateEnd?: string;
       tripType?: 'one-way' | 'round-trip';
     }) {
+      logAnalyticsInvocation('booking_flow_started', { reservationType: type });
       posthog.capture('booking_flow_started', {
         reservation_type: type,
         origin: params.origin,
@@ -51,6 +59,9 @@ export function useAnalytics() {
       price: number;
       reservationType: ResType;
     }) {
+      logAnalyticsInvocation('booking_vehicle_selected', {
+        reservationType: params.reservationType,
+      });
       posthog.capture('booking_vehicle_selected', {
         car_id: carId,
         car_name: params.carName,
@@ -199,6 +210,9 @@ export function useAnalytics() {
       totalPrice: number;
       paymentRecordsCount: number;
     }) {
+      logAnalyticsInvocation('booking_creation_succeeded', {
+        reservationType: params.reservationType,
+      });
       posthog.capture('booking_creation_succeeded', {
         booking_id: params.bookingId,
         reservation_type: params.reservationType,
@@ -217,6 +231,9 @@ export function useAnalytics() {
       paymentProvider?: string;
       errorMessage: string;
     }) {
+      logAnalyticsInvocation('booking_creation_failed', {
+        reservationType: params.reservationType,
+      });
       posthog.capture('booking_creation_failed', {
         booking_id: params.bookingId,
         reservation_type: params.reservationType,

@@ -1,5 +1,5 @@
 import {
-  
+  BookingPayment,
   CreateBookingInput,
   CreateBookingResponse,
   CreateReviewResponse,
@@ -11,10 +11,35 @@ import { apiAuthFetch } from './apiConfig';
 import { ResType } from '@/constants/databaseEnum';
 import { createReview } from './review';
 
+export type GetBookingPaymentsParams = {
+  clientId?: string;
+  bookingId?: string;
+  paymentMethod?: string;
+  page?: string | number;
+};
+
 // GET /booking?clientId=xxx
 export function getAllBookings(clientId?: string) {
   const query = clientId ? `?clientId=${clientId}` : '';
   return apiAuthFetch(`/booking${query}`, { method: 'GET' });
+}
+
+// GET /booking/payment?clientId=xxx&bookingId=xxx&paymentMethod=xxx&page=xxx
+export function getBookingPayments(
+  params: GetBookingPaymentsParams = {}
+): Promise<BookingPayment[]> {
+  const query = new URLSearchParams();
+
+  if (params.clientId) query.set('clientId', params.clientId);
+  if (params.bookingId) query.set('bookingId', params.bookingId);
+  if (params.paymentMethod) query.set('paymentMethod', params.paymentMethod);
+  if (params.page !== undefined) query.set('page', String(params.page));
+
+  const queryString = query.toString();
+  return apiAuthFetch<BookingPayment[]>(
+    `/booking/payment${queryString ? `?${queryString}` : ''}`,
+    { method: 'GET' }
+  );
 }
 
 // GET /booking/generate-id?type=xxx
@@ -56,8 +81,8 @@ export function clientCancelBooking(
 export function calculateDistance(
   origin: LocationPoint,
   destination: LocationPoint
-) {
-  return apiAuthFetch('/booking/directions', {
+): Promise<{ distanceMeters?: number }> {
+  return apiAuthFetch<{ distanceMeters?: number }>('/booking/directions', {
     method: 'POST',
     body: JSON.stringify({ origin, destination }),
   });

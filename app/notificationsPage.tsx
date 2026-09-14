@@ -1,30 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { usePreventRemove } from '@react-navigation/native';
+import { usePreventRemove } from 'expo-router/react-navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 
-import { getActivity, readNotification } from '@/api/activity';
+import { readNotification } from '@/api/activity';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
 import { Activity, ActivityAction } from '@/constants/dataInterface';
+import { useReadNotification } from '@/hooks/mutations/useReadNotification';
+import { useNotifications } from '@/hooks/queries/useNotifications';
 import { TranslationKey, useI18n } from '@/lib/i18n';
+import { POLLING } from '@/lib/query/polling';
+import { queryKeys } from '@/lib/query/query-keys';
 import { clearNotificationBadgeAsync } from '@/lib/notifications';
-import { supabase } from '@/lib/supabase';
+import { useLayoutScale } from '@/lib/layout-scale';
 import { useMyStateNotif } from '@/store/notification-state';
+import { useMyStateUser } from '@/store/user-state';
+
+const EMPTY_ACTIVITIES: Activity[] = [];
 
 function formatDate(iso: string, locale: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString(locale, {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(locale, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H2',location:'notificationsPage.tsx:formatDate',message:'formatDate threw',data:{iso,locale,error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    throw error;
+  }
 }
 
 function getDayKey(iso: string) {
@@ -133,25 +148,32 @@ function getBookingPreview(activity: Activity, locale: string) {
     return null;
   }
 
-  const booking = activity.booking;
-  const routeParts = [booking.departure?.label, booking.arrival?.label].filter(
-    (value): value is string => Boolean(value && value !== 'N/A')
-  );
+  try {
+    const booking = activity.booking;
+    const routeParts = [booking.departure?.label, booking.arrival?.label].filter(
+      (value): value is string => Boolean(value && value !== 'N/A')
+    );
 
-  return {
-    vehicle: activity.car?.name ?? activity.target ?? activity.bookingId ?? '—',
-    departureTime: booking.departureAt
-      ? new Date(booking.departureAt).toLocaleTimeString(locale, {
-          weekday: 'long',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : '—',
-    route: routeParts.length > 0 ? routeParts.join(' → ') : '—',
-  };
+    return {
+      vehicle: activity.car?.name ?? activity.target ?? activity.bookingId ?? '—',
+      departureTime: booking.departureAt
+        ? new Date(booking.departureAt).toLocaleTimeString(locale, {
+            weekday: 'long',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—',
+      route: routeParts.length > 0 ? routeParts.join(' → ') : '—',
+    };
+  } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H3',location:'notificationsPage.tsx:getBookingPreview',message:'getBookingPreview threw',data:{id:activity?.id,departureAt:activity?.booking?.departureAt,locale,error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    throw error;
+  }
 }
 
 function getActionMeta(
@@ -281,10 +303,22 @@ function NotificationItem({
   tf: ReturnType<typeof useI18n>['tf'];
   appLocale: string;
 }) {
-  const meta = getActionMeta(item.action, item, t, tf, appLocale);
-  const relativeDate = formatRelativeDate(item.createAt, appLocale);
+  const { s, font } = useLayoutScale();
+  const iconWell = s(42);
+  let meta;
+  let relativeDate = '';
+  let bookingPreview = null;
+  try {
+    meta = getActionMeta(item.action, item, t, tf, appLocale);
+    relativeDate = formatRelativeDate(item.createAt, appLocale);
+    bookingPreview = getBookingPreview(item, appLocale);
+  } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H3',location:'notificationsPage.tsx:NotificationItem',message:'notification item render threw',data:{id:item?.id,action:item?.action,createAt:item?.createAt,error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    throw error;
+  }
   const canOpenBooking = Boolean(item.bookingId);
-  const bookingPreview = getBookingPreview(item, appLocale);
 
   return (
     <TouchableOpacity
@@ -296,28 +330,28 @@ function NotificationItem({
         !item.isRead && { borderColor: meta.tone, borderWidth: 1.5 },
       ]}>
       <View style={styles.itemRow}>
-        <View style={[styles.iconWrap, { backgroundColor: `${meta.tone}22` }]}>
-          <Text style={[styles.iconText, { color: meta.tone }]}>{meta.icon}</Text>
+        <View style={[styles.iconWrap, { backgroundColor: `${meta.tone}22`, width: iconWell, height: iconWell, borderRadius: iconWell / 2 }]}>
+          <Text style={[styles.iconText, { color: meta.tone, fontSize: font.lg }]}>{meta.icon}</Text>
         </View>
 
         <View style={styles.contentWrap}>
           <View style={styles.itemHeader}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#000' }]} numberOfLines={2}>
+            <Text style={[styles.title, { color: isDark ? '#fff' : '#000', fontSize: font.base }]} numberOfLines={2}>
               {meta.title}
             </Text>
             {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: meta.tone }]} />}
           </View>
 
-          <Text style={[styles.body, { color: isDark ? '#c7c7cc' : '#4b5563' }]} numberOfLines={3}>
+          <Text style={[styles.body, { color: isDark ? '#c7c7cc' : '#4b5563', fontSize: font.sm }]} numberOfLines={3}>
             {meta.body}
           </Text>
 
           <View style={styles.metaRow}>
-            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280' }]}>
+            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280', fontSize: font.xs }]}>
               {relativeDate}
             </Text>
-            <Text style={[styles.date, { color: isDark ? '#5f5f66' : '#9ca3af' }]}>•</Text>
-            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280' }]}>
+            <Text style={[styles.date, { color: isDark ? '#5f5f66' : '#9ca3af', fontSize: font.xs }]}>•</Text>
+            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280', fontSize: font.xs }]}>
               {formatDate(item.createAt, appLocale)}
             </Text>
           </View>
@@ -329,31 +363,31 @@ function NotificationItem({
                 { backgroundColor: isDark ? '#202127' : '#f8fafc' },
               ]}>
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
+                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
                   {t('reservations.field.vehicle')}
                 </Text>
                 <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
                   numberOfLines={1}>
                   {bookingPreview.vehicle}
                 </Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
+                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
                   {t('reservations.field.departure')}
                 </Text>
                 <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
                   numberOfLines={1}>
                   {bookingPreview.departureTime}
                 </Text>
               </View>
               <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280' }]}>
+                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
                   {t('reservations.section.places')}
                 </Text>
                 <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827' }]}
+                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
                   numberOfLines={2}>
                   {bookingPreview.route}
                 </Text>
@@ -363,7 +397,7 @@ function NotificationItem({
 
           {canOpenBooking ? (
             <View style={[styles.linkChip, { backgroundColor: isDark ? '#26272b' : '#f3f4f6' }]}>
-              <Text style={[styles.linkChipText, { color: meta.tone }]}>
+              <Text style={[styles.linkChipText, { color: meta.tone, fontSize: font.sm }]}>
                 {t('notifications.openBooking')}
               </Text>
             </View>
@@ -375,17 +409,35 @@ function NotificationItem({
 }
 
 export default function Notifications() {
+  // #region agent log
+  fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H4',location:'notificationsPage.tsx:Notifications',message:'notifications screen mount',data:{},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const { colorScheme } = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { t, tf, appLocale } = useI18n();
+  const { font } = useLayoutScale();
   const router = useRouter();
+  const notificationsTitle = t('notifications.title');
   const emptyTitleKeyNotifiction: TranslationKey = 'notifications.empty.title';
   const emptyDescriptionKeyNotifiction: TranslationKey = 'notifications.empty.description';
 
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { clearCountNotif, decrementCountNotif, setCountNotif } = useMyStateNotif();
+  const storedUser = useMyStateUser((state) => state.user);
+  const queryClient = useQueryClient();
+  const userId = storedUser?.id;
+  const clearCountNotif = useMyStateNotif((state) => state.clearCountNotif);
+  const decrementCountNotif = useMyStateNotif((state) => state.decrementCountNotif);
+  const setCountNotif = useMyStateNotif((state) => state.setCountNotif);
+  const readNotificationMutation = useReadNotification();
+  const {
+    data,
+    isLoading: loading,
+    isLoadingError,
+  } = useNotifications(storedUser?.id, { pollingInterval: POLLING.notifications });
+  const activities = data ?? EMPTY_ACTIVITIES;
+  // #region agent log
+  fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H1',location:'notificationsPage.tsx:afterQuery',message:'notifications query in screen',data:{loading,isLoadingError,hasUser:Boolean(storedUser?.id),dataType:typeof data,isArray:Array.isArray(data),length:Array.isArray(data)?data.length:null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const navigation = useNavigation();
   const isMarkingAsReadRef = useRef(false);
@@ -396,7 +448,27 @@ export default function Notifications() {
     });
   }, []);
 
+  useEffect(() => {
+    const nextCount = activities.filter((activity) => !activity.isRead).length;
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'notifications-count-post-fix',hypothesisId:'H7',location:'notificationsPage.tsx:countEffect',message:'Synchronizing unread notification count',data:{currentCount:useMyStateNotif.getState().countNotif,nextCount,activityCount:activities.length,hasQueryData:Boolean(data)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    setCountNotif(nextCount);
+  }, [activities, setCountNotif]);
+
+  useEffect(() => {
+    if (isLoadingError) {
+      setError(t('notifications.loadError'));
+      return;
+    }
+
+    setError(null);
+  }, [isLoadingError, t]);
+
   const sections = useMemo(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H2',location:'notificationsPage.tsx:sections',message:'building notification sections',data:{isArray:Array.isArray(activities),length:Array.isArray(activities)?activities.length:null,createAts:Array.isArray(activities)?activities.slice(0,5).map((item)=>item?.createAt):null},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const ordered = [...activities].sort((left, right) => {
       return new Date(right.createAt).getTime() - new Date(left.createAt).getTime();
     });
@@ -425,25 +497,15 @@ export default function Notifications() {
     return groups;
   }, [activities, appLocale]);
 
-  useEffect(() => {
-    supabase.auth
-      .getUser()
-      .then(({ data: { user } }) => {
-        if (user) {
-          getActivity({ userId: user.id })
-            .then((data) => {
-              setActivities(data);
-              setCountNotif(data.filter((activity: Activity) => !activity.isRead).length);
-            })
-            .catch(() => setError(t('notifications.loadError')))
-            .finally(() => setLoading(false));
-        }
-      })
-      .catch(() => {
-        setError(t('notifications.loadError'));
-        setLoading(false);
-      });
-  }, [setCountNotif, t]);
+  const patchActivities = (updater: (currentActivities: Activity[]) => Activity[]) => {
+    if (!userId) {
+      return;
+    }
+
+    queryClient.setQueryData(queryKeys.activity.list(userId), (currentActivities: Activity[] | undefined) =>
+      updater(currentActivities ?? [])
+    );
+  };
 
   usePreventRemove(
     activities.some((activity) => !activity.isRead),
@@ -458,11 +520,12 @@ export default function Notifications() {
 
       Promise.allSettled(unreadNotifications.map((activity) => readNotification(activity.id)))
         .then(() => {
-          setActivities((currentActivities) =>
+          patchActivities((currentActivities) =>
             currentActivities.map((activity) =>
               activity.isRead ? activity : { ...activity, isRead: true }
             )
           );
+          void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
           clearCountNotif();
           requestAnimationFrame(() => {
             navigation.dispatch(data.action);
@@ -473,11 +536,14 @@ export default function Notifications() {
         });
     }
   );
+  // #region agent log
+  fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'notifications-crash-v1',hypothesisId:'H4',location:'notificationsPage.tsx:afterUsePreventRemove',message:'usePreventRemove completed',data:{hasUnread:activities.some((activity)=>!activity.isRead),activityCount:activities.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const handleNotificationPress = (selectedActivity: Activity) => {
     let shouldCallApi = false;
 
-    setActivities((currentActivities) =>
+    patchActivities((currentActivities) =>
       currentActivities.map((activityItem) => {
         if (activityItem.id !== selectedActivity.id || activityItem.isRead) {
           return activityItem;
@@ -509,10 +575,11 @@ export default function Notifications() {
 
     decrementCountNotif();
 
-    readNotification(selectedActivity.id)
+    readNotificationMutation
+      .mutateAsync(selectedActivity.id)
       .then(openRelatedBooking)
       .catch(() => {
-        setActivities((currentActivities) =>
+        patchActivities((currentActivities) =>
           currentActivities.map((activityItem) =>
             activityItem.id === selectedActivity.id
               ? { ...activityItem, isRead: false }
@@ -526,21 +593,21 @@ export default function Notifications() {
   return (
     <>
       <Stack.Screen
-        options={buildStackScreenOptions({
-          title: t('notifications.title'),
-          isDark,
-          canGoBack: true,
-        })}
+          options={buildStackScreenOptions({
+            title: notificationsTitle,
+            isDark,
+            canGoBack: true,
+          })}
       />
       <View
         style={[
           styles.container,
-          { backgroundColor: isDark ? color.appDarkBackground : '#f2f2f7' },
+          { backgroundColor: isDark ? color.appDarkBackground : '#ffffff' },
         ]}>
         {loading ? (
           <LoadingView />
         ) : error ? (
-          <Text style={[styles.emptyText, { color: isDark ? '#aaa' : '#555' }]}>{error}</Text>
+          <Text style={[styles.emptyText, { color: isDark ? '#aaa' : '#555', fontSize: font.sm }]}>{error}</Text>
         ) : (
           <View style={{ flex: 1, width: '100%' }}>
             <SectionList
@@ -549,7 +616,7 @@ export default function Notifications() {
               renderSectionHeader={({ section }) => (
                 <View style={styles.sectionHeaderWrap}>
                   <Text
-                    style={[styles.sectionHeaderText, { color: isDark ? '#f3f4f6' : '#111827' }]}>
+                    style={[styles.sectionHeaderText, { color: isDark ? '#f3f4f6' : '#111827', fontSize: font.md }]}>
                     {section.title}
                   </Text>
                 </View>
@@ -569,11 +636,18 @@ export default function Notifications() {
               SectionSeparatorComponent={() => <View style={styles.sectionSpacer} />}
               stickySectionHeadersEnabled={false}
               ListEmptyComponent={
+                (() => {
+                  // #region agent log
+                  fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H6',location:'notificationsPage.tsx:ListEmptyComponent',message:'empty notifications list rendered',data:{sectionCount:sections.length},timestamp:Date.now()})}).catch(()=>{});
+                  // #endregion
+                  return (
                 <ErrorEmpty
                   isDark={isDark}
                   title={t(emptyTitleKeyNotifiction)}
                   description={t(emptyDescriptionKeyNotifiction)}
                 />
+                  );
+                })()
               }
             />
           </View>

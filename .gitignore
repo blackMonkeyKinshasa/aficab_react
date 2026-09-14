@@ -25,6 +25,10 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# Windows reserved device name (often created by `> NUL`)
+NUL
+nul
+
 # macOS
 .DS_Store
 *.pem

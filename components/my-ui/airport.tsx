@@ -11,7 +11,6 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { color } from '@/constants/colors';
 import { Location } from '@/constants/constants';
 import { ResType } from '@/constants/databaseEnum';
-import { LocationDocTA } from '@/constants/dataInterface';
 import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
@@ -102,14 +101,6 @@ export function Airport() {
       return;
     }
 
-    const doc: LocationDocTA = {
-      type: ResType.TA,
-      tripType,
-      locationDepart,
-      locationDest,
-      dateStart,
-      ...(tripType === 'round-trip' && dateReturn ? { dateReturn } : {}),
-    };
     analytics.trackBookingStarted(ResType.TA, {
       origin: locationDepart.description,
       destination: locationDest.description,
@@ -119,7 +110,7 @@ export function Airport() {
     });
     router.push({
       pathname: '/new_booking/[doc]',
-      params: { doc: JSON.stringify(doc) },
+      params: { doc: ResType.TA },
     });
   };
 

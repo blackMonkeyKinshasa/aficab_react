@@ -10,20 +10,17 @@ import {
   View,
 } from 'react-native';
 
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createMaterialTopTabNavigator } from 'expo-router/js-top-tabs';
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import {
-  clientCancelBooking,
   createNewBooking,
-  getAllBookings,
   maxicashVISA,
   pawapayPay,
 } from '@/api/booking';
-import { createReview } from '@/api/review';
-import { BookingDetailSheet } from '@/components/my-ui/BookingDetailSheet';
 import { BookingListCard } from '@/components/my-ui/BookingListCard';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
@@ -42,11 +39,16 @@ import {
 } from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
 import { TranslationKey, useI18n } from '@/lib/i18n';
+import { POLLING } from '@/lib/query/polling';
+import { queryKeys } from '@/lib/query/query-keys';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 import { BookingDetailModal } from '@/components/reservation/BookingDetailModal';
 import { canClientCancelBooking } from '@/components/reservation/reservation-helpers';
+import { useCancelBooking } from '@/hooks/mutations/useCancelBooking';
+import { useCreateReview } from '@/hooks/mutations/useCreateReview';
+import { useBookings } from '@/hooks/queries/useBookings';
 
 type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
 
@@ -232,7 +234,7 @@ function BookingListTab({
               appLocale={appLocale}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.listContent}  
           ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
           showsVerticalScrollIndicator={false}
         />
@@ -271,14 +273,22 @@ export default function Reservation() {
   const toast = useAppToast();
   const analytics = useAnalytics();
   const storedUser = useMyStateUser((state: UserStoreState) => state.user);
+  const queryClient = useQueryClient();
+  const cancelBookingMutation = useCancelBooking();
+  const createReviewMutation = useCreateReview();
+  const clientId = storedUser?.id;
+  const {
+    data: bookings = [],
+    isLoading: loading,
+    isLoadingError,
+    refetch,
+  } = useBookings(clientId, { pollingInterval: POLLING.normal });
   const showBadgeId = Array.isArray(rawShowBadgeId) ? rawShowBadgeId[0] : rawShowBadgeId;
   const highlightBookingId = Array.isArray(rawHighlightBookingId)
     ? rawHighlightBookingId[0]
     : rawHighlightBookingId;
   const openBookingId = Array.isArray(rawOpenBookingId) ? rawOpenBookingId[0] : rawOpenBookingId;
 
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [reviewTarget, setReviewTarget] = useState<Booking | null>(null);
@@ -289,18 +299,22 @@ export default function Reservation() {
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null);
 
-  const loadBookings = async (clientId?: string) => {
-    const data = await getAllBookings(clientId);
-    setBookings(data);
-  };
+  useEffect(() => {
+    if (!isLoadingError) {
+      return;
+    }
+
+    toast({
+      title: t('common.error'),
+      description: t('reservations.loadError'),
+      action: 'error',
+    });
+  }, [isLoadingError, t, toast]);
 
   const refreshBookings = async () => {
     try {
       setRefreshing(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      await loadBookings(user?.id ?? '');
+      await refetch();
     } catch {
       toast({
         title: t('common.error'),
@@ -313,9 +327,13 @@ export default function Reservation() {
   };
 
   const updateBookingState = (bookingId: string, updater: (booking: Booking) => Booking) => {
-    setBookings((currentBookings) =>
-      currentBookings.map((booking) => (booking.id === bookingId ? updater(booking) : booking))
-    );
+    if (clientId) {
+      queryClient.setQueryData(
+        queryKeys.bookings.list(clientId),
+        (currentBookings: Booking[] | undefined) =>
+          currentBookings?.map((booking) => (booking.id === bookingId ? updater(booking) : booking))
+      );
+    }
 
     setSelected((currentSelected) =>
       currentSelected && currentSelected.id === bookingId
@@ -669,8 +687,14 @@ export default function Reservation() {
     return () => clearTimeout(timeoutId);
   }, [autoHighlightBookingId]);
 
+  const openedBookingIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!openBookingId || loading || bookings.length === 0) {
+      return;
+    }
+
+    if (openedBookingIdRef.current === openBookingId) {
       return;
     }
 
@@ -679,24 +703,9 @@ export default function Reservation() {
       return;
     }
 
-    setSelected(booking);
-  }, [openBookingId, bookings, loading]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const userID = user?.id ?? '';
-
-      loadBookings(userID)
-        .catch(() =>
-          toast({
-            title: t('common.error'),
-            description: t('reservations.loadError'),
-            action: 'error',
-          })
-        )
-        .finally(() => setLoading(false));
-    });
-  }, [t, toast]);
+    openedBookingIdRef.current = openBookingId;
+    router.push({ pathname: '/booking/[id]', params: { id: booking.id } });
+  }, [openBookingId, bookings, loading, router]);
 
   const handleReviewSubmit = async ({
     ratingDriving,
@@ -723,7 +732,7 @@ export default function Reservation() {
     setIsSubmittingReview(true);
 
     try {
-      const review = await createReview({
+      const review = await createReviewMutation.mutateAsync({
         bookingId: reviewTarget.id,
         driverId: reviewTarget.driverId,
         ratingDriving,
@@ -733,12 +742,7 @@ export default function Reservation() {
         comment,
       });
 
-      setBookings((currentBookings) =>
-        currentBookings.map((booking) =>
-          booking.id === reviewTarget.id ? { ...booking, review } : booking
-        )
-      );
-
+      updateBookingState(reviewTarget.id, (booking) => ({ ...booking, review }));
       setSelected((currentSelected) =>
         currentSelected && currentSelected.id === reviewTarget.id
           ? { ...currentSelected, review }
@@ -796,7 +800,11 @@ export default function Reservation() {
               throw new Error(t('booking.sessionMissing'));
             }
 
-            await clientCancelBooking(booking.id, booking.status, clientId);
+            await cancelBookingMutation.mutateAsync({
+              bookingId: booking.id,
+              status: booking.status,
+              clientId,
+            });
             updateBookingState(booking.id, (currentBooking) => ({
               ...currentBooking,
               status: ResStatus.CANCELED,
@@ -879,7 +887,9 @@ export default function Reservation() {
                   rawShowBadge={showBadgeId === activeHighlightId}
                   refreshing={refreshing}
                   onRefresh={refreshBookings}
-                  onSelectBooking={setSelected}
+                  onSelectBooking={(booking) =>
+                    router.push({ pathname: '/booking/[id]', params: { id: booking.id } })
+                  }
                   t={t}
                   appLocale={appLocale}
                   emptyTitleKey="reservations.empty.upcoming.title"
@@ -898,7 +908,9 @@ export default function Reservation() {
                   rawShowBadge={showBadgeId === activeHighlightId}
                   refreshing={refreshing}
                   onRefresh={refreshBookings}
-                  onSelectBooking={setSelected}
+                  onSelectBooking={(booking) =>
+                    router.push({ pathname: '/booking/[id]', params: { id: booking.id } })
+                  }
                   t={t}
                   appLocale={appLocale}
                   emptyTitleKey="reservations.empty.ongoing.title"
@@ -917,7 +929,9 @@ export default function Reservation() {
                   rawShowBadge={showBadgeId === activeHighlightId}
                   refreshing={refreshing}
                   onRefresh={refreshBookings}
-                  onSelectBooking={setSelected}
+                  onSelectBooking={(booking) =>
+                    router.push({ pathname: '/booking/[id]', params: { id: booking.id } })
+                  }
                   t={t}
                   appLocale={appLocale}
                   emptyTitleKey="reservations.empty.past.title"
@@ -928,18 +942,6 @@ export default function Reservation() {
           </ReservationTabs.Navigator>
         )}
       </View>
-
-      <BookingDetailSheet
-        booking={selected}
-        isOpen={selected !== null}
-        onClose={() => setSelected(null)}
-        onOpenReview={(booking) => setReviewTarget(booking)}
-        onOpenPayment={openPaymentModal}
-        onClientCancelBooking={handleClientCancelBooking}
-        isCancelling={selected !== null && cancellingBookingId === selected.id}
-        t={t}
-        appLocale={appLocale}
-      />
 
       {isSubmittingPayment ? (
         <View style={styles.loadingOverlay}>
@@ -1001,7 +1003,7 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 8 },
   listSeparator: { height: 12 },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.35)',

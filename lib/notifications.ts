@@ -48,6 +48,18 @@ function getNotificationsModule(): NotificationsModule | null {
   return require('expo-notifications') as NotificationsModule;
 }
 
+function isNotificationPermissionError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('UNErrorDomain') ||
+    error.message.includes('Notifications are not allowed') ||
+    ('code' in error && error.code === 'ERR_PERMISSIONS_REQUEST_NOTIFICATIONS')
+  );
+}
+
 export function reportPushTokenStage(stage: string, extra?: Record<string, unknown>) {
   Sentry.addBreadcrumb({
     category: 'push_token',
@@ -137,7 +149,6 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
     await notifications.setNotificationChannelAsync('default', {
       name: translateCurrent('notifications.push.channelName'),
       importance: notifications.AndroidImportance.MAX,
-      sound: 'default',
       vibrationPattern: [0, 250, 250, 250],
       lockscreenVisibility: notifications.AndroidNotificationVisibility.PUBLIC,
     });
@@ -156,16 +167,51 @@ export async function registerForPushNotificationsAsync(): Promise<PushTokenRegi
   }
 
   trace.push('verification permission notifications');
-  const { status: existingStatus } = await notifications.getPermissionsAsync();
+  let existingStatus = 'undetermined';
   let finalStatus = existingStatus;
 
-  if (existingStatus !== 'granted') {
-    trace.push(`permission actuelle: ${existingStatus}`);
-    const { status } = await notifications.requestPermissionsAsync();
-    finalStatus = status;
-    trace.push(`permission apres demande: ${finalStatus}`);
-  } else {
+  try {
+    const currentPermissions = await notifications.getPermissionsAsync();
+    existingStatus = currentPermissions.status;
+    finalStatus = existingStatus;
+  } catch (error) {
+    if (!isNotificationPermissionError(error)) {
+      throw error;
+    }
+
+    trace.push('blocage: notifications desactivees par le systeme');
+    reportPushTokenStage('permission-denied', {
+      platform: Platform.OS,
+      existingStatus: 'unavailable',
+      finalStatus: 'denied',
+    });
+    return {
+      token: null,
+      errorMessage: translateCurrent('notifications.push.permissionDenied'),
+      stage: 'permission-denied',
+      trace,
+    };
+  }
+
+  if (existingStatus === 'granted') {
     trace.push('permission deja accordee');
+  } else if (existingStatus === 'denied') {
+    trace.push('blocage: permission deja refusee');
+    finalStatus = existingStatus;
+  } else {
+    trace.push(`permission actuelle: ${existingStatus}`);
+    try {
+      const { status } = await notifications.requestPermissionsAsync();
+      finalStatus = status;
+      trace.push(`permission apres demande: ${finalStatus}`);
+    } catch (error) {
+      if (!isNotificationPermissionError(error)) {
+        throw error;
+      }
+
+      finalStatus = 'denied';
+      trace.push('blocage: iOS a refuse la demande de permission');
+    }
   }
 
   if (finalStatus !== 'granted') {
@@ -271,8 +317,16 @@ export async function clearNotificationBadgeAsync() {
     return false;
   }
 
-  await notifications.setBadgeCountAsync(0);
-  return true;
+  try {
+    await notifications.setBadgeCountAsync(0);
+    return true;
+  } catch (error) {
+    if (isNotificationPermissionError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 export function addNotificationReceivedListener(

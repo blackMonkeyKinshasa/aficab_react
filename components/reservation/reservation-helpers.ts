@@ -1,6 +1,8 @@
 import { Booking } from '@/constants/dataInterface';
-import { ResStatus } from '@/constants/databaseEnum';
+import { ResStatus, ResType } from '@/constants/databaseEnum';
 import { TranslationKey } from '@/lib/i18n';
+
+const DAY_MS = 1000 * 60 * 60 * 24;
 
 export const STATUS_COLORS: Record<ResStatus, string> = {
   [ResStatus.PENDING]: '#FFA500',
@@ -48,6 +50,50 @@ export function fmtDay(iso: string | null | undefined, locale: string) {
 export function fmtTime(iso: string | null | undefined, locale: string) {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+}
+
+export function toValidDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function getRentalDays(booking: Booking) {
+  if (typeof booking.options?.rentalDays === 'number' && booking.options.rentalDays > 0) {
+    return Math.max(1, Math.ceil(booking.options.rentalDays));
+  }
+
+  const startDate = toValidDate(booking.departureAt);
+  const endDate = toValidDate(booking.arrivalAt);
+
+  if (!startDate || !endDate) {
+    return 1;
+  }
+
+  const diffInMs = endDate.getTime() - startDate.getTime();
+  return Math.max(1, Math.ceil(diffInMs / DAY_MS));
+}
+
+export function getCurrentRentalDay(booking: Booking, rentalDays = getRentalDays(booking)) {
+  const startDate = toValidDate(booking.departureAt);
+  if (!startDate) {
+    return 1;
+  }
+
+  const now = Date.now();
+  if (now <= startDate.getTime()) {
+    return 1;
+  }
+
+  const elapsedDays = Math.floor((now - startDate.getTime()) / DAY_MS) + 1;
+  return Math.min(rentalDays, Math.max(1, elapsedDays));
+}
+
+export function isMultiDayRental(booking: Booking) {
+  return booking.type === ResType.LOC && getRentalDays(booking) > 1;
 }
 
 export function canClientCancelBooking(booking: Booking) {

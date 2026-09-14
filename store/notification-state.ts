@@ -59,9 +59,7 @@ export const useMyStateNotif = create<NotifState>()(
       },
 
       setCountNotif: (count: number) =>
-        set({
-          countNotif: count,
-        }),
+        set((state) => (state.countNotif === count ? state : { countNotif: count })),
 
       decrementCountNotif: () =>
         set((state) => ({

@@ -1,45 +1,130 @@
-import { isDev } from "@/constants/env";
+import { isDev } from '@/constants/env';
+import {
+  ApiNetworkError,
+  getIsOnline,
+  isNetworkFailure,
+} from '@/lib/network';
 import { supabase } from '@/lib/supabase';
 
 const API_URL = isDev ? 'https://aficab.vercel.app/api' : 'https://aficab.com/api';
 
-function shouldSkipErrorLog(endpoint: string, errorBody: any) {
-  return Boolean(errorBody?.code === 'USER_NOT_FOUND' && endpoint.startsWith('/user/'));
+export type ApiRequestOptions = Omit<RequestInit, 'headers' | 'body'> & {
+  headers?: Record<string, string | undefined>;
+  body?: RequestInit['body'];
+};
+
+export type ApiErrorBody = {
+  message?: string;
+  error?: string;
+  code?: string;
+  [key: string]: unknown;
+};
+
+export class ApiError extends Error {
+  status?: number;
+  code?: string;
+  body?: unknown;
+
+  constructor(message: string, options?: { status?: number; code?: string; body?: unknown }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = options?.status;
+    this.code = options?.code;
+    this.body = options?.body;
+  }
 }
 
-function buildApiError(response: Response, errorBody: any) {
-  const message = errorBody?.message ?? errorBody?.error ?? JSON.stringify(errorBody) ?? `Erreur HTTP: ${response.status}`;
-  const error = new Error(message) as Error & { status?: number; code?: string; body?: any };
-
-  error.status = response.status;
-  error.code = errorBody?.code;
-  error.body = errorBody;
-
-  return error;
-}
-
-async function parseErrorResponse(response: Response) {
-  let errorBody: any = null;
-
-  try {
-    errorBody = await response.json();
-  } catch {
-    errorBody = await response.text().catch(() => null);
+export function isNotFoundError(error: unknown) {
+  if (!error || typeof error !== 'object') {
+    return false;
   }
 
-  return errorBody;
+  return (error as { status?: number }).status === 404;
 }
 
-async function performFetch(endpoint: string, headers: Record<string, string>, options: any = {}) {
-  return fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
+function shouldSkipErrorLog(endpoint: string, errorBody: unknown) {
+  return Boolean(
+    errorBody &&
+      typeof errorBody === 'object' &&
+      'code' in errorBody &&
+      (errorBody as ApiErrorBody).code === 'USER_NOT_FOUND' &&
+      endpoint.startsWith('/user/')
+  );
+}
+
+function buildApiError(response: Response, errorBody: unknown) {
+  const parsedBody =
+    errorBody && typeof errorBody === 'object' ? (errorBody as ApiErrorBody) : null;
+  const message =
+    parsedBody?.message ??
+    parsedBody?.error ??
+    (typeof errorBody === 'string' ? errorBody : null) ??
+    `Erreur HTTP: ${response.status}`;
+
+  return new ApiError(message, {
+    status: response.status,
+    code: parsedBody?.code,
+    body: errorBody,
   });
 }
 
+async function parseErrorResponse(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return response.text().catch(() => null);
+  }
+}
+
+async function performFetch(endpoint: string, headers: Record<string, string>, options: ApiRequestOptions = {}) {
+  const isOnline = await getIsOnline();
+
+  if (!isOnline) {
+    throw new ApiNetworkError();
+  }
+
+  try {
+    return await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    if (isNetworkFailure(error) || error instanceof TypeError) {
+      throw new ApiNetworkError();
+    }
+
+    throw error;
+  }
+}
+
+function resolveHeaders(
+  options: ApiRequestOptions,
+  accessToken?: string | null
+): Record<string, string> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+  };
+
+  if (options.headers) {
+    for (const [key, value] of Object.entries(options.headers)) {
+      if (value !== undefined) {
+        headers[key] = value;
+      }
+    }
+  }
+
+  Object.keys(headers).forEach((key) => {
+    if (headers[key] === undefined) {
+      delete headers[key];
+    }
+  });
+
+  return headers;
+}
 
 export async function getAccessToken() {
-  
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -51,25 +136,18 @@ export async function getRequiredAccessToken() {
   const accessToken = await getAccessToken();
 
   if (!accessToken) {
-    throw new Error('Token d\'authentification introuvable. Reconnectez-vous puis reessayez.');
+    throw new Error("Token d'authentification introuvable. Reconnectez-vous puis reessayez.");
   }
 
   return accessToken;
 }
 
-export async function apiFetch(endpoint: string, options: any = {}) {
-  const isFormData = options.body instanceof FormData;
+export async function apiFetch<T = unknown>(
+  endpoint: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
   const resolvedToken = await getAccessToken();
-
-  const headers: Record<string, string> = {
-    ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
-    ...(!isFormData && { 'Content-Type': 'application/json' }),
-    ...options.headers,
-  };
-
-  // Supprimer les entrées undefined (ex: Content-Type forcé à undefined)
-  Object.keys(headers).forEach((k) => headers[k] === undefined && delete headers[k]);
-
+  const headers = resolveHeaders(options, resolvedToken);
   const response = await performFetch(endpoint, headers, options);
 
   if (response.status === 401 && resolvedToken) {
@@ -77,15 +155,11 @@ export async function apiFetch(endpoint: string, options: any = {}) {
     const refreshedToken = data.session?.access_token;
 
     if (!error && refreshedToken) {
-      const retryHeaders: Record<string, string> = {
-        ...headers,
-        Authorization: `Bearer ${refreshedToken}`,
-      };
-
+      const retryHeaders = resolveHeaders(options, refreshedToken);
       const retryResponse = await performFetch(endpoint, retryHeaders, options);
 
       if (retryResponse.ok) {
-        return retryResponse.json();
+        return retryResponse.json() as Promise<T>;
       }
 
       const retryErrorBody = await parseErrorResponse(retryResponse);
@@ -98,7 +172,9 @@ export async function apiFetch(endpoint: string, options: any = {}) {
 
   if (!response.ok) {
     if (response.status === 413) {
-      throw new Error('Fichier trop volumineux. Choisissez une image plus legere.');
+      throw new ApiError('Fichier trop volumineux. Choisissez une image plus legere.', {
+        status: 413,
+      });
     }
 
     const errorBody = await parseErrorResponse(response);
@@ -108,10 +184,16 @@ export async function apiFetch(endpoint: string, options: any = {}) {
     throw buildApiError(response, errorBody);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
-export async function apiAuthFetch(endpoint: string, options: any = {}) {
+export async function apiAuthFetch<T = unknown>(
+  endpoint: string,
+  options: ApiRequestOptions = {}
+): Promise<T> {
   const resolvedToken = await getRequiredAccessToken();
-  return apiFetch(endpoint, { ...options, headers: { ...options.headers, Authorization: `Bearer ${resolvedToken}` } });
+  return apiFetch<T>(endpoint, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${resolvedToken}` },
+  });
 }

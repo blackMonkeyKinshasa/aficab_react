@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import * as Application from 'expo-application';
@@ -33,9 +33,41 @@ export default function UpdateAppScreen() {
   const appConfig = useAppConfigState((state: AppConfigState) => state.appConfig);
   const appIsLock = useAppConfigState((state: AppConfigState) => state.appIsLock);
   const refreshAppConfig = useAppConfigState((state: AppConfigState) => state.refreshAppConfig);
+  const recomputeLockFromLocalVersion = useAppConfigState(
+    (state: AppConfigState) => state.recomputeLockFromLocalVersion
+  );
   const refreshing = useAppConfigState((state: AppConfigState) => state.refreshing);
   const { t } = useI18n();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const isLocked = recomputeLockFromLocalVersion();
+
+    if (!isLocked) {
+      router.replace('/');
+      return;
+    }
+
+    let isMounted = true;
+
+    const verifyLatestConfig = async () => {
+      try {
+        const result = await refreshAppConfig();
+
+        if (isMounted && !result.appIsLock) {
+          router.replace('/');
+        }
+      } catch {
+        // Keep the blocking screen if the config cannot be refreshed yet.
+      }
+    };
+
+    void verifyLatestConfig();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recomputeLockFromLocalVersion, refreshAppConfig, router]);
 
   const localVersion = useMemo(() => getLocalBuildVersion(), []);
   const storeUrl = useMemo(() => getStoreUrl(Platform.OS), []);

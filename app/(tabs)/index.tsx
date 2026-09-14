@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Stack, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
@@ -7,7 +7,7 @@ import { useColorScheme } from 'nativewind';
 import { getUserByID } from '@/api/user';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { NotificationIcon } from '@/components/my-ui/NotificationIcon';
-import { RideBookingScreen } from '@/components/my-ui/RideBookingScreen';
+import { MainLayout } from '@/components/my-ui/MainLayout';
 import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
 import { Role } from '@/constants/databaseEnum';
 import { useAnalytics } from '@/lib/analytics';
@@ -23,16 +23,6 @@ const SCREEN_OPTIONS = (isDark: boolean, onPress: () => void) =>
   buildStackScreenOptions({
     title: '',
     isDark,
-    headerLeft: () => (
-      <Image
-        source={
-          isDark
-            ? require('@/assets/images/aficab-logo-white.png')
-            : require('@/assets/images/aficab-logo-black.png')
-        }
-        style={{ width: 90, height: 30, resizeMode: 'contain', marginLeft: 10 }}
-      />
-    ),
     headerRight: () => (
       <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
         <NotificationIcon isDark={isDark} onPress={onPress} />
@@ -66,6 +56,9 @@ export default function HomeScreen() {
   );
   const refreshAppConfig = useAppConfigState(
     (state: AppConfigStoreState) => state.refreshAppConfig
+  );
+  const recomputeLockFromLocalVersion = useAppConfigState(
+    (state: AppConfigStoreState) => state.recomputeLockFromLocalVersion
   );
 
   useEffect(() => {
@@ -115,7 +108,7 @@ export default function HomeScreen() {
         try {
           const freshUser = await getUserByID(user.id);
 
-          if (freshUser.role !== Role.CLIENT) {
+          if (freshUser.role === Role.DRIVER) {
             analytics.trackRoleMismatchRedirect(user.id, {
               email: freshUser.email ?? user.email ?? '',
               role: freshUser.role,
@@ -165,7 +158,9 @@ export default function HomeScreen() {
       return;
     }
 
-    if (appIsLock) {
+    const currentlyLocked = recomputeLockFromLocalVersion() || appIsLock;
+
+    if (currentlyLocked) {
       router.replace('/update-app');
       return;
     }
@@ -196,6 +191,7 @@ export default function HomeScreen() {
   }, [
     appIsLock,
     loading,
+    recomputeLockFromLocalVersion,
     refreshAppConfig,
     router,
     shouldFetchAppConfig,
@@ -208,7 +204,7 @@ export default function HomeScreen() {
       <Stack.Screen options={SCREEN_OPTIONS(isDark, () => router.push('/notificationsPage'))} />
 
       <View style={{ flex: 1 }}>
-        <RideBookingScreen />
+        <MainLayout />
       </View>
 
       {loading && <LoadingView />}

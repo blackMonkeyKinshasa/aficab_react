@@ -29,6 +29,28 @@ export function formatBookingDateTime(date: Date | null, locale: string) {
   });
 }
 
+export function formatBookingDate(date: Date | null, locale: string) {
+  if (!date) return '';
+  return date.toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+export function formatBookingTime(date: Date | null, locale: string) {
+  if (!date) return '';
+  if (locale.startsWith('fr')) {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}h${minutes}`;
+  }
+  return date.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function toDate(value: DateType): Date | null {
   if (value == null) return null;
   const parsed = dayjs(value);
@@ -60,6 +82,7 @@ export function ModalDateSelector({
   value = null,
   minDate,
   isStartTime = false,
+  initialStep = 'date',
 }: {
   visible: boolean;
   onDismiss: () => void;
@@ -67,6 +90,7 @@ export function ModalDateSelector({
   value?: Date | null;
   minDate?: Date;
   isStartTime?: boolean;
+  initialStep?: SelectorStep;
 }) {
   const { t, language } = useI18n();
   const classNames = useDatePickerClassNames();
@@ -79,11 +103,11 @@ export function ModalDateSelector({
   useEffect(() => {
     if (!visible) return;
 
-    setStep('date');
+    setStep(initialStep === 'time' && value ? 'time' : 'date');
     setDraftDate(getInitialDate(value, minDate));
     setDraftHours(getInitialHours(value, isStartTime));
     setDraftMinutes(getInitialMinutes(value, isStartTime));
-  }, [visible, value, minDate, isStartTime]);
+  }, [visible, value, minDate, isStartTime, initialStep]);
 
   const handleSave = useCallback(() => {
     if (!draftDate) return;

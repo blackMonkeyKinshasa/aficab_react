@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Contacts from 'expo-contacts';
@@ -8,29 +8,44 @@ import { useRouter } from 'expo-router';
 import { generateIDBooking, getAllBookings } from '@/api/booking';
 import { getLocCars } from '@/api/car';
 import { validateCoupon } from '@/api/coupon';
-import {
-  BookingOptionSectionCard,
-  BookingOptionSectionHeader,
-} from '@/components/my-ui/BookingOptionSectionCard';
+import { BookingOptionSectionCard } from '@/components/my-ui/BookingOptionSectionCard';
 import { BookingOptionToggleRow } from '@/components/my-ui/BookingOptionToggleRow';
 import {
   BookingRecapDetailRow,
   BookingRecapDetailColumn,
 } from '@/components/my-ui/BookingRecapDetail';
+import {
+  BookingDateTimeRow,
+  BookingDetailsFormField,
+} from '@/components/my-ui/BookingDetailsFormField';
 import { BookingRecapLayout } from '@/components/my-ui/BookingRecapLayout';
 import { BookingRecapPriceSection } from '@/components/my-ui/BookingRecapPriceSection';
 import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
+import {
+  BookingRecapDriverNotice,
+  BookingRecapServiceBanner,
+  BookingRecapStatusRow,
+} from '@/components/my-ui/BookingRecapStatusCards';
 import { BookingRecapVehicleCard } from '@/components/my-ui/BookingRecapVehicleCard';
+import { BookingStepHeader } from '@/components/my-ui/BookingStepHeader';
 import { bookingSheetContentClassName } from '@/components/my-ui/BookingSheetLayout';
 import { BookingTripSummaryCard } from '@/components/my-ui/BookingTripSummaryCard';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
+import {
+  formatBookingDate,
+  formatBookingTime,
+  ModalDateSelector,
+} from '@/components/my-ui/ModalDateSelector';
+import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
 import { VehicleSelectionCard } from '@/components/my-ui/VehicleSelectionCard';
 import { VehicleSelectionListLoader } from '@/components/my-ui/VehicleSelectionListLoader';
 import { Button, ButtonText } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Input, InputField } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { color } from '@/constants/colors';
+import { Location } from '@/constants/constants';
 import { EtapeReservation, ResStatus, ResType } from '@/constants/databaseEnum';
 import {
   Booking,
@@ -42,14 +57,16 @@ import { bookingSpacing, controlHeightStyle } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
 import { supabase } from '@/lib/supabase';
+import { hasMinimumBookingLeadTime } from '@/lib/time-utils';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { useMyStateUser, type UserState } from '@/store/user-state';
 
 const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
-const filledInputClassName = 'rounded-md border border-outline-100 bg-background-100';
-
 const NEXT_ETAPE: Record<EtapeReservation, EtapeReservation> = {
+  [EtapeReservation.DETAILS]: EtapeReservation.SELECTION,
   [EtapeReservation.SELECTION]: EtapeReservation.OPTION,
   [EtapeReservation.OPTION]: EtapeReservation.RECAP,
   [EtapeReservation.RECAP]: EtapeReservation.RECAP,
@@ -114,6 +131,24 @@ function getExtraTimePrice(value: unknown) {
   return typeof value === 'number' ? value : null;
 }
 
+function getExtraHoursTier(date: Date | null): 'flex' | 'premium' | null {
+  if (!date || Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const minutes = date.getHours() * 60 + date.getMinutes();
+
+  if (minutes >= 23 * 60 + 30 || minutes <= 6 * 60) {
+    return 'premium';
+  }
+
+  if (minutes > 20 * 60) {
+    return 'flex';
+  }
+
+  return null;
+}
+
 function getDailyServiceEndDate(locationDoc: LocationDocLOC, flex: boolean, premium: boolean) {
   const endDate = toDate(locationDoc.dateEnd);
 
@@ -123,7 +158,7 @@ function getDailyServiceEndDate(locationDoc: LocationDocLOC, flex: boolean, prem
 
   if (premium) {
     const premiumEndDate = new Date(endDate);
-    premiumEndDate.setHours(5, 30, 0, 0);
+    premiumEndDate.setHours(6, 0, 0, 0);
 
     if (premiumEndDate.getTime() <= endDate.getTime()) {
       premiumEndDate.setDate(premiumEndDate.getDate() + 1);
@@ -216,30 +251,46 @@ function calculateFinalTotal(baseTotal: number, discountAmount: number): number 
 }
 
 type Props = {
-  locationDoc: LocationDocLOC;
   isDarkMode: boolean;
   onSubmit: (doc: Booking) => void;
   etape: EtapeReservation;
   setEtape: (etape: EtapeReservation) => void;
 };
 
-export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }: Props) {
-  void isDarkMode;
-
+export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const { appLocale, t } = useI18n();
   const toast = useAppToast();
   const fieldThemeColors = useFieldThemeColors();
+  const { s, font } = useLayoutScale();
   const emptyCarsTitleKey = 'booking.dailyCars.empty.title';
   const emptyCarsDescriptionKey = 'booking.dailyCars.empty.description';
-  const dateRangeLabel = formatDailyRange(
-    locationDoc,
-    appLocale,
-    t('booking.daySingular'),
-    t('booking.dayPlural'),
-    t('booking.dailyDatesUnavailable')
-  );
-  const rentalDays = getRentalDays(locationDoc);
+  const [locationDoc, setLocationDoc] = useState<LocationDocLOC | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [visibleDateStart, setVisibleDateStart] = useState(false);
+  const [visibleDateEnd, setVisibleDateEnd] = useState(false);
+  const [dateStartStep, setDateStartStep] = useState<'date' | 'time'>('date');
+  const [dateEndStep, setDateEndStep] = useState<'date' | 'time'>('date');
+  const [location, setLocation] = useState<Location | null>(null);
+  const [dateStart, setDateStart] = useState<Date | null>(null);
+  const [dateEnd, setDateEnd] = useState<Date | null>(null);
+  const [hasEarlyStartSelection, setHasEarlyStartSelection] = useState(false);
+  const userFullName = useMyStateUser((state: UserState) => state.user?.full_name?.trim() ?? '');
+  const userPhone = useMyStateUser((state: UserState) => state.user?.phone?.trim() ?? '');
+  const selectedExtraHoursTier = getExtraHoursTier(dateEnd);
+  const hasLateEndSelection = selectedExtraHoursTier !== null;
+  const showStandardHoursInfo = hasEarlyStartSelection || hasLateEndSelection;
+  const lastStandardHoursToastKeyRef = useRef<string | null>(null);
+  const dateRangeLabel = locationDoc
+    ? formatDailyRange(
+        locationDoc,
+        appLocale,
+        t('booking.daySingular'),
+        t('booking.dayPlural'),
+        t('booking.dailyDatesUnavailable')
+      )
+    : '';
+  const rentalDays = locationDoc ? getRentalDays(locationDoc) : 1;
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [page, setPage] = useState(1);
@@ -282,6 +333,11 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   const couponDiscountAmount = extractDiscountAmount(validatedCoupon);
   const finalTotalPrice = calculateFinalTotal(totalPrice, couponDiscountAmount);
 
+  useEffect(() => {
+    setFlex(selectedExtraHoursTier === 'flex' && hasFlexOption);
+    setPremium(selectedExtraHoursTier === 'premium' && hasPremiumOption);
+  }, [hasFlexOption, hasPremiumOption, selectedExtraHoursTier]);
+
   const getOrCreateBookingId = async () => {
     if (bookingId) {
       return bookingId;
@@ -307,7 +363,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   };
 
   const buildBooking = async (): Promise<Booking | null> => {
-    if (!selectedCar) {
+    if (!selectedCar || !locationDoc) {
       return null;
     }
 
@@ -326,8 +382,8 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       rentalDays,
     };
     const trimmedComment = comment.trim();
-    const trimmedGuestName = guestName.trim();
-    const trimmedGuestPhone = guestPhone.trim();
+    const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
+    const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
 
     return {
       id: resolvedBookingId,
@@ -412,8 +468,28 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     autoPromoAttemptedRef.current = false;
   }, [etape, selectedCar?.id]);
 
+  useEffect(() => {
+    if (!showStandardHoursInfo) {
+      lastStandardHoursToastKeyRef.current = null;
+      return;
+    }
+
+    const toastKey = `${hasEarlyStartSelection}-${hasLateEndSelection}`;
+
+    if (lastStandardHoursToastKeyRef.current === toastKey) {
+      return;
+    }
+
+    lastStandardHoursToastKeyRef.current = toastKey;
+    toast({
+      description: t('booking.standardHoursInfo'),
+      action: 'info',
+      duration: 3500,
+    });
+  }, [hasEarlyStartSelection, hasLateEndSelection, showStandardHoursInfo, t, toast]);
+
   const loadCars = async (nextPage: number, replace = false) => {
-    if (isLoadingCars) {
+    if (isLoadingCars || !locationDoc) {
       return;
     }
 
@@ -448,7 +524,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
 
   useEffect(() => {
     return () => {
-      setEtape(EtapeReservation.SELECTION);
+      setEtape(EtapeReservation.DETAILS);
     };
   }, [setEtape]);
 
@@ -733,7 +809,197 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when entering recap
   }, [etape, selectedCar?.id]);
 
+  const details = () => {
+    const handleSubmitDetails = () => {
+      if (!location || !dateStart || !dateEnd) return;
+
+      if (!hasMinimumBookingLeadTime(dateStart)) {
+        Alert.alert(t('booking.advanceNoticeTitle'), t('booking.advanceNoticeMessage'));
+        return;
+      }
+
+      if (!userPhone) {
+        Alert.alert(t('booking.phoneRequiredTitle'), t('booking.phoneRequiredMessage'), [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('booking.addNow'),
+            onPress: () =>
+              router.push({
+                pathname: '/edit-profile',
+                params: { focusField: 'phone', returnToBooking: '1' },
+              }),
+          },
+        ]);
+        return;
+      }
+
+      const doc: LocationDocLOC = {
+        type: ResType.LOC,
+        location,
+        dateStart,
+        dateEnd,
+      };
+      analytics.trackBookingStarted(ResType.LOC, {
+        origin: location.description,
+        dateStart: dateStart.toISOString(),
+        dateEnd: dateEnd.toISOString(),
+      });
+      setSelectedCar(null);
+      setCars([]);
+      setLocationDoc(doc);
+      setEtape(EtapeReservation.SELECTION);
+    };
+
+    const handleDateStartChange = (date: Date | null) => {
+      if (!date) {
+        setDateStart(null);
+        setHasEarlyStartSelection(false);
+        return;
+      }
+      const minHour = new Date(date);
+      minHour.setHours(8, 0, 0, 0);
+      setHasEarlyStartSelection(date < minHour);
+      const validStart = date < minHour ? minHour : date;
+      setDateStart(validStart);
+
+      const end = new Date(validStart);
+      end.setHours(20, 0, 0, 0);
+      setDateEnd(end);
+    };
+
+    const handleDateEndChange = (date: Date | null) => {
+      setDateEnd(date);
+    };
+
+    return (
+      <View className="flex-1">
+        <ScrollView
+          contentContainerStyle={{
+            paddingBottom: bookingSpacing.scrollPaddingBottom,
+            paddingTop: 8,
+          }}
+          showsVerticalScrollIndicator={false}>
+          <View className="px-4 pt-4">
+            <BookingStepHeader current={1} subtitle={t('booking.detailsSubtitle')} />
+
+            <View className="gap-5 rounded-2xl border border-outline-100 bg-white p-4 dark:bg-[#1E1E1E]">
+              <BookingDetailsFormField
+                label={t('booking.pickupAddress')}
+                icon="location-outline"
+                value={location?.description ?? ''}
+                placeholder={t('booking.departure')}
+                onPress={() => setVisible(true)}
+                isDarkMode={isDarkMode}
+                showChevron
+              />
+
+              <BookingDateTimeRow
+                dateLabel={t('booking.startDate')}
+                timeLabel={t('booking.startTime')}
+                dateValue={formatBookingDate(dateStart, appLocale)}
+                timeValue={formatBookingTime(dateStart, appLocale)}
+                datePlaceholder={t('booking.chooseDate')}
+                timePlaceholder={t('booking.selectTime')}
+                onPressDate={() => {
+                  setDateStartStep('date');
+                  setVisibleDateStart(true);
+                }}
+                onPressTime={() => {
+                  setDateStartStep(dateStart ? 'time' : 'date');
+                  setVisibleDateStart(true);
+                }}
+                isDarkMode={isDarkMode}
+              />
+
+              <BookingDateTimeRow
+                dateLabel={t('booking.endDate')}
+                timeLabel={t('booking.endTime')}
+                dateValue={formatBookingDate(dateEnd, appLocale)}
+                timeValue={formatBookingTime(dateEnd, appLocale)}
+                datePlaceholder={t('booking.chooseDate')}
+                timePlaceholder={t('booking.selectTime')}
+                onPressDate={() => {
+                  setDateEndStep('date');
+                  setVisibleDateEnd(true);
+                }}
+                onPressTime={() => {
+                  setDateEndStep(dateEnd ? 'time' : 'date');
+                  setVisibleDateEnd(true);
+                }}
+                isDarkMode={isDarkMode}
+              />
+
+              <View className="mb-5 flex-row rounded-xl border border-orange-100 bg-orange-50 px-4 py-4 dark:border-[#5B3428] dark:bg-[#3D241C]">
+                <Ionicons name="information-circle-outline" size={s(22)} color={color.primary} />
+                <View className="ml-3 flex-1">
+                  <Text className="font-semibold text-typography-900" style={{ fontSize: font.sm }}>
+                    {t('booking.standardHoursTitle')}
+                  </Text>
+                  <Text
+                    className="mt-1 text-typography-600"
+                    style={{ fontSize: font.sm, lineHeight: s(20) }}>
+                    {t('booking.standardHoursDescription')}
+                  </Text>
+                </View>
+              </View>
+
+              <Button
+                action="primary"
+                variant="solid"
+                size="control"
+                isDisabled={location === null || dateStart === null || dateEnd === null}
+                className="mt-3 w-full rounded-xl"
+                style={{ marginBottom: bookingSpacing.buttonMarginBottom }}
+                onPress={handleSubmitDetails}>
+                <ButtonText className="text-white">{t('booking.viewOffers')}</ButtonText>
+              </Button>
+            </View>
+          </View>
+        </ScrollView>
+
+        <ModalLocationSelector
+          visible={visible}
+          onDismiss={() => setVisible(false)}
+          onConfirm={(newLocation) => {
+            setLocation(newLocation);
+            setVisible(false);
+          }}
+        />
+
+        <ModalDateSelector
+          visible={visibleDateStart}
+          onDismiss={() => setVisibleDateStart(false)}
+          onConfirm={(date) => {
+            handleDateStartChange(date);
+            setVisibleDateStart(false);
+          }}
+          value={dateStart}
+          minDate={new Date()}
+          isStartTime={true}
+          initialStep={dateStartStep}
+        />
+
+        <ModalDateSelector
+          visible={visibleDateEnd}
+          onDismiss={() => setVisibleDateEnd(false)}
+          onConfirm={(date) => {
+            handleDateEndChange(date);
+            setVisibleDateEnd(false);
+          }}
+          value={dateEnd}
+          minDate={dateStart && dateStart.getDay() > new Date().getDay() ? dateStart : new Date()}
+          isStartTime={false}
+          initialStep={dateEndStep}
+        />
+      </View>
+    );
+  };
+
   const selectCarsPage = () => {
+    if (!locationDoc) {
+      return null;
+    }
+
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
     const priceUnit = `$${t('booking.perDay')}`;
 
@@ -757,14 +1023,9 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
           ListHeaderComponent={
-            <BookingTripSummaryCard onEditPress={() => router.back()}>
-              <Text className="text-base font-medium text-typography-900" numberOfLines={1}>
-                {locationDoc.location.description ?? t('booking.departure')}
-              </Text>
-              <Text className="mt-1 text-sm text-typography-500" numberOfLines={1}>
-                {dateRangeLabel}
-              </Text>
-            </BookingTripSummaryCard>
+            <>
+              <BookingStepHeader current={2} subtitle={t('booking.vehicleSelectionSubtitle')} />
+            </>
           }
           ListFooterComponent={
             isLoadingCars && !isRefreshing && cars.length > 0 ? (
@@ -798,13 +1059,17 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   };
 
   const selectOption = () => {
+    if (!locationDoc) {
+      return null;
+    }
+
     const optionFooter = (
       <View style={{ paddingHorizontal: bookingSpacing.screenPaddingX }}>
         <Button
           action="primary"
           variant="solid"
           size="control"
-          className="w-full rounded-2xl"
+          className="w-full rounded-xl"
           style={controlHeightStyle}
           onPress={handleNextEtape}>
           <ButtonText className="text-white">{actionLabel}</ButtonText>
@@ -824,22 +1089,19 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
               paddingHorizontal: bookingSpacing.screenPaddingX,
               paddingTop: bookingSpacing.sectionGap,
             }}>
-            <BookingTripSummaryCard onEditPress={() => router.back()}>
-              <Text className="text-base font-medium text-typography-900" numberOfLines={1}>
-                {locationDoc.location.description ?? t('booking.departure')}
-              </Text>
-              <Text className="mt-1 text-sm text-typography-500" numberOfLines={1}>
-                {dateRangeLabel}
-              </Text>
-            </BookingTripSummaryCard>
+            <BookingStepHeader current={3} subtitle={t('booking.optionsSubtitle')} />
 
             {hasAnyOption ? (
-              <BookingOptionSectionCard title={t('booking.optionsTitle')}>
+              <BookingOptionSectionCard
+                title={t('booking.optionsTitle')}
+                description={t('booking.optionsSubtitle')}
+                className="bg-white dark:bg-[#1E1E1E]">
                 {hasFuelOption ? (
                   <BookingOptionToggleRow
                     title={t('booking.fuelFees')}
                     description={t('booking.fuelFeesDescription')}
                     priceLabel={`${fuelPrice} $`}
+                    icon="car-sport-outline"
                     checked={fuel}
                     onCheckedChange={setFuel}
                     onInfoPress={handleFuelInfoPress}
@@ -851,6 +1113,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
                     title={t('booking.flexExtraHours')}
                     description={t('booking.flexExtraHoursDescription')}
                     priceLabel={`${flexPrice} $`}
+                    icon="time-outline"
                     checked={flex}
                     onCheckedChange={handleFlexChange}
                     showDivider={hasFuelOption}
@@ -862,6 +1125,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
                     title={t('booking.premiumExtraHours')}
                     description={t('booking.premiumExtraHoursDescription')}
                     priceLabel={`${premiumPrice} $`}
+                    icon="moon-outline"
                     checked={premium}
                     onCheckedChange={handlePremiumChange}
                     showDivider={hasFuelOption || hasFlexOption}
@@ -870,52 +1134,132 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
               </BookingOptionSectionCard>
             ) : null}
 
-            <BookingOptionSectionCard title={t('booking.commentOptional')}>
-              <Input variant="outline" size="control" className={filledInputClassName}>
-                <InputField
-                  placeholder={t('booking.commentPlaceholder')}
-                  placeholderTextColor={fieldThemeColors.placeholder}
-                  multiline
-                  value={comment}
-                  onChangeText={setComment}
-                />
-              </Input>
-            </BookingOptionSectionCard>
-
             <Collapsible open={isGuestSectionOpen} onOpenChange={setIsGuestSectionOpen}>
               <BookingOptionSectionCard
-                header={
-                  <CollapsibleTrigger asChild>
-                    <Pressable accessibilityRole="button" className="active:opacity-80">
-                      <BookingOptionSectionHeader
-                        title={t('booking.bookForOtherPersonOptional')}
-                        right={
-                          <Ionicons
-                            name={isGuestSectionOpen ? 'chevron-up' : 'chevron-down'}
-                            size={20}
-                            color={fieldThemeColors.listItemSubText}
-                          />
-                        }
-                      />
-                    </Pressable>
-                  </CollapsibleTrigger>
-                }>
+                title={t('booking.whoTravels')}
+                className="bg-white dark:bg-[#1E1E1E]">
+                <View className="mb-3 flex-row overflow-hidden rounded-xl border border-outline-100">
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setIsGuestSectionOpen(false)}
+                    className="flex-1 flex-row items-center justify-center gap-2 px-3 py-3"
+                    style={{
+                      backgroundColor: !isGuestSectionOpen
+                        ? isDarkMode
+                          ? '#3D241C'
+                          : '#FFF4EE'
+                        : 'transparent',
+                    }}>
+                    <Ionicons
+                      name="person-outline"
+                      size={s(19)}
+                      color={!isGuestSectionOpen ? color.primary : fieldThemeColors.listItemSubText}
+                    />
+                    <Text
+                      className="font-medium"
+                      style={{
+                        color: !isGuestSectionOpen
+                          ? color.primary
+                          : fieldThemeColors.listItemSubText,
+                        fontSize: font.sm,
+                      }}>
+                      {t('booking.myself')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setIsGuestSectionOpen(true)}
+                    className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border px-3 py-3"
+                    style={{
+                      borderColor: isGuestSectionOpen ? color.primary : 'transparent',
+                      backgroundColor: isGuestSectionOpen
+                        ? isDarkMode
+                          ? '#3D241C'
+                          : '#FFF4EE'
+                        : 'transparent',
+                    }}>
+                    <Ionicons
+                      name="person-add-outline"
+                      size={s(19)}
+                      color={isGuestSectionOpen ? color.primary : fieldThemeColors.listItemSubText}
+                    />
+                    <Text
+                      className="font-medium"
+                      style={{
+                        color: isGuestSectionOpen
+                          ? color.primary
+                          : fieldThemeColors.listItemSubText,
+                        fontSize: font.sm,
+                      }}>
+                      {t('booking.anotherPerson')}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {!isGuestSectionOpen ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('profile.editTitle')}
+                    className="active:opacity-80"
+                    onPress={() => router.push('/edit-profile')}>
+                    <View pointerEvents="none" className="gap-3">
+                      <Input
+                        variant="outline"
+                        size="control"
+                        className="rounded-xl border border-outline-100 bg-background-100">
+                        <InputField
+                          placeholder={t('booking.fullName')}
+                          placeholderTextColor={fieldThemeColors.placeholder}
+                          value={userFullName}
+                          editable={false}
+                        />
+                      </Input>
+
+                      <Input
+                        variant="outline"
+                        size="control"
+                        className="rounded-xl border border-outline-100 bg-background-100">
+                        <InputField
+                          placeholder={t('booking.phoneNumber')}
+                          placeholderTextColor={fieldThemeColors.placeholder}
+                          value={userPhone}
+                          editable={false}
+                          keyboardType="phone-pad"
+                        />
+                      </Input>
+                    </View>
+                    <View className="mt-3 flex-row items-center justify-end">
+                      <Ionicons name="create-outline" size={s(16)} color={color.primary} />
+                      <Text
+                        className="ml-1 font-medium"
+                        style={{ color: color.primary, fontSize: font.sm }}>
+                        {t('profile.editTitle')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : null}
+
                 <CollapsibleContent>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void handlePickGuestFromContacts()}
-                    className="mb-3 flex-row items-center rounded-md border border-outline-100  px-3 py-3 active:opacity-80">
+                    className="mb-3 flex-row items-center rounded-xl border border-outline-100 px-3 py-3 active:opacity-80">
                     <Ionicons
                       name="people-outline"
-                      size={18}
+                      size={s(18)}
                       color={fieldThemeColors.listItemText}
                     />
-                    <Text className="ml-2 text-sm font-medium text-typography-900">
+                    <Text
+                      className="ml-2 font-medium text-typography-900"
+                      style={{ fontSize: font.sm }}>
                       {t('booking.importFromContacts')}
                     </Text>
                   </Pressable>
 
-                  <Input variant="outline" size="control" className={filledInputClassName}>
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className="rounded-xl border border-outline-100 bg-background-100">
                     <InputField
                       placeholder={t('booking.fullName')}
                       placeholderTextColor={fieldThemeColors.placeholder}
@@ -927,7 +1271,7 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
                   <Input
                     variant="outline"
                     size="control"
-                    className={`${filledInputClassName} mt-3`}>
+                    className="mt-3 rounded-xl border border-outline-100 bg-background-100">
                     <InputField
                       placeholder={t('booking.phoneNumber')}
                       placeholderTextColor={fieldThemeColors.placeholder}
@@ -939,6 +1283,19 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
                 </CollapsibleContent>
               </BookingOptionSectionCard>
             </Collapsible>
+
+            <BookingOptionSectionCard
+              title={t('booking.specialInstructions')}
+              className="bg-white dark:bg-[#1E1E1E]">
+              <Textarea
+                className="rounded-xl border-outline-100 bg-background-100"
+                placeholder={t('booking.commentPlaceholder')}
+                placeholderTextColor={fieldThemeColors.placeholder}
+                numberOfLines={5}
+                value={comment}
+                onChangeText={setComment}
+              />
+            </BookingOptionSectionCard>
           </View>
         </BookingRecapLayout>
       </View>
@@ -946,10 +1303,16 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
   };
 
   const recap = () => {
+    if (!locationDoc) {
+      return null;
+    }
+
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
     const trimmedComment = comment.trim();
-    const trimmedGuestName = guestName.trim();
-    const trimmedGuestPhone = guestPhone.trim();
+    const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
+    const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
+    const travelerName = isGuestSectionOpen ? trimmedGuestName : userFullName;
+    const travelerPhone = isGuestSectionOpen ? trimmedGuestPhone : userPhone;
     const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
     const selectedOptions = [
       fuel && fuelPrice !== null ? t('booking.fuelIncluded') : null,
@@ -966,16 +1329,11 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
       appLocale,
       t('booking.dailyDatesUnavailable')
     );
-    const serviceHoursSummary = premium
-      ? t('booking.premiumHoursSummary')
-      : flex
-        ? t('booking.flexHoursSummary')
-        : t('booking.serviceHoursSummary');
     const hasSecondaryDetails =
       selectedOptions.length > 0 ||
       Boolean(trimmedComment) ||
-      Boolean(trimmedGuestName) ||
-      Boolean(trimmedGuestPhone);
+      Boolean(travelerName) ||
+      Boolean(travelerPhone);
     const priceLines = [
       {
         label: `${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')} ${t('booking.rentalDaysPrice')} x ${selectedCar?.priceLOC ?? 0} $`,
@@ -1020,15 +1378,24 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         action="primary"
         variant="solid"
         size="control"
-        className="w-full rounded-2xl"
+        className="w-full rounded-xl"
         style={controlHeightStyle}
         onPress={handleNextEtape}>
-        <ButtonText className="text-white">{actionLabel}</ButtonText>
+        <ButtonText className="text-white">
+          {t('booking.confirmAndPay')} · {finalTotalPrice} $
+        </ButtonText>
       </Button>
     );
 
     return (
       <BookingRecapLayout footer={recapFooter}>
+        <BookingStepHeader current={4} subtitle={t('booking.recapSubtitle')} />
+        <BookingRecapServiceBanner
+          icon="car-sport-outline"
+          label={t('booking.dailyService')}
+          status={t('booking.pendingStatus')}
+        />
+
         <BookingRecapVehicleCard
           imageUri={recapImage}
           name={selectedCar?.name ?? t('booking.noVehicle')}
@@ -1037,15 +1404,25 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
           baggage={selectedCar?.baggage ?? 0}
           priceAmount={`${selectedCar?.priceLOC ?? 0} $`}
           priceUnit={t('booking.perDay')}
+          durationLabel={`${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')}`}
         />
 
         <BookingRecapSection title={t('booking.detailsTitle')}>
           <BookingRecapDetailColumn
+            icon="calendar-outline"
+            label={t('booking.startDateTime')}
+            value={startDateLabel}
+          />
+          <BookingRecapDetailColumn
+            icon="location-outline"
             label={t('booking.address')}
             value={locationDoc.location.description ?? t('booking.addressUnavailable')}
           />
-          <BookingRecapDetailColumn label={t('booking.startDateTime')} value={startDateLabel} />
-          <BookingRecapDetailColumn label={t('booking.endDateTime')} value={endDateLabel} />
+          <BookingRecapDetailColumn
+            icon="calendar-outline"
+            label={t('booking.endDateTime')}
+            value={endDateLabel}
+          />
 
           <View className="my-3 border-t border-outline-100" />
 
@@ -1066,26 +1443,27 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
         </BookingRecapSection>
 
         {hasSecondaryDetails ? (
-             <BookingRecapSection>
+          <BookingRecapSection title={t('booking.optionsTitle')}>
             {selectedOptions.length > 0 ? (
-               <View className="my-3 " >                
-               <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.optionsTitle')}</Text> 
-               <Text className="text-sm text-typography-500">- {selectedOptions.join('\n- ')}</Text>
-               </View>
-             ) : null}
-            {trimmedComment ? (
-              <View className="my-3 " >                
-                <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.comment')}</Text> 
-                 <Text className="text-sm text-typography-500">- {trimmedComment}</Text>
-              </View>
+              <BookingRecapDetailColumn
+                icon="options-outline"
+                label={t('booking.optionsTitle')}
+                value={selectedOptions.join(' · ')}
+              />
             ) : null}
-            {trimmedGuestName || trimmedGuestPhone ? (
-
-               <View className="my-3 " >                
-                <Text className="text-typography-900 mb-1 text-base font-bold">{t('booking.bookingFor')}</Text> 
-                 <Text className="text-sm text-typography-500">- {[trimmedGuestName, trimmedGuestPhone].filter(Boolean).join(' · ')}</Text>
-              </View>
-              
+            {trimmedComment ? (
+              <BookingRecapDetailColumn
+                icon="chatbubble-ellipses-outline"
+                label={t('booking.specialInstructions')}
+                value={trimmedComment.replace(/\n/g, ' · ')}
+              />
+            ) : null}
+            {travelerName || travelerPhone ? (
+              <BookingRecapDetailColumn
+                icon="person-outline"
+                label={t('booking.bookingFor')}
+                value={[travelerName, travelerPhone].filter(Boolean).join(' · ')}
+              />
             ) : null}
           </BookingRecapSection>
         ) : null}
@@ -1113,22 +1491,35 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
           totalLabel={t('booking.total')}
           totalValue={`${finalTotalPrice} $`}
         />
+
+        <BookingRecapStatusRow
+          label={t('booking.paymentLabel')}
+          value={t('booking.paymentPending')}
+        />
+        <BookingRecapStatusRow
+          label={t('booking.fuelLabel')}
+          value={fuel ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense')}
+          tone={fuel ? 'success' : 'primary'}
+          showChevron
+        />
       </BookingRecapLayout>
     );
   };
 
   const isSheetStep = etape === EtapeReservation.SELECTION || etape === EtapeReservation.OPTION;
+  const isDetailsStep = etape === EtapeReservation.DETAILS;
 
   return (
     <View
       className="flex-1"
-      style={
-        isSheetStep
-          ? undefined
-          : { paddingHorizontal: bookingSpacing.screenPaddingX, paddingTop: 16 }
-      }>
+      style={{
+        backgroundColor: theme.bg,
+        ...(!isSheetStep && !isDetailsStep
+          ? { paddingHorizontal: bookingSpacing.screenPaddingX, paddingTop: 16 }
+          : {}),
+      }}>
+      {etape === EtapeReservation.DETAILS && details()}
       {etape === EtapeReservation.SELECTION && selectCarsPage()}
-
       {etape === EtapeReservation.OPTION && selectOption()}
       {etape === EtapeReservation.RECAP && recap()}
     </View>
@@ -1136,8 +1527,8 @@ export function LocDaily({ locationDoc, isDarkMode, onSubmit, etape, setEtape }:
 }
 
 const light = {
-  bg: '#ffffff',
-  card: '#f3f4f6',
+  bg: '#F7F7F8',
+  card: '#ffffff',
   text: '#14181B',
   subText: '#6b6b6b',
   border: '#d1d5db',

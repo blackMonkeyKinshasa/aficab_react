@@ -17,21 +17,16 @@ import { uploadAvatar } from '@/api/uploadFiles';
 import { getUserByID, updateUserByID } from '@/api/user';
 import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
+import { GenderDropdown } from '@/components/my-ui/GenderDropdown';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { Button, ButtonText } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
 import { color } from '@/constants/colors';
 import { genderOptions } from '@/constants/constants';
 import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
 import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
@@ -58,6 +53,7 @@ export default function CreateProfile() {
   const clearStoredUser = useMyStateUser((state: UserState) => state.clearUser);
   const { t } = useI18n();
   const toast = useAppToast();
+  const { s, font } = useLayoutScale();
   const localizedGenderOptions = genderOptions.map((option) => ({
     ...option,
     label: option.value === 'male' ? t('profile.genderMale') : t('profile.genderFemale'),
@@ -218,15 +214,20 @@ export default function CreateProfile() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}>
-          <Text style={[styles.modalTitle, { color: fg }]}>{t('profile.createTitle')}</Text>
-          <Text style={[styles.modalSubtitle, { color: sub }]}>{t('profile.createSubtitle')}</Text>
+          <Text style={[styles.modalTitle, { color: fg, fontSize: font.xl }]}>{t('profile.createTitle')}</Text>
+          <Text style={[styles.modalSubtitle, { color: sub, fontSize: font.sm }]}>{t('profile.createSubtitle')}</Text>
 
           <View style={styles.avatarWrapper}>
             <View
-              style={[styles.avatarContainer, { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0' }]}>
+              style={[
+                styles.avatarContainer,
+                { backgroundColor: isDark ? '#2c2c2e' : '#f0f0f0', width: s(96), height: s(96), borderRadius: s(48) },
+              ]}>
               <Avatar uri={image || ''} size={96} borderRadius={48} isDark={isDark} />
-              <TouchableOpacity style={styles.cameraBtn} onPress={chooseImage}>
-                <Camera size={18} color="white" />
+              <TouchableOpacity
+                style={[styles.cameraBtn, { width: s(32), height: s(32), borderRadius: s(16) }]}
+                onPress={chooseImage}>
+                <Camera size={s(18)} color="white" />
               </TouchableOpacity>
             </View>
           </View>
@@ -266,27 +267,13 @@ export default function CreateProfile() {
           </Tooltip>
             </View>
 
-            <Select
-              value={{
-                value: gender,
-                label:
-                  localizedGenderOptions.find((option) => option.value === gender)?.label ??
-                  t('common.select'),
-              }}
-              onValueChange={(option) => {
-                setGender(option?.value ?? '');
-              }}>
-              <SelectTrigger>
-                <SelectValue placeholder={t('common.select')} />
-              </SelectTrigger>
-              <SelectContent>
-                {localizedGenderOptions.map((option) => (
-                  <SelectItem key={option.value} label={option.label} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <GenderDropdown
+              data={localizedGenderOptions}
+              value={gender}
+              placeholder={t('common.select')}
+              isDark={isDark}
+              onChange={setGender}
+            />
           </View>
 
             <Button

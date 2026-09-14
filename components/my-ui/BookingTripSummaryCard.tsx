@@ -16,7 +16,8 @@ export function BookingTripSummaryCard({ children, onEditPress }: BookingTripSum
   const themeColors = useFieldThemeColors();
 
   return (
-    <View className={`${bookingSheetCardClassName} mb-4 flex-row items-center p-4`}>
+    <View
+      className={`${bookingSheetCardClassName} mb-4 flex-row items-center bg-white p-4 dark:bg-[#1E1E1E]`}>
       <View className="min-w-0 flex-1 pr-3">{children}</View>
       <Pressable
         accessibilityRole="button"

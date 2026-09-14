@@ -304,6 +304,33 @@ function replaceExactString(filePath, oldText, newText) {
   console.log(`Patched ${path.relative(process.cwd(), filePath)}.`);
 }
 
+function patchExpoRouterUseLinkingInitialUrl() {
+  replaceExactString(
+    path.join(expoRouterDir, 'build', 'fork', 'useLinking.native.js'),
+    `                    return url.then((url) => {
+                        const state = getStateFromURL(url);
+                        if (typeof url === 'string') {
+                            // If the link were handled, it gets cleared in NavigationContainer
+                            onUnhandledLinking((0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url));
+                        }
+                        return state;
+                    });`,
+    `                    return url.then((url) => {
+                        const state = getStateFromURL(url);
+                        if (typeof url === 'string') {
+                            // Defer until after NavigationContainer commits.
+                            // Calling this synchronously races React 19's mount and logs:
+                            // "Can't perform a React state update on a component that hasn't mounted yet."
+                            const path = (0, extractPathFromURL_1.extractExpoPathFromURL)(prefixes, url);
+                            setTimeout(() => {
+                                onUnhandledLinking(path);
+                            }, 0);
+                        }
+                        return state;
+                    });`
+  );
+}
+
 function patchExpoRouter() {
   if (!fs.existsSync(expoRouterDir)) {
     console.warn('expo-router package not found in node_modules. Skipping patch.');
@@ -1416,6 +1443,7 @@ function patchExpoLocalMavenRepos() {
 }
 
 patchExpoRouter();
+patchExpoRouterUseLinkingInitialUrl();
 patchExpoRouterAssets();
 patchExpoLocationTsconfig();
 patchExpoSplashScreenTsconfig();

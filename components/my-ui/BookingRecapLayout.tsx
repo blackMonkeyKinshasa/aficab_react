@@ -31,7 +31,7 @@ export function BookingRecapLayout({ children, footer }: BookingRecapLayoutProps
         </ScrollView>
 
         <View
-          className="bg-background mb-10"
+          className="border-t border-outline-100 bg-background"
           style={{
             paddingTop: 12,
             paddingBottom: footerBottomPadding,

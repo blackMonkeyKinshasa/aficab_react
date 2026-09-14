@@ -6,6 +6,7 @@ import { useColorScheme } from 'nativewind';
 
 import { color } from '@/constants/colors';
 import { useI18n } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
 
 type SlideItem = {
   key: string;
@@ -43,16 +44,16 @@ const slides: SlideItem[] = [
   },
 ];
 
-function SlideIcon({ icon }: { icon: SlideItem['icon'] }) {
+function SlideIcon({ icon, size }: { icon: SlideItem['icon']; size: number }) {
   if (icon === 'car') {
-    return <CarFront size={42} color={color.primary} strokeWidth={2.2} />;
+    return <CarFront size={size} color={color.primary} strokeWidth={2.2} />;
   }
 
   if (icon === 'flash') {
-    return <Zap size={42} color={color.primary} strokeWidth={2.2} />;
+    return <Zap size={size} color={color.primary} strokeWidth={2.2} />;
   }
 
-  return <MapPinned size={42} color={color.primary} strokeWidth={2.2} />;
+  return <MapPinned size={size} color={color.primary} strokeWidth={2.2} />;
 }
 
 export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<void> }) {
@@ -60,6 +61,8 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
   const isDark = colorScheme === 'dark';
   const [activeIndex, setActiveIndex] = useState(0);
   const { t } = useI18n();
+  const { s, font } = useLayoutScale();
+  const iconWell = s(96);
 
   const slides = useMemo<SlideItem[]>(
     () => [
@@ -103,7 +106,7 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       renderSkipButton={() =>
         activeIndex < slides.length - 1 ? (
           <TouchableOpacity style={styles.skipButton} onPress={onDone}>
-            <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827' }]}>
+            <Text style={[styles.skipText, { color: isDark ? '#E5E7EB' : '#111827', fontSize: font.sm }]}>
               {t('onboarding.skip')}
             </Text>
           </TouchableOpacity>
@@ -113,12 +116,12 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
       }
       renderNextButton={() => (
         <View style={[styles.nextButton, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
-          <Text style={styles.nextText}>{t('onboarding.next')}</Text>
+          <Text style={[styles.nextText, { fontSize: font.md }]}>{t('onboarding.next')}</Text>
         </View>
       )}
       renderDoneButton={() => (
         <View style={styles.doneButton}>
-          <Text style={styles.doneText}>{t('onboarding.start')}</Text>
+          <Text style={[styles.doneText, { fontSize: font.md }]}>{t('onboarding.start')}</Text>
         </View>
       )}
       renderItem={({ item }) => (
@@ -128,29 +131,43 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
           <View style={[styles.heroCard, { backgroundColor: isDark ? '#171A21' : '#FFFFFF' }]}>
             <View style={styles.topRow}>
               <View style={[styles.brandPill, { backgroundColor: isDark ? '#22252D' : '#111827' }]}>
-                <Text style={styles.brandPillText}>AFICAB</Text>
+                <Text style={[styles.brandPillText, { fontSize: font.xs }]}>AFICAB</Text>
               </View>
-              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280' }]}>
+              <Text style={[styles.cityText, { color: isDark ? '#B9BDC7' : '#6B7280', fontSize: font.xs }]}>
                 {t('booking.kinshasa')}
               </Text>
             </View>
 
             <View style={styles.visualArea}>
               <View
+              style={[
+                styles.visualHalo,
+                {
+                  backgroundColor: isDark ? 'rgba(255, 87, 5, 0.18)' : 'rgba(255, 87, 5, 0.12)',
+                  width: s(170),
+                  height: s(170),
+                  borderRadius: s(85),
+                },
+              ]}
+            />
+              <View
                 style={[
-                  styles.visualHalo,
-                  { backgroundColor: isDark ? 'rgba(255, 87, 5, 0.18)' : 'rgba(255, 87, 5, 0.12)' },
-                ]}
-              />
-              <View style={[styles.iconWrap, { backgroundColor: isDark ? '#22252D' : '#FFF1E8' }]}>
-                <SlideIcon icon={item.icon} />
+                  styles.iconWrap,
+                  {
+                    backgroundColor: isDark ? '#22252D' : '#FFF1E8',
+                    width: iconWell,
+                    height: iconWell,
+                    borderRadius: iconWell / 2,
+                  },
+                ]}>
+                <SlideIcon icon={item.icon} size={s(42)} />
               </View>
             </View>
 
-            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827' }]}>
+            <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#111827', fontSize: font.display }]}>
               {item.title}
             </Text>
-            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563' }]}>
+            <Text style={[styles.text, { color: isDark ? '#C7C7CC' : '#4B5563', fontSize: font.base }]}>
               {item.text}
             </Text>
 
@@ -163,7 +180,9 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
                     borderColor: isDark ? '#5F321B' : '#F3C4A8',
                   },
                 ]}>
-                <Text style={styles.footerPillText}>{t('onboarding.footer.premiumMobility')}</Text>
+                <Text style={[styles.footerPillText, { fontSize: font.xs }]}>
+                  {t('onboarding.footer.premiumMobility')}
+                </Text>
               </View>
               <View
                 style={[
@@ -173,7 +192,7 @@ export function AuthOnboardingSlider({ onDone }: { onDone: () => void | Promise<
                     borderColor: isDark ? '#313744' : '#E4E4E7',
                   },
                 ]}>
-                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827' }]}>
+                <Text style={[styles.footerPillText, { color: isDark ? '#E5E7EB' : '#111827', fontSize: font.xs }]}>
                   {t('onboarding.footer.service247')}
                 </Text>
               </View>

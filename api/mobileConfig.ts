@@ -8,9 +8,24 @@ export interface AppConfiguration {
   updatedAt: string;
 }
 
+function isAppConfiguration(value: unknown): value is AppConfiguration {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return typeof record.version_client === 'number';
+}
+
 // GET /mobile/config
-export function getAppConfiguration() {
-  return apiFetch('/mobile/config', { method: 'GET' }) as Promise<AppConfiguration>;
+export async function getAppConfiguration(): Promise<AppConfiguration> {
+  const data = await apiFetch<AppConfiguration>('/mobile/config', { method: 'GET' });
+
+  if (!isAppConfiguration(data)) {
+    throw new Error('Configuration mobile invalide.');
+  }
+
+  return data;
 }
 
 // PATCH /mobile/config

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Keyboard, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,9 +20,6 @@ import {
 import {
   Booking,
   CreateBookingResponse,
-  LocationDoc,
-  LocationDocLOC,
-  LocationDocTA,
   PawapayPaymentResponse,
 } from '@/constants/dataInterface';
 import { useAnalytics } from '@/lib/analytics';
@@ -32,10 +29,19 @@ import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
 const PREVIOUS_ETAPE: Record<EtapeReservation, EtapeReservation> = {
-  [EtapeReservation.SELECTION]: EtapeReservation.SELECTION,
+  [EtapeReservation.DETAILS]: EtapeReservation.DETAILS,
+  [EtapeReservation.SELECTION]: EtapeReservation.DETAILS,
   [EtapeReservation.OPTION]: EtapeReservation.SELECTION,
   [EtapeReservation.RECAP]: EtapeReservation.OPTION,
 };
+
+function parseResType(value: string | string[] | undefined): ResType | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === ResType.TA || raw === ResType.LOC) {
+    return raw;
+  }
+  return null;
+}
 
 const SCREEN_OPTIONS = (title: string, isDark: boolean, onPress: () => void) =>
   buildStackScreenOptions({
@@ -57,15 +63,6 @@ function isMobileMoneyPayment(paymentMethod: PaymentMethod) {
   );
 }
 
-function toIsoDateOrUndefined(value: unknown) {
-  if (!value) {
-    return undefined;
-  }
-
-  const date = value instanceof Date ? value : new Date(value as string);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
 function normalizePhone(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -75,6 +72,7 @@ type ConfirmationState = {
   userName?: string;
   email?: string;
   client?: Record<string, unknown>;
+  booking?: Booking;
 };
 
 type UserStoreState = ReturnType<typeof useMyStateUser.getState>;
@@ -83,15 +81,16 @@ export default function NewBooking() {
   const { t } = useI18n();
   const toast = useAppToast();
   const router = useRouter();
-  const { doc: docParam } = useLocalSearchParams() as { doc?: string };
-  const doc: LocationDoc | null = docParam ? JSON.parse(docParam) : null;
+  const { doc: docParam } = useLocalSearchParams() as { doc?: string | string[] };
+  const bookingType = parseResType(docParam);
 
   const isDarkMode = useColorScheme() === 'dark';
-  const [etape, setEtape] = useState<EtapeReservation>(EtapeReservation.SELECTION);
+  const [etape, setEtape] = useState<EtapeReservation>(EtapeReservation.DETAILS);
   const [bookingDoc, setBookingDoc] = useState<Booking | null>(null);
   const ETAPE_TITLES: Record<EtapeReservation, string> = {
-    [EtapeReservation.SELECTION]: t('booking.stepSelectionVehicle'),
-    [EtapeReservation.OPTION]: t('booking.stepOptionsSelection'),
+    [EtapeReservation.DETAILS]: bookingType === ResType.LOC ? t('booking.stepDetailsLocation') : t('booking.stepDetailsAirport'),
+    [EtapeReservation.SELECTION]: t('booking.vehicleScreenTitle'),
+    [EtapeReservation.OPTION]: t('booking.optionsScreenTitle'),
     [EtapeReservation.RECAP]: t('booking.stepRecap'),
   };
   const title = ETAPE_TITLES[etape];
@@ -100,26 +99,6 @@ export default function NewBooking() {
   const [confirmationState, setConfirmationState] = useState<ConfirmationState | null>(null);
   const analytics = useAnalytics();
   const storedUser = useMyStateUser((state: UserStoreState) => state.user);
-
-  useEffect(() => {
-    if (!doc) {
-      return;
-    }
-
-    const dateStart = toIsoDateOrUndefined(doc.dateStart);
-    const dateEnd =
-      doc.type === ResType.LOC
-        ? toIsoDateOrUndefined(doc.dateEnd)
-        : toIsoDateOrUndefined(doc.dateReturn);
-
-    analytics.trackBookingStarted(doc.type, {
-      origin: doc.type === ResType.LOC ? doc.location.description : doc.locationDepart.description,
-      destination: doc.type === ResType.TA ? doc.locationDest.description : undefined,
-      dateStart,
-      dateEnd,
-      tripType: doc.type === ResType.TA ? doc.tripType : 'one-way',
-    });
-  }, [analytics, doc]);
 
   const closePaymentModal = (source: 'backdrop' | 'flow-exit' | 'completion' = 'backdrop') => {
     analytics.trackPaymentModalClosed({
@@ -263,6 +242,7 @@ export default function NewBooking() {
         paymentNumber: phoneNumber,
       });
       confirmationDetails.bookingId = response.id ?? bookingDoc.id;
+      confirmationDetails.booking = response;
       analytics.trackBookingCreationSucceeded({
         bookingId: response.id ?? bookingDoc.id,
         reservationType: bookingDoc.type,
@@ -443,7 +423,7 @@ export default function NewBooking() {
   const handleHeaderBackPress = () => {
     Keyboard.dismiss();
 
-    if (etape !== EtapeReservation.SELECTION) {
+    if (etape !== EtapeReservation.DETAILS) {
       setEtape(PREVIOUS_ETAPE[etape]);
       return;
     }
@@ -455,7 +435,7 @@ export default function NewBooking() {
     router.back();
   };
 
-  if (!doc) {
+  if (!bookingType) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Text>{t('booking.missingData')}</Text>
@@ -470,6 +450,7 @@ export default function NewBooking() {
         <ReservationConfirmedScreen
           userName={confirmationState.userName}
           email={confirmationState.email}
+          booking={bookingDoc ?? undefined}
           onPressMyBookings={() =>
             router.replace({
               pathname: '/(tabs)/reservation',
@@ -504,26 +485,20 @@ export default function NewBooking() {
               : 'flex-1'
           }
           style={styles.container}>
-          {doc.type === ResType.LOC ? (
-            <>
-              <LocDaily
-                locationDoc={doc as LocationDocLOC}
-                isDarkMode={isDarkMode}
-                onSubmit={onSubmitDocBooking}
-                etape={etape}
-                setEtape={setEtape}
-              />
-            </>
+          {bookingType === ResType.LOC ? (
+            <LocDaily
+              isDarkMode={isDarkMode}
+              onSubmit={onSubmitDocBooking}
+              etape={etape}
+              setEtape={setEtape}
+            />
           ) : (
-            <>
-              <LocAirport
-                locationDoc={doc as LocationDocTA}
-                isDarkMode={isDarkMode}
-                onSubmit={onSubmitDocBooking}
-                etape={etape}
-                setEtape={setEtape}
-              />
-            </>
+            <LocAirport
+              isDarkMode={isDarkMode}
+              onSubmit={onSubmitDocBooking}
+              etape={etape}
+              setEtape={setEtape}
+            />
           )}
         </View>
 
@@ -553,7 +528,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.35)',

@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 
 import { BookingRecapDetailRow } from '@/components/my-ui/BookingRecapDetail';
 import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
+import { useLayoutScale } from '@/lib/layout-scale';
 
 export interface BookingRecapPriceLine {
   label: string;
@@ -22,6 +23,8 @@ export function BookingRecapPriceSection({
   totalLabel,
   totalValue,
 }: BookingRecapPriceSectionProps) {
+  const { font } = useLayoutScale();
+
   return (
     <BookingRecapSection title={title}>
       {lines.map((line) => (
@@ -31,8 +34,12 @@ export function BookingRecapPriceSection({
       <View className="my-3 border-t border-outline-100" />
 
       <View className="flex-row items-center justify-between">
-        <Text className="text-base font-bold text-typography-900">{totalLabel}</Text>
-        <Text className="text-base font-bold text-typography-900">{totalValue}</Text>
+        <Text className="font-bold text-typography-900" style={{ fontSize: font.base }}>
+          {totalLabel}
+        </Text>
+        <Text className="font-bold text-primary" style={{ fontSize: font.xl }}>
+          {totalValue}
+        </Text>
       </View>
     </BookingRecapSection>
   );

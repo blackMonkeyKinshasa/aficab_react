@@ -244,6 +244,8 @@ export interface BookingPayment {
   paidAt: string | null;
   bookingId: string;
   clientId: string;
+  booking?: Record<string, unknown> | null;
+  user?: Record<string, unknown> | null;
 }
 
 export interface BookingCoupon {

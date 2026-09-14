@@ -56,6 +56,7 @@ export enum ClientType {
 }
 
 export enum EtapeReservation{
+    DETAILS = 'DETAILS',
     SELECTION = 'SELECTION',
     OPTION = 'OPTION',
     RECAP = 'RECAP',

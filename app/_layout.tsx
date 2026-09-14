@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, TouchableOpacity, View } from 'react-native';
 
 import * as Sentry from '@sentry/react-native';
-import { ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider } from 'expo-router/react-navigation';
 import { PortalHost } from '@rn-primitives/portal';
 import { User } from '@supabase/supabase-js';
 import * as Location from 'expo-location';
@@ -20,8 +20,8 @@ import { MD3DarkTheme, MD3LightTheme, Provider as PaperProvider } from 'react-na
 import { en, fr, registerTranslation } from 'react-native-paper-dates';
 
 import { getUserByID } from '@/api/user';
-import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { buildStackScreenOptions, HEADER_SIDE_WIDTH } from '@/components/my-ui/ScreenHeader';
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { color } from '@/constants/colors';
 import { Role } from '@/constants/databaseEnum';
 import { isDev } from '@/constants/env';
@@ -41,6 +41,7 @@ import {
   reportPushTokenStage,
   subscribeToPushTokenChanges,
 } from '@/lib/notifications';
+import { QueryProvider } from '@/lib/query/query-provider';
 import { supabase } from '@/lib/supabase';
 import { NAV_THEME } from '@/lib/theme';
 import { getThemePreference } from '@/lib/theme-preference';
@@ -53,6 +54,10 @@ const POSTHOG_HOST = 'https://us.i.posthog.com';
 const posthogClient = new PostHog(POSTHOG_API_KEY, {
   host: POSTHOG_HOST,
 });
+
+// #region agent log
+fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H1',location:'app/_layout.tsx:posthogClient',message:'Telemetry clients initialized',data:{posthogHost:POSTHOG_HOST,sentryConfigured:true},timestamp:Date.now()})}).catch(()=>{});
+// #endregion
 
 void SplashScreen.preventAutoHideAsync().catch((error) => {
   console.warn('splash_prevent_auto_hide_failed', error);
@@ -78,9 +83,24 @@ Sentry.init({
   tracesSampleRate: 0.2,
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
-  
+  beforeSend(event) {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H5',location:'app/_layout.tsx:Sentry.beforeSend',message:'Sentry event processed before transport',data:{eventId:event.event_id,level:event.level,hasException:Boolean(event.exception?.values?.length),transaction:event.transaction},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return event;
+  },
+
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
 });
+
+if (__DEV__) {
+  // #region agent log
+  Sentry.captureMessage('telemetry_audit_probe', {
+    level: 'info',
+    tags: { telemetry_audit: '348b3c' },
+  });
+  // #endregion
+}
 
 registerTranslation('en', en);
 registerTranslation('fr', fr);
@@ -118,7 +138,9 @@ export default Sentry.wrap(function RootLayout() {
   return (
     // Point d'entree global: tous les ecrans heritent ici des providers analytics/telemetrie.
     <PostHogProvider client={posthogClient}>
-      <RootLayoutInner />
+      <QueryProvider>
+        <RootLayoutInner />
+      </QueryProvider>
     </PostHogProvider>
   );
 });
@@ -288,6 +310,19 @@ function RootLayoutInner() {
         );
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isPermissionDenied =
+        message.includes('UNErrorDomain') ||
+        message.includes('Notifications are not allowed') ||
+        (error instanceof Error &&
+          'code' in error &&
+          error.code === 'ERR_PERMISSIONS_REQUEST_NOTIFICATIONS');
+
+      if (isPermissionDenied) {
+        reportPushTokenStage('permission-denied', { source, platform: Platform.OS });
+        return;
+      }
+
       reportStartupError('push_token_sync_failed', error);
     } finally {
       pushTokenSyncInFlightRef.current = false;
@@ -315,7 +350,7 @@ function RootLayoutInner() {
       if (refreshedUser) {
         setStoredUser(refreshedUser);
 
-        if (refreshedUser.role !== Role.CLIENT) {
+        if (refreshedUser.role === Role.DRIVER) {
           analytics.trackRoleMismatchRedirect(authUser.id, {
             email: refreshedUser.email ?? authUser.email ?? '',
             role: refreshedUser.role,
@@ -430,10 +465,19 @@ function RootLayoutInner() {
   }, []);
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H4',location:'app/_layout.tsx:pathnameEffect',message:'Navigation route changed',data:{pathname,manualPostHogScreenTrackingConfigured:false},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [pathname]);
+
+  useEffect(() => {
     // Lie la session authentifiee au profil analytics.
     // Quand l'utilisateur se deconnecte, on nettoie le contexte PostHog.
     if (user) {
       const scheme = colorScheme ?? 'light';
+      // #region agent log
+      fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H2',location:'app/_layout.tsx:identityEffect',message:'PostHog identify invoked',data:{authenticated:true,hasStoredProfile:Boolean(storedUser)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       posthog?.identify(user.id, {
         email: user.email ?? '',
         phone: storedUser?.phone ?? 'non renseigné',
@@ -444,6 +488,9 @@ function RootLayoutInner() {
         platform: Platform.OS,
       });
     } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'telemetry-audit-pre-fix',hypothesisId:'H2',location:'app/_layout.tsx:identityEffect',message:'PostHog reset invoked',data:{authenticated:false},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       posthog?.reset();
     }
   }, [user, storedUser, colorScheme, posthog]);
@@ -465,9 +512,16 @@ function RootLayoutInner() {
             return;
           }
 
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
+          const loc =
+            (await Location.getLastKnownPositionAsync()) ??
+            (await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }));
+
+          if (!loc) {
+            return;
+          }
+
           posthog?.capture('user_location_captured', {
             user_id: userId,
             latitude: loc.coords.latitude,
@@ -475,6 +529,19 @@ function RootLayoutInner() {
             platform: Platform.OS,
           });
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const isLocationUnavailable =
+            message.includes('Current location is unavailable') ||
+            message.includes('location services') ||
+            (error instanceof Error &&
+              'code' in error &&
+              (error.code === 'E_LOCATION_UNAVAILABLE' ||
+                error.code === 'E_LOCATION_SETTINGS_UNSATISFIED'));
+
+          if (isLocationUnavailable) {
+            return;
+          }
+
           reportStartupError('location_bootstrap_failed', error);
         }
       })();
@@ -700,24 +767,20 @@ function RootLayoutInner() {
                   isDark: colorScheme === 'dark',
                   canGoBack: true,
                   headerRight: () => (
-                    <View style={{ width: HEADER_SIDE_WIDTH, alignItems: 'flex-end' }}>
-                      <TouchableOpacity
-                        onPress={syncStoredUser}
-                        disabled={isSyncingUser}
-                        style={{ marginRight: 4, opacity: isSyncingUser ? 0.7 : 1 }}>
-                        {isSyncingUser ? (
-                          <ActivityIndicator
-                            size="small"
-                            color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
-                          />
-                        ) : (
-                          <RefreshCw
-                            size={20}
-                            color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                    onPress={syncStoredUser}
+                    disabled={isSyncingUser}
+                    style={{  opacity: isSyncingUser ? 0.7 : 1 }}
+                    className="flex-row items-center justify-center ml-2" >
+                    {isSyncingUser ? (
+                      <ActivityIndicator
+                        size="small"
+                        color="#000000"
+                      />
+                    ) : (
+                      <RefreshCw size={20} color="#000000" />
+                    )}
+                  </TouchableOpacity>
                   ),
                 })}
               />
@@ -732,6 +795,14 @@ function RootLayoutInner() {
 
               {/* Route de secours pour les chemins inconnus. */}
               <Stack.Screen name="+not-found" />
+
+              <Stack.Screen
+                name="booking/[id]"
+                options={{
+                  headerShown: true,
+                  headerTransparent: false,
+                }}
+              />
 
               {/* Flow detail de reservation, ouvert depuis les ecrans du parcours principal. */}
               <Stack.Screen

@@ -7,18 +7,16 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { AppConfiguration, getAppConfiguration } from '@/api/mobileConfig';
 
-type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
-type StoreGetter<T> = () => T;
-
 export interface AppConfigState {
   appConfig: AppConfiguration | null;
   lastUpdatePhone: string | null;
   appIsLock: boolean;
   refreshing: boolean;
-  localClientVersion?: number;
+  localClientVersion: number;
   setAppConfig: (appConfig: AppConfiguration, appIsLock: boolean) => void;
   setLastUpdatePhone: (lastUpdatePhone: string) => void;
   shouldFetchAppConfig: () => boolean;
+  recomputeLockFromLocalVersion: () => boolean;
   refreshAppConfig: () => Promise<{ appConfig: AppConfiguration; appIsLock: boolean }>;
   clearAppConfig: () => void;
 }
@@ -35,15 +33,23 @@ function getFallbackBuildVersion() {
   return String(Constants.expoConfig?.android?.versionCode ?? '0');
 }
 
-function getLocalClientVersion() {
+export function getLocalClientVersion() {
   const rawVersion = Application.nativeBuildVersion ?? getFallbackBuildVersion();
   const parsedVersion = Number.parseInt(rawVersion ?? '0', 10);
   return Number.isFinite(parsedVersion) ? parsedVersion : 0;
 }
 
+export function isClientVersionBlocked(versionClient: number | null | undefined) {
+  if (typeof versionClient !== 'number' || !Number.isFinite(versionClient)) {
+    return false;
+  }
+
+  return getLocalClientVersion() < versionClient;
+}
+
 export const useAppConfigState = create<AppConfigState>()(
   persist(
-    (set: StoreSetter<AppConfigState>, get: StoreGetter<AppConfigState>) => ({
+    (set, get) => ({
       appConfig: null,
       lastUpdatePhone: null,
       appIsLock: false,
@@ -54,6 +60,7 @@ export const useAppConfigState = create<AppConfigState>()(
         set({
           appConfig,
           appIsLock,
+          localClientVersion: getLocalClientVersion(),
         }),
 
       setLastUpdatePhone: (lastUpdatePhone: string) =>
@@ -61,26 +68,60 @@ export const useAppConfigState = create<AppConfigState>()(
           lastUpdatePhone,
         }),
 
-      shouldFetchAppConfig: () => get().lastUpdatePhone !== getTodayKey(),
+      recomputeLockFromLocalVersion: () => {
+        const localClientVersion = getLocalClientVersion();
+        const appIsLock = isClientVersionBlocked(get().appConfig?.version_client);
+
+        set({
+          localClientVersion,
+          appIsLock,
+        });
+
+        return appIsLock;
+      },
+
+      shouldFetchAppConfig: () => {
+        const { lastUpdatePhone, appConfig, appIsLock } = get();
+        const localClientVersion = getLocalClientVersion();
+
+        if (!appConfig) {
+          return true;
+        }
+
+        if (appIsLock || isClientVersionBlocked(appConfig.version_client)) {
+          return true;
+        }
+
+        if (get().localClientVersion !== localClientVersion) {
+          return true;
+        }
+
+        return lastUpdatePhone !== getTodayKey();
+      },
 
       refreshAppConfig: async () => {
-        set({ refreshing: true });
+        set({ refreshing: true, localClientVersion: getLocalClientVersion() });
 
         try {
           const appConfig = await getAppConfiguration();
-          const localClientVersion = getLocalClientVersion();
-          const appIsLock = localClientVersion < appConfig.version_client;
+          const appIsLock = isClientVersionBlocked(appConfig.version_client);
 
           set({
             appConfig,
             appIsLock,
+            localClientVersion: getLocalClientVersion(),
             lastUpdatePhone: getTodayKey(),
             refreshing: false,
           });
 
           return { appConfig, appIsLock };
         } catch (error) {
-          set({ refreshing: false });
+          const appIsLock = isClientVersionBlocked(get().appConfig?.version_client);
+          set({
+            refreshing: false,
+            localClientVersion: getLocalClientVersion(),
+            appIsLock,
+          });
           throw error;
         }
       },
@@ -91,11 +132,19 @@ export const useAppConfigState = create<AppConfigState>()(
           lastUpdatePhone: null,
           appIsLock: false,
           refreshing: false,
+          localClientVersion: getLocalClientVersion(),
         }),
     }),
     {
       name: 'my-state-app-config',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        appConfig: state.appConfig,
+        lastUpdatePhone: state.lastUpdatePhone,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.recomputeLockFromLocalVersion();
+      },
     }
   )
 );
