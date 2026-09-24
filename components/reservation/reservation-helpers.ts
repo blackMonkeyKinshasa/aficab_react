@@ -24,6 +24,29 @@ export const STATUS_LABELS: Record<ResStatus, TranslationKey> = {
   [ResStatus.ARCHIVED]: 'reservations.status.archived',
 };
 
+function withHexAlpha(color: string, alpha: number) {
+  const normalized = color.replace('#', '');
+  if (normalized.length !== 6) {
+    return color;
+  }
+
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+  const alphaHex = Math.round(clampedAlpha * 255)
+    .toString(16)
+    .padStart(2, '0');
+
+  return `#${normalized}${alphaHex}`;
+}
+
+export function getStatusHighlightStyles(statusColor: string, isDark: boolean) {
+  return {
+    borderColor: statusColor,
+    backgroundColor: withHexAlpha(statusColor, isDark ? 0.2 : 0.12),
+    badgeColor: statusColor,
+    shadowColor: statusColor,
+  };
+}
+
 const CLIENT_CANCELLABLE_STATUSES: ResStatus[] = [
   ResStatus.PENDING,
   ResStatus.PENDINGDRIVER,

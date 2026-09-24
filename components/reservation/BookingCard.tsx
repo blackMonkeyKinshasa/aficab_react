@@ -3,7 +3,14 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Booking } from '@/constants/dataInterface';
 import { TranslationKey } from '@/lib/i18n';
 
-import { fmtDay, fmtTime, getCarImage, STATUS_COLORS, STATUS_LABELS } from './reservation-helpers';
+import {
+  fmtDay,
+  fmtTime,
+  getCarImage,
+  getStatusHighlightStyles,
+  STATUS_COLORS,
+  STATUS_LABELS,
+} from './reservation-helpers';
 
 type BookingCardProps = {
   item: Booking;
@@ -28,18 +35,18 @@ export function BookingCard({
   const fg = isDark ? '#fff' : '#000';
   const sub = isDark ? '#aaa' : '#666';
   const statusColor = STATUS_COLORS[item.status] ?? '#999';
-  const highlightColor = isDark ? '#f59e0b' : '#ff8a00';
+  const highlightStyles = getStatusHighlightStyles(statusColor, isDark);
 
   return (
     <TouchableOpacity
       style={[
         styles.card,
         {
-          backgroundColor: highlighted ? (isDark ? '#3a2a0a' : '#fff3d6') : bg,
+          backgroundColor: highlighted ? highlightStyles.backgroundColor : bg,
           borderWidth: highlighted ? 1.5 : 0,
-          borderColor: highlighted ? highlightColor : 'transparent',
+          borderColor: highlighted ? highlightStyles.borderColor : 'transparent',
           elevation: highlighted ? 4 : 1,
-          shadowColor: highlighted ? highlightColor : '#000',
+          shadowColor: highlighted ? highlightStyles.shadowColor : '#000',
           shadowOpacity: highlighted ? 0.18 : 0.07,
           shadowRadius: highlighted ? 12 : 8,
         },
@@ -54,7 +61,7 @@ export function BookingCard({
       />
       <View style={styles.content}>
         {highlighted && badgeIsShow ? (
-          <View style={[styles.highlightBadge, { backgroundColor: highlightColor }]}>
+          <View style={[styles.highlightBadge, { backgroundColor: highlightStyles.badgeColor }]}>
             <Text style={styles.highlightBadgeText}>{t('reservations.highlightBadge')}</Text>
           </View>
         ) : null}

@@ -79,7 +79,7 @@ const translations = {
       'La location standard est valable chaque jour de 8h à 20h. Si vous souhaitez prolonger cette durée, vous pourrez ajouter des heures supplémentaires lors des étapes suivantes de votre réservation. Pour toute information complémentaire, veuillez contacter le service client.',
     'booking.advanceNoticeTitle': 'Réservation à prévoir',
     'booking.advanceNoticeMessage':
-      'Par mesure de précaution, les réservations doivent être effectuées au moins 24 heures à l’avance. Veuillez choisir une date et une heure de départ ultérieures.',
+      'Les réservations ne peuvent pas être effectuées pour le jour même. Veuillez choisir une date de départ à partir de demain.',
     'booking.departure': 'Lieu de Prise en charge',
     'booking.destination': 'Destination',
     'booking.pickupAddress': 'Adresse de prise en charge',
@@ -706,7 +706,7 @@ const translations = {
       'The standard rental runs daily from 8:00 AM to 8:00 PM. If you wish to extend beyond this period, you can select additional hours during the next steps of your booking. For more information, please contact customer support.',
     'booking.advanceNoticeTitle': 'Advance booking required',
     'booking.advanceNoticeMessage':
-      'As a precaution, bookings must be made at least 24 hours in advance. Please choose a later departure date and time.',
+      'Bookings cannot be made for the same day. Please choose a departure date starting from tomorrow.',
     'booking.departure': 'Pick-up location',
     'booking.destination': 'Destination',
     'booking.pickupAddress': 'Pickup address',

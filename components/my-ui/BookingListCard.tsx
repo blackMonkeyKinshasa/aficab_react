@@ -13,7 +13,12 @@ import { ResStatus, ResType } from '@/constants/databaseEnum';
 import { Booking } from '@/constants/dataInterface';
 import { TranslationKey } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
-import { fmtDay, getRentalDays, isMultiDayRental } from '@/components/reservation/reservation-helpers';
+import {
+  fmtDay,
+  getRentalDays,
+  getStatusHighlightStyles,
+  isMultiDayRental,
+} from '@/components/reservation/reservation-helpers';
 
 const STATUS_COLORS: Record<ResStatus, string> = {
   [ResStatus.PENDING]: '#FFA500',
@@ -134,8 +139,8 @@ export function BookingListCard({
   const sub = isDark ? '#9ca3af' : '#6b7280';
   const borderColor = isDark ? '#2f2f2f' : '#e5e7eb';
   const cardBg = isDark ? '#1E1E1E' : '#ffffff';
-  const highlightColor = isDark ? '#f59e0b' : '#ff8a00';
   const statusColor = STATUS_COLORS[item.status] ?? '#999';
+  const highlightStyles = getStatusHighlightStyles(statusColor, isDark);
   const createdAt = fmtCreatedAt(item.createAt, appLocale);
   const isCanceled = item.status === ResStatus.CANCELED;
   const isCompleted = item.status === ResStatus.ENDED || item.status === ResStatus.ARCHIVED;
@@ -164,9 +169,13 @@ export function BookingListCard({
       style={[
         styles.card,
         {
-          borderColor: highlighted ? highlightColor : borderColor,
-          backgroundColor: highlighted ? (isDark ? '#2a2418' : '#fffaf0') : cardBg,
+          borderColor: highlighted ? highlightStyles.borderColor : borderColor,
+          backgroundColor: highlighted ? highlightStyles.backgroundColor : cardBg,
           borderWidth: highlighted ? 1.5 : 1,
+          shadowColor: highlighted ? highlightStyles.shadowColor : '#000',
+          shadowOpacity: highlighted ? 0.18 : 0.07,
+          shadowRadius: highlighted ? 12 : 8,
+          elevation: highlighted ? 4 : 1,
         },
       ]}
       onPress={onPress}
@@ -174,7 +183,7 @@ export function BookingListCard({
       <View style={[styles.statusRail, { backgroundColor: statusColor }]} />
 
       {highlighted && badgeIsShow ? (
-        <View style={[styles.highlightBadge, { backgroundColor: highlightColor }]}>
+        <View style={[styles.highlightBadge, { backgroundColor: highlightStyles.badgeColor }]}>
           <Text style={[styles.highlightBadgeText, { fontSize: font.xs }]}>
             {t('reservations.newBookingBadge')}
           </Text>

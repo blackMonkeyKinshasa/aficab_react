@@ -18,7 +18,7 @@
       ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "buildNumber": "151",
+      "buildNumber": "152",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
@@ -97,7 +97,7 @@
           ]
         }
       ],
-      "versionCode": 127,
+      "versionCode": 128,
       "package": "io.kinvtc.mapstracking",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
