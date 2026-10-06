@@ -2,7 +2,7 @@
   "expo": {
     "name": "Aficab",
     "slug": "Aficab",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/aficab-app-logo-white.png",
     "scheme": "aficab",
@@ -18,7 +18,7 @@
       ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "buildNumber": "152",
+      "buildNumber": "156",
       "bundleIdentifier": "io.kinvtc.mapstracking",
       "infoPlist": {
         "NSCameraUsageDescription": "Autoriser l'acces a la camera pour prendre des photos.",
@@ -97,7 +97,7 @@
           ]
         }
       ],
-      "versionCode": 128,
+      "versionCode": 133,
       "package": "io.kinvtc.mapstracking",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",

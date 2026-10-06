@@ -19,22 +19,18 @@ import { getTaCars } from '@/api/car';
 import { validateCoupon } from '@/api/coupon';
 import { BookingOptionSectionCard } from '@/components/my-ui/BookingOptionSectionCard';
 import {
-  BookingRecapDetailRow,
-  BookingRecapDetailColumn,
-} from '@/components/my-ui/BookingRecapDetail';
-import {
   BookingDateTimeRow,
   BookingDetailsFormField,
   BookingSegmentedControl,
 } from '@/components/my-ui/BookingDetailsFormField';
+import { BookingRecapConfirmFooter } from '@/components/my-ui/BookingRecapConfirmFooter';
+import { BookingRecapDetailsCard } from '@/components/my-ui/BookingRecapDetailsCard';
+import { BookingRecapImportantInfoCard } from '@/components/my-ui/BookingRecapImportantInfoCard';
+import { BookingRecapIncludedSection } from '@/components/my-ui/BookingRecapIncludedSection';
 import { BookingRecapLayout } from '@/components/my-ui/BookingRecapLayout';
+import { BookingRecapPassengerCard } from '@/components/my-ui/BookingRecapPassengerCard';
+import { BookingRecapPaymentSecurity } from '@/components/my-ui/BookingRecapPaymentSecurity';
 import { BookingRecapPriceSection } from '@/components/my-ui/BookingRecapPriceSection';
-import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
-import {
-  BookingRecapDriverNotice,
-  BookingRecapServiceBanner,
-  BookingRecapStatusRow,
-} from '@/components/my-ui/BookingRecapStatusCards';
 import { BookingRecapVehicleCard } from '@/components/my-ui/BookingRecapVehicleCard';
 import { BookingStepHeader } from '@/components/my-ui/BookingStepHeader';
 import { BookingTripSummaryCard } from '@/components/my-ui/BookingTripSummaryCard';
@@ -47,6 +43,7 @@ import {
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
 import { VehicleSelectionCard } from '@/components/my-ui/VehicleSelectionCard';
+import { VehicleSelectionFooter } from '@/components/my-ui/VehicleSelectionFooter';
 import { VehicleSelectionListLoader } from '@/components/my-ui/VehicleSelectionListLoader';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
@@ -66,8 +63,10 @@ import { useAnalytics } from '@/lib/analytics';
 import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
+import { getAddressName } from '@/lib/location-utils';
+import { formatRecapPriceWithCurrency } from '@/lib/recap-format';
 import { supabase } from '@/lib/supabase';
-import { hasMinimumBookingLeadTime } from '@/lib/time-utils';
+import { getEarliestBookingDate, hasMinimumBookingLeadTime } from '@/lib/time-utils';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useMyStateUser, type UserState } from '@/store/user-state';
@@ -248,7 +247,7 @@ function normalizeGuestPhone(phoneNumber: string | null | undefined) {
 export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
-  const { appLocale, t } = useI18n();
+  const { appLocale, t, tf } = useI18n();
   const toast = useAppToast();
   const analytics = useAnalytics();
   const fieldThemeColors = useFieldThemeColors();
@@ -269,6 +268,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const [dateReturn, setDateReturn] = useState<Date | null>(null);
   const userFullName = useMyStateUser((state: UserState) => state.user?.full_name?.trim() ?? '');
   const userPhone = useMyStateUser((state: UserState) => state.user?.phone?.trim() ?? '');
+  const userEmail = useMyStateUser((state: UserState) => state.user?.email?.trim() ?? '');
   const scheduleLabel = locationDoc
     ? formatAirportSchedule(locationDoc, appLocale, t('booking.airportDateUnavailable'))
     : '';
@@ -806,7 +806,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
               <BookingDetailsFormField
                 label={t('booking.pickupAddress')}
                 icon="location-outline"
-                value={locationDepart?.description ?? ''}
+                value={getAddressName(locationDepart?.description)}
                 placeholder={t('booking.departure')}
                 onPress={() => setVisibleDepart(true)}
                 isDarkMode={isDarkMode}
@@ -816,7 +816,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
               <BookingDetailsFormField
                 label={t('booking.dropoffAddress')}
                 icon="navigate-outline"
-                value={locationDest?.description ?? ''}
+                value={getAddressName(locationDest?.description)}
                 placeholder={t('booking.destination')}
                 onPress={() => setVisibleDest(true)}
                 isDarkMode={isDarkMode}
@@ -929,7 +929,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             setVisibleDateStart(false);
           }}
           value={dateStart}
-          minDate={new Date()}
+          minDate={getEarliestBookingDate()}
           isStartTime
           initialStep={dateStartStep}
         />
@@ -942,7 +942,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             setVisibleDateReturn(false);
           }}
           value={dateReturn}
-          minDate={dateStart ?? new Date()}
+          minDate={dateStart ?? getEarliestBookingDate()}
           isStartTime={false}
           initialStep={dateReturnStep}
         />
@@ -956,8 +956,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     }
 
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
-    const priceUnit = `$`;
-    // const priceUnit = `$${t('booking.perTrip')}`;
+    const priceUnit = `USD ${t('booking.perTrip')}`;
 
     return (
       <View style={[{ backgroundColor: theme.bg }, { flex: 1 }]}>
@@ -976,13 +975,16 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
           onRefresh={handleRefresh}
           ListHeaderComponent={
             <>
-              <BookingStepHeader current={2} subtitle={t('booking.vehicleSelectionSubtitle')} />
+              <BookingStepHeader current={2} />
             </>
           }
           ListFooterComponent={
-            isLoadingCars && !isRefreshing && cars.length > 0 ? (
-              <VehicleSelectionListLoader compact />
-            ) : null
+            <>
+              {isLoadingCars && !isRefreshing && cars.length > 0 ? (
+                <VehicleSelectionListLoader compact />
+              ) : null}
+              {cars.length > 0 ? <VehicleSelectionFooter /> : null}
+            </>
           }
           ListEmptyComponent={
             isLoadingCars && cars.length === 0 ? (
@@ -1244,38 +1246,52 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
 
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
     const isRoundTrip = locationDoc.tripType === 'round-trip';
-    const allerScheduleLabel = formatAirportSchedule(
-      { ...locationDoc, tripType: 'one-way' },
-      appLocale,
-      t('booking.airportDateUnavailable')
-    );
-    const retourScheduleLabel = (() => {
-      const d = toDate(locationDoc.dateReturn);
-      if (!d || Number.isNaN(d.getTime())) return t('booking.airportDateUnavailable');
-      return `${d.toLocaleDateString(appLocale, { day: 'numeric', month: 'short', year: '2-digit' })} ${d.toLocaleTimeString(appLocale, { hour: '2-digit', minute: '2-digit' })}`;
-    })();
-    const activeDateLabel = isPositionAller ? allerScheduleLabel : retourScheduleLabel;
     const trimmedComment = comment.trim();
     const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
     const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
     const travelerName = isGuestSectionOpen ? trimmedGuestName : userFullName;
     const travelerPhone = isGuestSectionOpen ? trimmedGuestPhone : userPhone;
+    const travelerEmail = isGuestSectionOpen ? '' : userEmail;
+    const activeDate = isPositionAller
+      ? toDate(locationDoc.dateStart)
+      : toDate(locationDoc.dateReturn ?? locationDoc.dateStart);
     const departureAddress = isPositionAller
       ? (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'))
       : (locationDoc.locationDest.description ?? t('booking.addressUnavailable'));
     const arrivalAddress = isPositionAller
       ? (locationDoc.locationDest.description ?? t('booking.addressUnavailable'))
       : (locationDoc.locationDepart.description ?? t('booking.addressUnavailable'));
+
+    const includedItems = [
+      t('booking.professionalDriver'),
+      tf('booking.rentalZone', { city: t('booking.kinshasa') }),
+      t('booking.cancellationPolicyText'),
+    ];
+
+    const importantItems = [
+      ...(flyNumber
+        ? [{ icon: 'airplane-outline' as const, text: `${t('booking.flightNumber')} : ${flyNumber}` }]
+        : []),
+      ...(distanceKm !== null
+        ? [{ icon: 'speedometer-outline' as const, text: `${t('booking.distance')} : ${distanceKm.toFixed(1)} km` }]
+        : []),
+      ...(trimmedComment
+        ? [{ icon: 'chatbubble-ellipses-outline' as const, text: trimmedComment }]
+        : []),
+    ];
+
     const priceLines = [
       {
-        label: `→ ${!isRoundTrip ? t('booking.oneWay') : t('booking.outbound')}`,
-        value: `${tripPrice} $`,
+        label: tf('booking.recapTripLine', {
+          vehicle: selectedCar?.name ?? t('booking.noVehicle'),
+        }),
+        value: formatRecapPriceWithCurrency(tripPrice),
       },
       ...(isRoundTrip
         ? [
             {
-              label: `← ${t('booking.return')}`,
-              value: `${tripPrice} $`,
+              label: t('booking.return'),
+              value: formatRecapPriceWithCurrency(tripPrice),
             },
           ]
         : []),
@@ -1283,34 +1299,22 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         ? [
             {
               label: t('booking.discount'),
-              value: `- ${promoDiscountAmount} $`,
+              value: `- ${formatRecapPriceWithCurrency(promoDiscountAmount)}`,
             },
           ]
         : []),
     ];
 
     const recapFooter = (
-      <Button
-        action="primary"
-        variant="solid"
-        size="control"
-        className="w-full rounded-xl"
-        style={controlHeightStyle}
-        onPress={() => void handleNextEtape()}>
-        <ButtonText className="text-white">
-          {t('booking.confirmAndPay')} · {finalTotalPrice} $
-        </ButtonText>
-      </Button>
+      <BookingRecapConfirmFooter
+        totalLabel={formatRecapPriceWithCurrency(finalTotalPrice)}
+        onPress={() => void handleNextEtape()}
+      />
     );
 
     return (
       <BookingRecapLayout footer={recapFooter}>
         <BookingStepHeader current={4} subtitle={t('booking.recapSubtitle')} />
-        <BookingRecapServiceBanner
-          icon="airplane-outline"
-          label={t('booking.airportService')}
-          status={t('booking.pendingStatus')}
-        />
 
         {isRoundTrip ? (
           <View className="mb-4 flex-row">
@@ -1354,75 +1358,36 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
           </View>
         ) : null}
 
+        <BookingRecapDetailsCard
+          title={t('booking.reservationDetailsTitle')}
+          onEditPress={() => setEtape(EtapeReservation.DETAILS)}
+          dateValue={`${formatBookingDate(activeDate, appLocale)} ${appLocale.startsWith('fr') ? 'à' : 'at'} ${formatBookingTime(activeDate, appLocale)}`}
+          pickupLabel={t('booking.pickupLocation')}
+          pickupPrimary={getAddressName(departureAddress)}
+          destinationLabel={t('booking.destination')}
+          destinationPrimary={getAddressName(arrivalAddress)}
+        />
+
         <BookingRecapVehicleCard
           imageUri={recapImage}
           name={selectedCar?.name ?? t('booking.noVehicle')}
           category={selectedCar?.category?.name ?? t('booking.categoryUnavailable')}
           seats={selectedCar?.seats ?? 0}
           baggage={selectedCar?.baggage ?? 0}
-          priceAmount={`${tripPrice} $`}
-          priceUnit={t('booking.perTrip')}
-          durationLabel={isRoundTrip ? t('booking.roundTrip') : t('booking.oneWay')}
         />
 
-        <BookingRecapSection title={t('booking.detailsTitle')}>
-          <BookingRecapDetailColumn
-            icon="calendar-outline"
-            label={
-              isRoundTrip
-                ? isPositionAller
-                  ? t('booking.departureDateTime')
-                  : t('booking.returnDateTime')
-                : t('booking.departureDateTime')
-            }
-            value={activeDateLabel}
+        {travelerName ? (
+          <BookingRecapPassengerCard
+            name={travelerName}
+            phone={travelerPhone || undefined}
+            email={travelerEmail || undefined}
+            onEditPress={() => setEtape(EtapeReservation.OPTION)}
           />
-          <BookingRecapDetailColumn
-            icon="location-outline"
-            label={t('booking.from')}
-            value={departureAddress}
-          />
-          <BookingRecapDetailColumn
-            icon="navigate-outline"
-            label={t('booking.to')}
-            value={arrivalAddress}
-          />
-          {distanceKm !== null ? (
-            <BookingRecapDetailColumn
-              icon="speedometer-outline"
-              label={t('booking.distance')}
-              value={`${distanceKm.toFixed(1)} km`}
-            />
-          ) : null}
-          {flyNumber ? (
-            <BookingRecapDetailColumn
-              icon="airplane-outline"
-              label={t('booking.flightNumber')}
-              value={flyNumber}
-            />
-          ) : null}
-          {trimmedComment ? (
-            <BookingRecapDetailColumn
-              icon="chatbubble-ellipses-outline"
-              label={t('booking.specialInstructions')}
-              value={trimmedComment.replace(/\n/g, ' · ')}
-            />
-          ) : null}
-          {travelerName || travelerPhone ? (
-            <BookingRecapDetailColumn
-              icon="person-outline"
-              label={t('booking.reservationFor')}
-              value={[travelerName, travelerPhone].filter(Boolean).join(' · ')}
-            />
-          ) : null}
-          <View className="my-4 border-t border-outline-100" />
-          <Text className="text-sm font-semibold text-typography-900">
-            {t('booking.cancellationPolicy')}
-          </Text>
-          <Text className="mt-2 text-sm text-typography-500">
-            {t('booking.cancellationPolicyText')}
-          </Text>
-        </BookingRecapSection>
+        ) : null}
+
+        <BookingRecapIncludedSection items={includedItems} />
+
+        <BookingRecapImportantInfoCard items={importantItems} />
 
         <PromoCodeField
           label={t('booking.promoCodeLabel')}
@@ -1442,16 +1407,11 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         />
 
         <BookingRecapPriceSection
-          title={t('booking.priceDetails')}
           lines={priceLines}
-          totalLabel={t('booking.total')}
-          totalValue={`${finalTotalPrice} $`}
+          totalValue={formatRecapPriceWithCurrency(finalTotalPrice)}
         />
 
-        <BookingRecapStatusRow
-          label={t('booking.paymentLabel')}
-          value={t('booking.paymentPending')}
-        />
+        <BookingRecapPaymentSecurity />
       </BookingRecapLayout>
     );
   };

@@ -8,7 +8,7 @@ export function BookingStepHeader({
   subtitle,
 }: {
   current: 1 | 2 | 3 | 4;
-  subtitle: string;
+  subtitle?: string;
 }) {
   const { tf } = useI18n();
   const { font } = useLayoutScale();
@@ -23,9 +23,11 @@ export function BookingStepHeader({
           <View className="h-full rounded-full bg-primary" style={{ width: `${current * 25}%` }} />
         </View>
       </View>
-      <Text className="mt-3 text-typography-500" style={{ fontSize: font.sm }}>
-        {subtitle}
-      </Text>
+      {subtitle ? (
+        <Text className="mt-3 text-typography-500" style={{ fontSize: font.sm }}>
+          {subtitle}
+        </Text>
+      ) : null}
     </View>
   );
 }

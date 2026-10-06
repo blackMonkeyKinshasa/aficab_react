@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SectionList, StyleSheet, Text, View } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
+import type { ComponentProps } from 'react';
 
 import { readNotification } from '@/api/activity';
 import { ErrorEmpty } from '@/components/my-ui/errorEmpty';
 import { LoadingView } from '@/components/my-ui/LoadingView';
+import { NotificationCard } from '@/components/my-ui/NotificationCard';
+import type { NotificationDetailLine } from '@/components/my-ui/NotificationCard';
+import { NotificationDayHeader } from '@/components/my-ui/NotificationDayHeader';
+import { NotificationFeedHeader } from '@/components/my-ui/NotificationFeedHeader';
 import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import { color } from '@/constants/colors';
 import { Activity, ActivityAction } from '@/constants/dataInterface';
@@ -23,6 +29,7 @@ import { useMyStateNotif } from '@/store/notification-state';
 import { useMyStateUser } from '@/store/user-state';
 
 const EMPTY_ACTIVITIES: Activity[] = [];
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 function formatDate(iso: string, locale: string) {
   try {
@@ -40,6 +47,14 @@ function formatDate(iso: string, locale: string) {
     // #endregion
     throw error;
   }
+}
+
+function formatClock(iso: string, locale: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function getDayKey(iso: string) {
@@ -150,9 +165,8 @@ function getBookingPreview(activity: Activity, locale: string) {
 
   try {
     const booking = activity.booking;
-    const routeParts = [booking.departure?.label, booking.arrival?.label].filter(
-      (value): value is string => Boolean(value && value !== 'N/A')
-    );
+    const pickup = booking.departure?.label ?? '';
+    const destination = booking.arrival?.label ?? '';
 
     return {
       vehicle: activity.car?.name ?? activity.target ?? activity.bookingId ?? '—',
@@ -166,7 +180,16 @@ function getBookingPreview(activity: Activity, locale: string) {
             minute: '2-digit',
           })
         : '—',
-      route: routeParts.length > 0 ? routeParts.join(' → ') : '—',
+      pickup,
+      destination,
+      serviceType: booking.type,
+      arrivalTime: booking.arrivalAt
+        ? new Date(booking.arrivalAt).toLocaleTimeString(locale, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : null,
+      route: [pickup, destination].filter(Boolean).join(' → ') || '—',
     };
   } catch (error) {
     // #region agent log
@@ -182,7 +205,7 @@ function getActionMeta(
   t: ReturnType<typeof useI18n>['t'],
   tf: ReturnType<typeof useI18n>['tf'],
   appLocale: string
-) {
+): { title: string; body: string; iconName: IoniconName; subtitle: string; tone: string } {
   const bookingLabel = activity.booking?.car?.name ?? activity.target ?? activity.bookingId ?? '';
   const driverName =
     activity.driver?.user?.full_name ??
@@ -198,52 +221,54 @@ function getActionMeta(
       return {
         title: t('notifications.action.carApproved.title'),
         body: tf('notifications.action.carApproved.message', { target: activity.target ?? '' }),
-        icon: '✓',
+        iconName: 'checkmark-circle',
+        subtitle: t('notifications.action.carApproved.title'),
         tone: '#16a34a',
       };
     case 'car-pending-approval':
       return {
         title: t('notifications.action.carPending.title'),
         body: tf('notifications.action.carPending.message', { target: activity.target ?? '' }),
-        icon: '…',
+        iconName: 'time-outline',
+        subtitle: t('notifications.action.carPending.title'),
         tone: '#f59e0b',
       };
     case 'driver-approved':
       return {
         title: t('notifications.action.driverApproved.title'),
         body: tf('notifications.action.driverApproved.message', { target: activity.target ?? '' }),
-        icon: '✓',
+        iconName: 'checkmark-circle',
+        subtitle: t('notifications.action.driverApproved.title'),
         tone: '#16a34a',
       };
     case 'driver-pending-approval':
       return {
         title: t('notifications.action.driverPending.title'),
         body: tf('notifications.action.driverPending.message', { target: activity.target ?? '' }),
-        icon: '…',
+        iconName: 'time-outline',
+        subtitle: t('notifications.action.driverPending.title'),
         tone: '#f59e0b',
       };
     case 'booking-new':
       return {
-        title: 'Reservation confirmee',
-        body: schedule
-          ? `Votre reservation ${bookingLabel ? `pour ${bookingLabel} ` : ''}est confirmee. Prevue le ${schedule}.`
-          : `Votre reservation ${bookingLabel ? `pour ${bookingLabel} ` : ''}est confirmee.`,
-        icon: '↗',
+        title: 'Réservation confirmée',
+        body:
+          activity.booking?.type === 'TA'
+            ? 'Votre transfert vers l’aéroport est confirmé.'
+            : 'Votre réservation pour une location à la journée est confirmée.',
+        iconName: 'checkmark',
+        subtitle: activity.booking?.type === 'TA' ? t('booking.airportService') : t('booking.dailyService'),
         tone: '#2563eb',
       };
     case 'booking-checkin':
     case 'booking-checkout':
       return {
-        title: 'Chauffeur en route',
-        body: [
-          'Votre chauffeur est en route.',
-          driverName ? `${driverName} vient de demarrer.` : '',
-          carName ? `${carName}${carPlate ? ` [${carPlate}]` : ''}.` : '',
-          schedule ? `Arrivee estimee : ${schedule}.` : '',
-        ]
-          .filter(Boolean)
-          .join(' '),
-        icon: '🚗',
+        title: 'Votre chauffeur est en route',
+        body: driverName
+          ? `${driverName} se dirige vers votre point de prise en charge.`
+          : 'Votre chauffeur se dirige vers votre point de prise en charge.',
+        iconName: 'car-outline',
+        subtitle: driverName ? `Chauffeur : ${driverName}` : t('notifications.title'),
         tone: '#7c3aed',
       };
     case 'booking-driver-notify':
@@ -252,160 +277,45 @@ function getActionMeta(
         body: activity.bookingId
           ? `Le chauffeur a ete notifie pour la reservation ${activity.bookingId}.`
           : 'Le chauffeur a ete notifie pour votre reservation.',
-        icon: '🔔',
+        iconName: 'notifications-outline',
+        subtitle: t('notifications.action.bookingDriverNotify.title'),
         tone: '#ea580c',
       };
     case 'booking-driver-cancel':
       return {
-        title: 'Reservation refusee',
+        title: 'Réservation annulée',
         body: driverName
-          ? `${driverName} a refuse la reservation${activity.bookingId ? ` ${activity.bookingId}` : ''}.`
-          : `Votre reservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a ete refusee.`,
-        icon: '!',
+          ? `La course de ${driverName}${activity.bookingId ? ` (${activity.bookingId})` : ''} a été annulée.`
+          : `Votre réservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a été annulée.`,
+        iconName: 'close-circle-outline',
+        subtitle: 'Annulation',
         tone: '#dc2626',
       };
     case 'booking-client-cancel':
       return {
-        title: 'Reservation annulee',
-        body: `La reservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a ete annulee.`,
-        icon: '!',
+        title: 'Réservation annulée',
+        body: `Votre réservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a été annulée.`,
+        iconName: 'close-circle-outline',
+        subtitle: 'Annulation',
         tone: '#dc2626',
       };
     case 'booking-auto-canceled':
       return {
-        title: 'Reservation annulee automatiquement',
-        body: `La reservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a ete annulee par le systeme car elle n'a pas ete honoree avant la date de depart.`,
-        icon: '!',
+        title: 'Réservation annulée',
+        body: `Votre réservation${activity.bookingId ? ` ${activity.bookingId}` : ''} a été annulée automatiquement par le système.`,
+        iconName: 'close-circle-outline',
+        subtitle: 'Annulation automatique',
         tone: '#dc2626',
       };
     default:
       return {
         title: 'Nouvelle activite',
         body: activity.target ?? '',
-        icon: '•',
+        iconName: 'notifications-outline',
+        subtitle: t('notifications.title'),
         tone: '#6b7280',
       };
   }
-}
-
-function NotificationItem({
-  item,
-  isDark,
-  onPress,
-  t,
-  tf,
-  appLocale,
-}: {
-  item: Activity;
-  isDark: boolean;
-  onPress: () => void;
-  t: ReturnType<typeof useI18n>['t'];
-  tf: ReturnType<typeof useI18n>['tf'];
-  appLocale: string;
-}) {
-  const { s, font } = useLayoutScale();
-  const iconWell = s(42);
-  let meta;
-  let relativeDate = '';
-  let bookingPreview = null;
-  try {
-    meta = getActionMeta(item.action, item, t, tf, appLocale);
-    relativeDate = formatRelativeDate(item.createAt, appLocale);
-    bookingPreview = getBookingPreview(item, appLocale);
-  } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H3',location:'notificationsPage.tsx:NotificationItem',message:'notification item render threw',data:{id:item?.id,action:item?.action,createAt:item?.createAt,error:error instanceof Error?error.message:String(error)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    throw error;
-  }
-  const canOpenBooking = Boolean(item.bookingId);
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[
-        styles.item,
-        { backgroundColor: isDark ? '#17181c' : '#ffffff' },
-        !item.isRead && { borderColor: meta.tone, borderWidth: 1.5 },
-      ]}>
-      <View style={styles.itemRow}>
-        <View style={[styles.iconWrap, { backgroundColor: `${meta.tone}22`, width: iconWell, height: iconWell, borderRadius: iconWell / 2 }]}>
-          <Text style={[styles.iconText, { color: meta.tone, fontSize: font.lg }]}>{meta.icon}</Text>
-        </View>
-
-        <View style={styles.contentWrap}>
-          <View style={styles.itemHeader}>
-            <Text style={[styles.title, { color: isDark ? '#fff' : '#000', fontSize: font.base }]} numberOfLines={2}>
-              {meta.title}
-            </Text>
-            {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: meta.tone }]} />}
-          </View>
-
-          <Text style={[styles.body, { color: isDark ? '#c7c7cc' : '#4b5563', fontSize: font.sm }]} numberOfLines={3}>
-            {meta.body}
-          </Text>
-
-          <View style={styles.metaRow}>
-            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280', fontSize: font.xs }]}>
-              {relativeDate}
-            </Text>
-            <Text style={[styles.date, { color: isDark ? '#5f5f66' : '#9ca3af', fontSize: font.xs }]}>•</Text>
-            <Text style={[styles.date, { color: isDark ? '#7c7c84' : '#6b7280', fontSize: font.xs }]}>
-              {formatDate(item.createAt, appLocale)}
-            </Text>
-          </View>
-
-          {bookingPreview ? (
-            <View
-              style={[
-                styles.bookingPreviewCard,
-                { backgroundColor: isDark ? '#202127' : '#f8fafc' },
-              ]}>
-              <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
-                  {t('reservations.field.vehicle')}
-                </Text>
-                <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
-                  numberOfLines={1}>
-                  {bookingPreview.vehicle}
-                </Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
-                  {t('reservations.field.departure')}
-                </Text>
-                <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
-                  numberOfLines={1}>
-                  {bookingPreview.departureTime}
-                </Text>
-              </View>
-              <View style={styles.previewRow}>
-                <Text style={[styles.previewLabel, { color: isDark ? '#9ca3af' : '#6b7280', fontSize: font.xs, width: s(72) }]}>
-                  {t('reservations.section.places')}
-                </Text>
-                <Text
-                  style={[styles.previewValue, { color: isDark ? '#ffffff' : '#111827', fontSize: font.sm }]}
-                  numberOfLines={2}>
-                  {bookingPreview.route}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-
-          {canOpenBooking ? (
-            <View style={[styles.linkChip, { backgroundColor: isDark ? '#26272b' : '#f3f4f6' }]}>
-              <Text style={[styles.linkChipText, { color: meta.tone, fontSize: font.sm }]}>
-                {t('notifications.openBooking')}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
 }
 
 export default function Notifications() {
@@ -435,6 +345,7 @@ export default function Notifications() {
     isLoadingError,
   } = useNotifications(storedUser?.id, { pollingInterval: POLLING.notifications });
   const activities = data ?? EMPTY_ACTIVITIES;
+  const unreadCount = activities.filter((activity) => !activity.isRead).length;
   // #region agent log
   fetch('http://127.0.0.1:7678/ingest/e489a6eb-08fd-49a3-8970-439b9b875778',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'348b3c'},body:JSON.stringify({sessionId:'348b3c',runId:'pre-fix',hypothesisId:'H1',location:'notificationsPage.tsx:afterQuery',message:'notifications query in screen',data:{loading,isLoadingError,hasUser:Boolean(storedUser?.id),dataType:typeof data,isArray:Array.isArray(data),length:Array.isArray(data)?data.length:null},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
@@ -590,6 +501,24 @@ export default function Notifications() {
       });
   };
 
+  const handleMarkAllAsRead = () => {
+    const unreadActivities = activities.filter((activity) => !activity.isRead);
+    if (unreadActivities.length === 0) {
+      return;
+    }
+
+    patchActivities((currentActivities) =>
+      currentActivities.map((activity) =>
+        activity.isRead ? activity : { ...activity, isRead: true }
+      )
+    );
+    clearCountNotif();
+
+    Promise.allSettled(unreadActivities.map((activity) => readNotification(activity.id))).finally(() => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activity.all });
+    });
+  };
+
   return (
     <>
       <Stack.Screen
@@ -614,23 +543,91 @@ export default function Notifications() {
               sections={sections}
               keyExtractor={(item) => item.id}
               renderSectionHeader={({ section }) => (
-                <View style={styles.sectionHeaderWrap}>
-                  <Text
-                    style={[styles.sectionHeaderText, { color: isDark ? '#f3f4f6' : '#111827', fontSize: font.md }]}>
-                    {section.title}
-                  </Text>
-                </View>
+                <NotificationDayHeader title={section.title} isDark={isDark} />
               )}
-              renderItem={({ item }) => (
-                <NotificationItem
-                  item={item}
+              renderItem={({ item }) => {
+                const meta = getActionMeta(item.action, item, t, tf, appLocale);
+                const bookingPreview = getBookingPreview(item, appLocale);
+                const routeFields = bookingPreview
+                  ? [
+                      ...(bookingPreview.pickup
+                        ? [{ label: t('booking.pickupLocation'), value: bookingPreview.pickup }]
+                        : []),
+                      ...(bookingPreview.destination
+                        ? [{ label: t('booking.destination'), value: bookingPreview.destination }]
+                        : []),
+                    ]
+                  : [];
+                const detailLines: NotificationDetailLine[] = [
+                  {
+                    label: 'Service',
+                    value:
+                      bookingPreview?.serviceType === 'TA'
+                        ? `${t('booking.airportService')}`
+                        : `${t('booking.dailyService')}`,
+                  },
+                  ...(item.booking?.driver?.user?.full_name
+                    ? [{ label: 'Chauffeur', value: `${item.booking.driver.user.full_name}` }]
+                    : []),
+                  ...(bookingPreview?.vehicle && bookingPreview.vehicle !== '—'
+                    ? [{ label: `${t('reservations.field.vehicle')}`, value: `${bookingPreview.vehicle}` }]
+                    : []),
+                  ...(item.action === 'booking-checkin' || item.action === 'booking-checkout'
+                    ? [{ label: 'Arrivée', value: 'Heure d’arrivée à confirmer' }]
+                    : []),
+                  ...(item.action === 'booking-auto-canceled'
+                    ? [
+                        {
+                          label: 'Motif',
+                          value: item.bookingId
+                            ? `Votre réservation ${item.bookingId} a été annulée car le paiement n’a pas été reçu dans le délai prévu.`
+                            : 'Votre réservation a été annulée car le paiement n’a pas été reçu dans le délai prévu.',
+                        },
+                      ]
+                    : []),
+                ];
+
+                return (
+                  <NotificationCard
+                    isDark={isDark}
+                    isUnread={!item.isRead}
+                    title={meta.title}
+                    subtitle={`${formatClock(item.createAt, appLocale)} · ${meta.subtitle}`}
+                    message={meta.body}
+                    dateLabel={bookingPreview?.departureTime || formatRelativeDate(item.createAt, appLocale)}
+                    icon={meta.iconName}
+                    tone={meta.tone}
+                    routeFields={routeFields}
+                    detailLines={detailLines}
+                    actionLabel={t('notifications.openBooking')}
+                    onOpenBooking={item.bookingId ? () => handleNotificationPress(item) : undefined}
+                  />
+                );
+              }}
+              ListHeaderComponent={
+                <NotificationFeedHeader
+                  title={notificationsTitle}
+                  unreadSummary={
+                    unreadCount > 0
+                      ? appLocale.startsWith('fr')
+                        ? `${unreadCount} ${
+                            unreadCount > 1
+                              ? 'notifications non lues'
+                              : 'notification non lue'
+                          }`
+                        : `${unreadCount} ${
+                            unreadCount > 1
+                              ? 'unread notifications'
+                              : 'unread notification'
+                          }`
+                      : t('notifications.allRead')
+                  }
+                  hasUnread={unreadCount > 0}
+                  markAllLabel={t('notifications.markAllRead')}
+                  onMarkAllRead={handleMarkAllAsRead}
                   isDark={isDark}
-                  onPress={() => handleNotificationPress(item)}
-                  t={t}
-                  tf={tf}
-                  appLocale={appLocale}
                 />
-              )}
+              }
               contentContainerStyle={styles.list}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               SectionSeparatorComponent={() => <View style={styles.sectionSpacer} />}
@@ -659,7 +656,7 @@ export default function Notifications() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingTop: 16, paddingHorizontal: 12, paddingBottom: 32 },
+  list: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 32 },
   item: {
     borderRadius: 20,
     padding: 16,
@@ -704,7 +701,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   linkChipText: { fontSize: 12, fontWeight: '700' },
-  separator: { height: 10 },
+  separator: { height: 12 },
   sectionHeaderWrap: { paddingHorizontal: 4, paddingBottom: 8 },
   sectionHeaderText: { fontSize: 15, fontWeight: '800', textTransform: 'capitalize' },
   sectionSpacer: { height: 14 },

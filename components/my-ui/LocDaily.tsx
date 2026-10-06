@@ -11,21 +11,21 @@ import { validateCoupon } from '@/api/coupon';
 import { BookingOptionSectionCard } from '@/components/my-ui/BookingOptionSectionCard';
 import { BookingOptionToggleRow } from '@/components/my-ui/BookingOptionToggleRow';
 import {
-  BookingRecapDetailRow,
-  BookingRecapDetailColumn,
-} from '@/components/my-ui/BookingRecapDetail';
-import {
   BookingDateTimeRow,
   BookingDetailsFormField,
 } from '@/components/my-ui/BookingDetailsFormField';
+import { BookingRecapConfirmFooter } from '@/components/my-ui/BookingRecapConfirmFooter';
+import { BookingRecapDetailsCard } from '@/components/my-ui/BookingRecapDetailsCard';
+import { BookingRecapImportantInfoCard } from '@/components/my-ui/BookingRecapImportantInfoCard';
+import { BookingRecapIncludedSection } from '@/components/my-ui/BookingRecapIncludedSection';
 import { BookingRecapLayout } from '@/components/my-ui/BookingRecapLayout';
+import { BookingRecapPassengerCard } from '@/components/my-ui/BookingRecapPassengerCard';
+import { BookingRecapPaymentSecurity } from '@/components/my-ui/BookingRecapPaymentSecurity';
 import { BookingRecapPriceSection } from '@/components/my-ui/BookingRecapPriceSection';
-import { BookingRecapSection } from '@/components/my-ui/BookingRecapSection';
 import {
-  BookingRecapDriverNotice,
-  BookingRecapServiceBanner,
-  BookingRecapStatusRow,
-} from '@/components/my-ui/BookingRecapStatusCards';
+  BookingRecapSelectedOption,
+  BookingRecapSelectedOptionsCard,
+} from '@/components/my-ui/BookingRecapSelectedOptionsCard';
 import { BookingRecapVehicleCard } from '@/components/my-ui/BookingRecapVehicleCard';
 import { BookingStepHeader } from '@/components/my-ui/BookingStepHeader';
 import { bookingSheetContentClassName } from '@/components/my-ui/BookingSheetLayout';
@@ -39,6 +39,7 @@ import {
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { PromoCodeField } from '@/components/my-ui/PromoCodeField';
 import { VehicleSelectionCard } from '@/components/my-ui/VehicleSelectionCard';
+import { VehicleSelectionFooter } from '@/components/my-ui/VehicleSelectionFooter';
 import { VehicleSelectionListLoader } from '@/components/my-ui/VehicleSelectionListLoader';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
@@ -58,8 +59,10 @@ import { useAnalytics } from '@/lib/analytics';
 import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
+import { getAddressName } from '@/lib/location-utils';
+import { formatRecapPriceWithCurrency } from '@/lib/recap-format';
 import { supabase } from '@/lib/supabase';
-import { hasMinimumBookingLeadTime } from '@/lib/time-utils';
+import { getEarliestBookingDate, hasMinimumBookingLeadTime } from '@/lib/time-utils';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { useMyStateUser, type UserState } from '@/store/user-state';
@@ -259,7 +262,7 @@ type Props = {
 
 export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
-  const { appLocale, t } = useI18n();
+  const { appLocale, t, tf } = useI18n();
   const toast = useAppToast();
   const fieldThemeColors = useFieldThemeColors();
   const { s, font } = useLayoutScale();
@@ -277,6 +280,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const [hasEarlyStartSelection, setHasEarlyStartSelection] = useState(false);
   const userFullName = useMyStateUser((state: UserState) => state.user?.full_name?.trim() ?? '');
   const userPhone = useMyStateUser((state: UserState) => state.user?.phone?.trim() ?? '');
+  const userEmail = useMyStateUser((state: UserState) => state.user?.email?.trim() ?? '');
   const selectedExtraHoursTier = getExtraHoursTier(dateEnd);
   const hasLateEndSelection = selectedExtraHoursTier !== null;
   const showStandardHoursInfo = hasEarlyStartSelection || hasLateEndSelection;
@@ -886,7 +890,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
               <BookingDetailsFormField
                 label={t('booking.pickupAddress')}
                 icon="location-outline"
-                value={location?.description ?? ''}
+                value={getAddressName(location?.description)}
                 placeholder={t('booking.departure')}
                 onPress={() => setVisible(true)}
                 isDarkMode={isDarkMode}
@@ -974,7 +978,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             setVisibleDateStart(false);
           }}
           value={dateStart}
-          minDate={new Date()}
+          minDate={getEarliestBookingDate()}
           isStartTime={true}
           initialStep={dateStartStep}
         />
@@ -987,7 +991,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             setVisibleDateEnd(false);
           }}
           value={dateEnd}
-          minDate={dateStart && dateStart.getDay() > new Date().getDay() ? dateStart : new Date()}
+          minDate={dateStart ?? getEarliestBookingDate()}
           isStartTime={false}
           initialStep={dateEndStep}
         />
@@ -1001,7 +1005,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     }
 
     const categoryUnavailableLabel = t('booking.categoryUnavailable');
-    const priceUnit = `$${t('booking.perDay')}`;
+    const priceUnit = `USD ${t('booking.perDay')}`;
 
     return (
       <View
@@ -1024,13 +1028,16 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
           onRefresh={handleRefresh}
           ListHeaderComponent={
             <>
-              <BookingStepHeader current={2} subtitle={t('booking.vehicleSelectionSubtitle')} />
+              <BookingStepHeader current={2} />
             </>
           }
           ListFooterComponent={
-            isLoadingCars && !isRefreshing && cars.length > 0 ? (
-              <VehicleSelectionListLoader compact />
-            ) : null
+            <>
+              {isLoadingCars && !isRefreshing && cars.length > 0 ? (
+                <VehicleSelectionListLoader compact />
+              ) : null}
+              {cars.length > 0 ? <VehicleSelectionFooter /> : null}
+            </>
           }
           ListEmptyComponent={
             isLoadingCars && cars.length === 0 ? (
@@ -1308,42 +1315,94 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     }
 
     const recapImage = selectedCar?.images[0] ?? 'https://via.placeholder.com/400x240';
-    const trimmedComment = comment.trim();
     const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
     const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
     const travelerName = isGuestSectionOpen ? trimmedGuestName : userFullName;
     const travelerPhone = isGuestSectionOpen ? trimmedGuestPhone : userPhone;
+    const travelerEmail = isGuestSectionOpen ? '' : userEmail;
     const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
-    const selectedOptions = [
-      fuel && fuelPrice !== null ? t('booking.fuelIncluded') : null,
-      flex && flexPrice !== null ? t('booking.flexHoursSummary') : null,
-      premium && premiumPrice !== null ? t('booking.premiumHoursSummary') : null,
-    ].filter(Boolean) as string[];
-    const startDateLabel = formatBookingDateTime(
-      locationDoc.dateStart,
-      appLocale,
-      t('booking.dailyDatesUnavailable')
-    );
-    const endDateLabel = formatBookingDateTime(
-      serviceEndDate,
-      appLocale,
-      t('booking.dailyDatesUnavailable')
-    );
-    const hasSecondaryDetails =
-      selectedOptions.length > 0 ||
-      Boolean(trimmedComment) ||
-      Boolean(travelerName) ||
-      Boolean(travelerPhone);
+    const startDate = toDate(locationDoc.dateStart);
+    const scheduledEndDate = toDate(locationDoc.dateEnd);
+    const isEndNextDay = serviceEndDate.toDateString() !== scheduledEndDate.toDateString();
+    const pickupAddress = locationDoc.location.description ?? t('booking.addressUnavailable');
+    const vehicleRentalTotal = (selectedCar?.priceLOC ?? 0) * rentalDays;
+    const rentalPeriodLabel = `${formatBookingDate(startDate, appLocale)} – ${formatBookingDate(serviceEndDate, appLocale)}`;
+
+    const selectedOptionItems: BookingRecapSelectedOption[] = [
+      ...(fuel && fuelPrice !== null
+        ? [
+            {
+              icon: 'water-outline' as const,
+              title: t('booking.fuelFees'),
+              description: t('booking.fuelFeesDescription'),
+              priceLabel: formatRecapPriceWithCurrency(fuelPrice * rentalDays),
+            },
+          ]
+        : []),
+      ...(flex && flexPrice !== null
+        ? [
+            {
+              icon: 'moon-outline' as const,
+              title: t('booking.flexExtraHours'),
+              description: t('booking.flexExtraHoursDescription'),
+              priceLabel: formatRecapPriceWithCurrency(flexPrice * rentalDays),
+            },
+          ]
+        : []),
+      ...(premium && premiumPrice !== null
+        ? [
+            {
+              icon: 'moon-outline' as const,
+              title: t('booking.premiumExtraHours'),
+              description: t('booking.premiumExtraHoursDescription'),
+              priceLabel: formatRecapPriceWithCurrency(premiumPrice * rentalDays),
+            },
+          ]
+        : []),
+    ];
+
+    const includedItems = [
+      t('booking.professionalDriver'),
+      tf('booking.rentalZone', { city: t('booking.kinshasa') }),
+      ...(fuel ? [t('booking.fuelIncludedShort')] : []),
+      ...(flex ? [t('booking.flexExtraHoursShort')] : []),
+      ...(premium ? [t('booking.premiumExtraHoursShort')] : []),
+      t('booking.dailyCancellationSummary'),
+      t('booking.freeModificationsSummary'),
+    ];
+
+    const importantItems = [
+      ...(fuel
+        ? []
+        : [
+            {
+              icon: 'car-outline' as const,
+              text: t('booking.fuelAtClientExpense'),
+            },
+          ]),
+      {
+        icon: 'time-outline' as const,
+        text: premium
+          ? t('booking.extendedServiceHoursNotice')
+          : flex
+            ? t('booking.flexServiceHoursNotice')
+            : t('booking.standardServiceHoursNotice'),
+      },
+    ];
+
     const priceLines = [
       {
-        label: `${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')} ${t('booking.rentalDaysPrice')} x ${selectedCar?.priceLOC ?? 0} $`,
-        value: `${(selectedCar?.priceLOC ?? 0) * rentalDays} $`,
+        label: tf('booking.recapVehicleRental', {
+          vehicle: selectedCar?.name ?? t('booking.noVehicle'),
+          period: rentalPeriodLabel,
+        }),
+        value: formatRecapPriceWithCurrency(vehicleRentalTotal),
       },
       ...(fuel && fuelPrice !== null
         ? [
             {
               label: t('booking.fuelFees'),
-              value: `${fuelPrice * rentalDays} $`,
+              value: formatRecapPriceWithCurrency(fuelPrice * rentalDays),
             },
           ]
         : []),
@@ -1351,7 +1410,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         ? [
             {
               label: t('booking.flexExtraHours'),
-              value: `${flexPrice * rentalDays} $`,
+              value: formatRecapPriceWithCurrency(flexPrice * rentalDays),
             },
           ]
         : []),
@@ -1359,7 +1418,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         ? [
             {
               label: t('booking.premiumExtraHours'),
-              value: `${premiumPrice * rentalDays} $`,
+              value: formatRecapPriceWithCurrency(premiumPrice * rentalDays),
             },
           ]
         : []),
@@ -1367,33 +1426,29 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         ? [
             {
               label: t('booking.discount'),
-              value: `- ${couponDiscountAmount} $`,
+              value: `- ${formatRecapPriceWithCurrency(couponDiscountAmount)}`,
             },
           ]
         : []),
     ];
 
     const recapFooter = (
-      <Button
-        action="primary"
-        variant="solid"
-        size="control"
-        className="w-full rounded-xl"
-        style={controlHeightStyle}
-        onPress={handleNextEtape}>
-        <ButtonText className="text-white">
-          {t('booking.confirmAndPay')} · {finalTotalPrice} $
-        </ButtonText>
-      </Button>
+      <BookingRecapConfirmFooter
+        totalLabel={formatRecapPriceWithCurrency(finalTotalPrice)}
+        onPress={handleNextEtape}
+      />
     );
 
     return (
       <BookingRecapLayout footer={recapFooter}>
         <BookingStepHeader current={4} subtitle={t('booking.recapSubtitle')} />
-        <BookingRecapServiceBanner
-          icon="car-sport-outline"
-          label={t('booking.dailyService')}
-          status={t('booking.pendingStatus')}
+
+        <BookingRecapDetailsCard
+          title={t('booking.reservationDetailsTitle')}
+          onEditPress={() => setEtape(EtapeReservation.DETAILS)}
+          dateValue={`${formatBookingDate(startDate, appLocale)} ${appLocale.startsWith('fr') ? 'à' : 'at'} ${formatBookingTime(startDate, appLocale)}`}
+          pickupLabel={t('booking.pickupLocation')}
+          pickupPrimary={getAddressName(pickupAddress)}
         />
 
         <BookingRecapVehicleCard
@@ -1402,71 +1457,22 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
           category={selectedCar?.category?.name ?? t('booking.categoryUnavailable')}
           seats={selectedCar?.seats ?? 0}
           baggage={selectedCar?.baggage ?? 0}
-          priceAmount={`${selectedCar?.priceLOC ?? 0} $`}
-          priceUnit={t('booking.perDay')}
-          durationLabel={`${rentalDays} ${rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular')}`}
         />
 
-        <BookingRecapSection title={t('booking.detailsTitle')}>
-          <BookingRecapDetailColumn
-            icon="calendar-outline"
-            label={t('booking.startDateTime')}
-            value={startDateLabel}
+        {travelerName ? (
+          <BookingRecapPassengerCard
+            name={travelerName}
+            phone={travelerPhone || undefined}
+            email={travelerEmail || undefined}
+            onEditPress={() => setEtape(EtapeReservation.OPTION)}
           />
-          <BookingRecapDetailColumn
-            icon="location-outline"
-            label={t('booking.address')}
-            value={locationDoc.location.description ?? t('booking.addressUnavailable')}
-          />
-          <BookingRecapDetailColumn
-            icon="calendar-outline"
-            label={t('booking.endDateTime')}
-            value={endDateLabel}
-          />
-
-          <View className="my-3 border-t border-outline-100" />
-
-          <Text className="mt-1 text-sm text-typography-500">- {t('booking.driverIncluded')}</Text>
-
-          {fuel && fuelPrice !== null ? null : (
-            <Text className="mt-1 text-sm text-typography-500">
-              - {t('booking.fuelAtClientExpense')}
-            </Text>
-          )}
-
-          <Text className="mt-1 text-sm text-typography-500">
-            - {t('booking.dailyCancellationSummary')}
-          </Text>
-          <Text className="mt-1 text-sm text-typography-500">
-            - {t('booking.city')}: {t('booking.kinshasa')}
-          </Text>
-        </BookingRecapSection>
-
-        {hasSecondaryDetails ? (
-          <BookingRecapSection title={t('booking.optionsTitle')}>
-            {selectedOptions.length > 0 ? (
-              <BookingRecapDetailColumn
-                icon="options-outline"
-                label={t('booking.optionsTitle')}
-                value={selectedOptions.join(' · ')}
-              />
-            ) : null}
-            {trimmedComment ? (
-              <BookingRecapDetailColumn
-                icon="chatbubble-ellipses-outline"
-                label={t('booking.specialInstructions')}
-                value={trimmedComment.replace(/\n/g, ' · ')}
-              />
-            ) : null}
-            {travelerName || travelerPhone ? (
-              <BookingRecapDetailColumn
-                icon="person-outline"
-                label={t('booking.bookingFor')}
-                value={[travelerName, travelerPhone].filter(Boolean).join(' · ')}
-              />
-            ) : null}
-          </BookingRecapSection>
         ) : null}
+
+        <BookingRecapSelectedOptionsCard options={selectedOptionItems} />
+
+        <BookingRecapIncludedSection items={includedItems} />
+
+        <BookingRecapImportantInfoCard items={importantItems} />
 
         <PromoCodeField
           label={t('booking.promoCodeLabel')}
@@ -1486,22 +1492,11 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         />
 
         <BookingRecapPriceSection
-          title={t('booking.totalTitle')}
           lines={priceLines}
-          totalLabel={t('booking.total')}
-          totalValue={`${finalTotalPrice} $`}
+          totalValue={formatRecapPriceWithCurrency(finalTotalPrice)}
         />
 
-        <BookingRecapStatusRow
-          label={t('booking.paymentLabel')}
-          value={t('booking.paymentPending')}
-        />
-        <BookingRecapStatusRow
-          label={t('booking.fuelLabel')}
-          value={fuel ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense')}
-          tone={fuel ? 'success' : 'primary'}
-          showChevron
-        />
+        <BookingRecapPaymentSecurity />
       </BookingRecapLayout>
     );
   };

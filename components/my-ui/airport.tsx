@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {useColorScheme} from 'nativewind';
 import { formatBookingDateTime, ModalDateSelector } from '@/components/my-ui/ModalDateSelector';
+import { getEarliestBookingDate } from '@/lib/time-utils';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { ResType } from '@/constants/databaseEnum';
 import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
+import { getAddressName } from '@/lib/location-utils';
 import { useMyStateUser, type UserState } from '@/store/user-state';
 
 type TripType = 'one-way' | 'round-trip';
@@ -159,7 +161,7 @@ export function Airport() {
         <View className="gap-3 px-5">
           <ModuleReservation
             icon={'location-outline'}
-            title={locationDepart?.description ?? ''}
+            title={getAddressName(locationDepart?.description)}
             placeholder={t('booking.departure')}
             onPress={() => setVisibleDepart(true)}
             isDarkMode={isDark}
@@ -167,7 +169,7 @@ export function Airport() {
 
           <ModuleReservation
             icon={'navigate-outline'}
-            title={locationDest?.description ?? ''}
+            title={getAddressName(locationDest?.description)}
             placeholder={t('booking.destination')}
             onPress={() => setVisibleDest(true)}
             isDarkMode={isDark}
@@ -241,7 +243,7 @@ export function Airport() {
           setVisibleDateStart(false);
         }}
         value={dateStart}
-        minDate={new Date()}
+        minDate={getEarliestBookingDate()}
         isStartTime
       />
 
@@ -253,7 +255,7 @@ export function Airport() {
           setVisibleDateReturn(false);
         }}
         value={dateReturn}
-        minDate={dateStart ?? new Date()}
+        minDate={dateStart ?? getEarliestBookingDate()}
         isStartTime={false}
       />
     </View>

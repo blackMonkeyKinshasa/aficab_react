@@ -515,6 +515,7 @@ export default function NewBooking() {
         <PaymentModal
           visible={paymentModalVisible}
           isPremium={storedUser?.clientType === ClientType.PREMIUM}
+          amount={bookingDoc?.total ?? null}
           onClose={() => closePaymentModal('backdrop')}
           onSubmit={onSubmitPayement}
         />

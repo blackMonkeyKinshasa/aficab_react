@@ -13,6 +13,14 @@ function isSameCalendarDay(left: Date, right: Date) {
   );
 }
 
+/** Earliest selectable booking date: tomorrow at local midnight. */
+export function getEarliestBookingDate(now: Date = new Date()) {
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return tomorrow;
+}
+
 /** Returns true when departure is scheduled on a day after today (same-day bookings are rejected). */
 export function hasMinimumBookingLeadTime(departureDate: Date, now: Date = new Date()) {
   if (Number.isNaN(departureDate.getTime())) {

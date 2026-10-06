@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 
 import { useColorScheme } from 'nativewind';
 import { formatBookingDateTime, ModalDateSelector } from '@/components/my-ui/ModalDateSelector';
+import { getEarliestBookingDate } from '@/lib/time-utils';
 import { ModalLocationSelector } from '@/components/my-ui/ModalLocationSelector';
 import { ModuleReservation } from '@/components/my-ui/ModuleReservation';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { ResType } from '@/constants/databaseEnum';
 import { bookingSpacing } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
 import { useI18n } from '@/lib/i18n';
+import { getAddressName } from '@/lib/location-utils';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser } from '@/store/user-state';
 
@@ -117,7 +119,7 @@ export function Daily() {
         <View className="mb-4 gap-4 px-5">
           <ModuleReservation
             icon={'location-outline'}
-            title={location?.description ?? ''}
+            title={getAddressName(location?.description)}
             placeholder={t('booking.departure')}
             onPress={() => setVisible(true)}
             isDarkMode={isDark}
@@ -171,7 +173,7 @@ export function Daily() {
           setVisibleDateStart(false);
         }}
         value={dateStart}
-        minDate={new Date()}
+        minDate={getEarliestBookingDate()}
         isStartTime={true}
       />
 
@@ -183,7 +185,7 @@ export function Daily() {
           setVisibleDateEnd(false);
         }}
         value={dateEnd}
-        minDate={dateStart && dateStart.getDay() > new Date().getDay() ? dateStart : new Date()}
+        minDate={dateStart ?? getEarliestBookingDate()}
         isStartTime={false}
       />
     </View>

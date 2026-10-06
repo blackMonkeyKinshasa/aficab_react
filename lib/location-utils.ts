@@ -68,6 +68,12 @@ export function getPlaceRowTexts(rowData: PlaceRowData) {
   return { title, subtitle };
 }
 
+export function getAddressName(description?: string | null, fallback = ''): string {
+  const value = description?.trim() ?? '';
+  if (!value) return fallback;
+  return value.split(',')[0]?.trim() || value;
+}
+
 export function isKinshasaLocation(details: unknown, description?: string) {
   const detailsRecord = details as Record<string, unknown> | null | undefined;
   const addressComponents = detailsRecord?.address_components;

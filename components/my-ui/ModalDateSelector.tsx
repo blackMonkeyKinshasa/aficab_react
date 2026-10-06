@@ -11,7 +11,7 @@ import { BookingSheetLayout } from '@/components/my-ui/BookingSheetLayout';
 import { BookingTimePicker } from '@/components/my-ui/BookingTimePicker';
 import { useDatePickerClassNames } from '@/lib/date-picker-theme';
 import { useI18n } from '@/lib/i18n';
-import { snapMinutesToStep } from '@/lib/time-utils';
+import { getEarliestBookingDate, snapMinutesToStep } from '@/lib/time-utils';
 
 const DEFAULT_START_HOUR = 8;
 const DEFAULT_START_MINUTE = 0;
@@ -60,7 +60,7 @@ function toDate(value: DateType): Date | null {
 function getInitialDate(value: Date | null | undefined, minDate: Date | undefined) {
   if (value) return new Date(value);
   if (minDate) return new Date(minDate);
-  return new Date();
+  return getEarliestBookingDate();
 }
 
 function getInitialHours(value: Date | null | undefined, isStartTime: boolean) {

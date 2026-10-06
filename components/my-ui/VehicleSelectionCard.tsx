@@ -20,29 +20,42 @@ interface VehicleSelectionCardProps {
   onPress: (car: Car) => void;
 }
 
-function SpecBadge({
+function SpecItem({
   icon,
   label,
-  badgeClassName,
+  showInfo,
 }: {
-  icon: 'person' | 'briefcase';
+  icon: 'person' | 'briefcase' | 'person-check';
   label: string;
-  badgeClassName: string;
+  showInfo?: boolean;
 }) {
   const { s, font } = useLayoutScale();
-  const iconName = icon === 'person' ? 'person' : 'briefcase';
-  const badge = s(24);
 
   return (
     <View className="flex-row items-center">
-      <View
-        className={cn('mr-2 items-center justify-center overflow-hidden rounded-md', badgeClassName)}
-        style={{ width: badge, height: badge }}>
-        <Ionicons name={iconName} size={s(18)} color="#6B7280" />
-      </View>
-      <Text className="text-typography-900" style={{ fontSize: font.md }}>
+      {icon === 'person-check' ? (
+        <View className="flex-row items-center">
+          <Ionicons name="person" size={s(14)} color="#6B7280" />
+          <Ionicons name="checkmark" size={s(10)} color={color.primary} style={{ marginLeft: -2 }} />
+        </View>
+      ) : (
+        <Ionicons
+          name={icon === 'person' ? 'person-outline' : 'briefcase-outline'}
+          size={s(14)}
+          color="#6B7280"
+        />
+      )}
+      <Text className="ml-2 text-typography-700" style={{ fontSize: font.sm }}>
         {label}
       </Text>
+      {showInfo ? (
+        <Ionicons
+          name="information-circle-outline"
+          size={s(14)}
+          color="#9CA3AF"
+          style={{ marginLeft: 4 }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -56,7 +69,9 @@ export function VehicleSelectionCard({
   onPress,
 }: VehicleSelectionCardProps) {
   const { t } = useI18n();
-  const { imageHeight, font } = useLayoutScale();
+  const { s, font } = useLayoutScale();
+  const imageWidth = s(112);
+  const imageHeight = s(72);
   const passengersLabel = `${car.seats} ${t('booking.passengers')}`;
   const baggageLabel = `${car.baggage} ${t('booking.baggageItems')}`;
 
@@ -68,44 +83,45 @@ export function VehicleSelectionCard({
       <View
         className={cn(
           bookingSheetCardClassName,
-          'relative overflow-hidden bg-white p-4 dark:bg-[#1E1E1E]',
+          'relative overflow-hidden bg-white p-3 dark:bg-[#1E1E1E]',
           isSelected && 'border-primary'
         )}
         style={{ borderWidth: isSelected ? 1.5 : 1 }}>
-        {isSelected ? (
-          <View className="absolute left-4 top-4 z-10 h-7 w-7 items-center justify-center rounded-full bg-primary">
-            <Ionicons name="checkmark" size={18} color={color.white} />
+        <View className="flex-row gap-3">
+          <View
+            className="items-center justify-center overflow-hidden rounded-lg"
+            style={{ width: imageWidth, height: imageHeight }}>
+            <Image
+              source={{ uri: car.images[0] ?? PLACEHOLDER_IMAGE }}
+              style={{ width: imageWidth, height: imageHeight }}
+              resizeMode="contain"
+            />
           </View>
-        ) : null}
 
-        <View className="items-center overflow-hidden rounded-xl">
-          <Image
-            source={{ uri: car.images[0] ?? PLACEHOLDER_IMAGE }}
-            style={{ width: '100%', height: imageHeight(180, 0.47, 340) }}
-            resizeMode="contain"
-          />
+          <View className="flex-1 justify-center">
+            <Text className="font-bold text-typography-900" style={{ fontSize: font.lg }}>
+              {car.name}
+            </Text>
+            <Text className="mt-0.5 text-typography-500" style={{ fontSize: font.sm }}>
+              {car.category?.name ?? categoryUnavailableLabel}
+            </Text>
+
+            <View className="mt-2 gap-1.5">
+              <SpecItem icon="person" label={passengersLabel} />
+              <SpecItem icon="briefcase" label={baggageLabel} />
+              <SpecItem icon="person-check" label={t('booking.driverIncluded')} showInfo />
+            </View>
+          </View>
         </View>
 
-        <Text className="text-typography-900 mt-2 font-bold" style={{ fontSize: font.xl }}>
-          {car.name}
-        </Text>
-        <Text className="text-typography-500 mt-0.5" style={{ fontSize: font.sm }}>
-          {car.category?.name ?? categoryUnavailableLabel}
-        </Text>
-
-        <View className="mt-3 flex-row items-center gap-6">
-          <SpecBadge icon="person" label={passengersLabel} badgeClassName="bg-transparent" />
-          <SpecBadge icon="briefcase" label={baggageLabel} badgeClassName="bg-transparent" />
-        </View>
-
-        <View className="mt-4 border-t border-outline-100 pt-3">
+        <View className="mt-3 flex-row items-end">
           <View className="flex-row items-baseline">
-          <Text className="font-bold text-primary" style={{ fontSize: font.xl }}>
-            {priceAmount}
-          </Text>
-          <Text className="text-typography-500 ml-1 font-medium" style={{ fontSize: font.sm }}>
-            {priceUnit}
-          </Text>
+            <Text className="font-bold text-primary" style={{ fontSize: font.xl }}>
+              {priceAmount}
+            </Text>
+            <Text className="ml-1 font-medium text-typography-500" style={{ fontSize: font.sm }}>
+              {priceUnit}
+            </Text>
           </View>
         </View>
       </View>
