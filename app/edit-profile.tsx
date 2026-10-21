@@ -3,14 +3,13 @@ import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { Camera, Trash2 } from 'lucide-react-native';
+import { Camera } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 
 import { uploadAvatar } from '@/api/uploadFiles';
-import { getUserByID, updateUserByID } from '@/api/user';
+import { deleteUserByID, getUserByID, updateUserByID } from '@/api/user';
 import { Avatar } from '@/components/my-ui/Avatar';
 import { FormField } from '@/components/my-ui/FormField';
-import { InfoIcon } from '@/components/my-ui/InfoIcon';
 import { LoadingView } from '@/components/my-ui/LoadingView';
 import { GenderDropdown } from '@/components/my-ui/GenderDropdown';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -21,12 +20,10 @@ import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
-import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
-import { useMyStateUser, useUserStoreHydrated, type UserState } from '@/store/user-state';
-import { deleteUserByID } from '@/api/user';
 import { resetUserSessionState } from '@/store';
+import { useMyStateUser, useUserStoreHydrated, type UserState } from '@/store/user-state';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Tooltip,
@@ -57,8 +54,6 @@ export default function EditProfile() {
   const [update, setUpdate] = useState(false);
   const cachedUser = useMyStateUser((state: UserStoreState) => state.user);
   const [image, setImage] = useState<string | null>(null);
-  const [city, setCity] = useState<string | null>(null);
-  const [country, setCountry] = useState<string | null>(null);
   const [phoneFieldY, setPhoneFieldY] = useState(0);
   const hasHydratedInitialUser = useRef(false);
   const storedUser = useMyStateUser((state: UserState) => state.user);
@@ -265,8 +260,6 @@ export default function EditProfile() {
         phone: phoneNumber.trim() || null,
         genre: gender || null,
         avatar_url: avatarUrl || null,
-        country: country || null,
-        city: city || null,
       } as User);
 
       const refreshedUser = await getUserByID(userID);
@@ -410,7 +403,6 @@ export default function EditProfile() {
             placeholder={t('profile.emailPlaceholder')}
             editable={false}
           />
-
 
            {/* button DeleteAccount */}
          { ! update && (<TouchableOpacity onPress={handleDeleteAccount} className="mt-6">

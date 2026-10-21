@@ -27,7 +27,6 @@ import { User } from '@/constants/dataInterface';
 import { pickImageToGallery, takePhoto, uriToBlob } from '@/constants/image-manager';
 import { useI18n } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
-import { getUserLocationDetails } from '@/lib/my-location';
 import { supabase } from '@/lib/supabase';
 import { useAppToast } from '@/lib/toast';
 import { useMyStateUser, type UserState } from '@/store/user-state';
@@ -82,8 +81,6 @@ export default function CreateProfile() {
           router.replace('/(auth)/login');
           return;
         }
-
-        void getUserLocationDetails();
 
         if (!isMounted) {
           return;
@@ -161,16 +158,10 @@ export default function CreateProfile() {
         setImage(upload.url);
       }
 
-      const locationDetails = await getUserLocationDetails();
-      const city = locationDetails.city ?? storedUser?.city ?? null;
-      const country = locationDetails.country ?? storedUser?.country ?? null;
-     
       await updateUserByID(user.id, {
         full_name: fullName.trim(),
         phone: phoneNumber.trim() || null,
         genre: gender || null,
-        city,
-        country,
       } as User);
 
       await supabase.auth.updateUser({ data: { avatar_url: avatarUrl } });
