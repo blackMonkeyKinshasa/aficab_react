@@ -804,6 +804,22 @@ function RootLayoutInner() {
                 }}
               />
 
+              <Stack.Screen
+                name="billing"
+                options={{
+                  headerShown: true,
+                  headerTransparent: false,
+                }}
+              />
+
+              <Stack.Screen
+                name="guests"
+                options={{
+                  headerShown: true,
+                  headerTransparent: false,
+                }}
+              />
+
               {/* Flow detail de reservation, ouvert depuis les ecrans du parcours principal. */}
               <Stack.Screen
                 name="new_booking/[doc]"

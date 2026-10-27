@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import * as Contacts from 'expo-contacts';
 import { useRouter } from 'expo-router';
 
 import { generateIDBooking, getAllBookings } from '@/api/booking';
@@ -10,6 +9,8 @@ import { getLocCars } from '@/api/car';
 import { validateCoupon } from '@/api/coupon';
 import { BookingOptionSectionCard } from '@/components/my-ui/BookingOptionSectionCard';
 import { BookingOptionToggleRow } from '@/components/my-ui/BookingOptionToggleRow';
+import { DayExtensionPicker } from '@/components/my-ui/DayExtensionPicker';
+import { SavedGuestsPicker } from '@/components/guests/SavedGuestsPicker';
 import {
   BookingDateTimeRow,
   BookingDetailsFormField,
@@ -56,15 +57,27 @@ import {
 } from '@/constants/dataInterface';
 import { bookingSpacing, controlHeightStyle } from '@/constants/spacing';
 import { useAnalytics } from '@/lib/analytics';
+import { buildBookingOptions } from '@/lib/booking-options';
+import {
+  countDayExtensionTypes,
+  DayExtensionChoice,
+  dayExtensionMapToList,
+  dayKeyToDate,
+  hasDayExtensionType,
+  listRentalDayKeys,
+  tierToDayExtensionType,
+} from '@/lib/day-extensions';
 import { useFieldThemeColors } from '@/lib/field-theme';
 import { useI18n } from '@/lib/i18n';
 import { useLayoutScale } from '@/lib/layout-scale';
 import { getAddressName } from '@/lib/location-utils';
 import { formatRecapPriceWithCurrency } from '@/lib/recap-format';
 import { supabase } from '@/lib/supabase';
+import { ContactPickError, pickGuestFromContacts } from '@/lib/pick-contact';
 import { getEarliestBookingDate, hasMinimumBookingLeadTime } from '@/lib/time-utils';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { SavedGuest, useGuestsState } from '@/store/guests-state';
 import { useMyStateUser, type UserState } from '@/store/user-state';
 
 const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
@@ -121,13 +134,26 @@ function getRentalDays(locationDoc: LocationDocLOC) {
   return Math.max(1, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)));
 }
 
-function getFuelOptionPrice(car: Car | null) {
+function getFuelOption(car: Car | null) {
   const fuelOption = car?.priceOptions?.find((option: { name?: string; price?: unknown }) => {
     const optionName = option?.name?.toLowerCase() ?? '';
     return optionName.includes('carburant') || optionName.includes('fuel');
   });
 
-  return typeof fuelOption?.price === 'number' ? fuelOption.price : null;
+  if (!fuelOption || typeof fuelOption.price !== 'number') {
+    return null;
+  }
+
+  return {
+    name: typeof fuelOption.name === 'string' && fuelOption.name.trim()
+      ? fuelOption.name.trim()
+      : 'Carburant',
+    price: fuelOption.price,
+  };
+}
+
+function getFuelOptionPrice(car: Car | null) {
+  return getFuelOption(car)?.price ?? null;
 }
 
 function getExtraTimePrice(value: unknown) {
@@ -204,32 +230,6 @@ function formatBookingDateTime(value: Date | string, locale: string, unavailable
   return `${dateLabel} · ${timeLabel}`;
 }
 
-function normalizeGuestPhone(phoneNumber: string | null | undefined) {
-  if (!phoneNumber) {
-    return '';
-  }
-
-  const digits = phoneNumber.replace(/\D/g, '');
-
-  if (!digits) {
-    return '';
-  }
-
-  if (digits.startsWith('243') && digits.length >= 12) {
-    return digits.slice(3, 12);
-  }
-
-  if (digits.startsWith('0') && digits.length >= 10) {
-    return digits.slice(1, 10);
-  }
-
-  if (digits.length > 9) {
-    return digits.slice(-9);
-  }
-
-  return digits;
-}
-
 function toLocationPoint(locationDoc: LocationDocLOC) {
   return {
     label: locationDoc.location.description,
@@ -304,8 +304,10 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const router = useRouter();
   const analytics = useAnalytics();
   const [fuel, setFuel] = useState(false);
-  const [flex, setFlex] = useState(false);
-  const [premium, setPremium] = useState(false);
+  /** Per-calendar-day Flex / Premium (web dayExtensions parity). */
+  const [dayExtensionByDay, setDayExtensionByDay] = useState<Record<string, DayExtensionChoice>>(
+    {}
+  );
   const [code, setCode] = useState('');
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [promoFeedback, setPromoFeedback] = useState<{
@@ -319,7 +321,12 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const [comment, setComment] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [selectedSavedGuestId, setSelectedSavedGuestId] = useState<string | null>(null);
   const [isGuestSectionOpen, setIsGuestSectionOpen] = useState(false);
+  const savedGuests = useGuestsState((state) => state.guests);
+  const addSavedGuest = useGuestsState((state) => state.addGuest);
+  const findDuplicateGuest = useGuestsState((state) => state.findDuplicate);
   const [totalPrice, setTotalPrice] = useState(0);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
@@ -331,16 +338,55 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const hasFuelOption = fuelPrice !== null;
   const hasFlexOption = flexPrice !== null;
   const hasPremiumOption = premiumPrice !== null;
-  const hasAnyOption = hasFuelOption || hasFlexOption || hasPremiumOption;
+  const hasExtraHoursOptions = hasFlexOption || hasPremiumOption;
+  const hasAnyOption = hasFuelOption || hasExtraHoursOptions;
+  const rentalDayKeys = locationDoc
+    ? listRentalDayKeys(toDate(locationDoc.dateStart), rentalDays)
+    : [];
+  const dayExtensions = dayExtensionMapToList(dayExtensionByDay);
+  const dayExtensionCounts = countDayExtensionTypes(dayExtensions);
+  const hasFlexSelected = hasDayExtensionType(dayExtensions, 'flex');
+  const hasPremiumSelected = hasDayExtensionType(dayExtensions, 'premium');
   const baseVehicleAmount = (selectedCar?.priceLOC ?? 0) * rentalDays;
   // Coupon discount is fixed once validated; invalidates when options change via useEffect
   const couponDiscountAmount = extractDiscountAmount(validatedCoupon);
   const finalTotalPrice = calculateFinalTotal(totalPrice, couponDiscountAmount);
 
+  // Rebuild day map when rental window changes; auto-apply end-time tier on the LAST day only.
   useEffect(() => {
-    setFlex(selectedExtraHoursTier === 'flex' && hasFlexOption);
-    setPremium(selectedExtraHoursTier === 'premium' && hasPremiumOption);
-  }, [hasFlexOption, hasPremiumOption, selectedExtraHoursTier]);
+    if (!locationDoc || rentalDayKeys.length === 0) {
+      setDayExtensionByDay({});
+      return;
+    }
+
+    const autoType = tierToDayExtensionType(
+      selectedExtraHoursTier === 'flex' && hasFlexOption
+        ? 'flex'
+        : selectedExtraHoursTier === 'premium' && hasPremiumOption
+          ? 'premium'
+          : null
+    );
+    const lastDayKey = rentalDayKeys[rentalDayKeys.length - 1];
+
+    setDayExtensionByDay((previous) => {
+      const next: Record<string, DayExtensionChoice> = {};
+      for (const dayKey of rentalDayKeys) {
+        if (dayKey === lastDayKey) {
+          // Last day follows end-time tier; user can still override via the picker afterward.
+          next[dayKey] = autoType;
+          continue;
+        }
+
+        let kept = Object.prototype.hasOwnProperty.call(previous, dayKey)
+          ? (previous[dayKey] ?? null)
+          : null;
+        if (kept === 'flex' && !hasFlexOption) kept = null;
+        if (kept === 'premium' && !hasPremiumOption) kept = null;
+        next[dayKey] = kept;
+      }
+      return next;
+    });
+  }, [rentalDayKeys.join('|'), hasFlexOption, hasPremiumOption, selectedExtraHoursTier]);
 
   const getOrCreateBookingId = async () => {
     if (bookingId) {
@@ -373,21 +419,27 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
 
     const nowIso = new Date().toISOString();
     const resolvedBookingId = await getOrCreateBookingId();
-    const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
+    const serviceEndDate = getDailyServiceEndDate(
+      locationDoc,
+      hasFlexSelected,
+      hasPremiumSelected
+    );
     const originalTotal = totalPrice;
     const finalTotal = finalTotalPrice;
 
-    const selectedOptions = {
-      fuel: fuel ? (fuelPrice ?? 0) : 0,
-      flex: flex ? (flexPrice ?? 0) : 0,
-      premium: premium ? (premiumPrice ?? 0) : 0,
-      couponCode: appliedCouponCode,
-      couponDiscountAmount: couponDiscountAmount,
-      rentalDays,
-    };
+    const fuelOption = getFuelOption(selectedCar);
+    const selectedOptions = buildBookingOptions({
+      fuelSelected: fuel,
+      fuelOptionName: fuelOption?.name ?? null,
+      fuelUnitPrice: fuelOption?.price ?? null,
+      flexUnitPrice: flexPrice,
+      premiumUnitPrice: premiumPrice,
+      dayExtensions,
+    });
     const trimmedComment = comment.trim();
     const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
     const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
+    const trimmedGuestEmail = isGuestSectionOpen ? guestEmail.trim() : '';
 
     return {
       id: resolvedBookingId,
@@ -409,10 +461,11 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
       total: finalTotal,
       options: selectedOptions,
       guest:
-        trimmedGuestName || trimmedGuestPhone
+        trimmedGuestName || trimmedGuestPhone || trimmedGuestEmail
           ? {
-              fullName: trimmedGuestName || null,
-              phone: trimmedGuestPhone || null,
+              ...(trimmedGuestName ? { fullName: trimmedGuestName } : {}),
+              ...(trimmedGuestPhone ? { phone: trimmedGuestPhone } : {}),
+              ...(trimmedGuestEmail ? { email: trimmedGuestEmail } : {}),
             }
           : null,
       name: trimmedGuestName || null,
@@ -431,6 +484,14 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         registrationId: selectedCar.registrationId,
         images: selectedCar.images,
         category: selectedCar.category ? { ...selectedCar.category } : null,
+        priceLOC: selectedCar.priceLOC,
+        extraTime: selectedCar.extraTime
+          ? {
+              flex: getExtraTimePrice(selectedCar.extraTime.flex) ?? undefined,
+              premium: getExtraTimePrice(selectedCar.extraTime.premium) ?? undefined,
+            }
+          : null,
+        priceOptions: Array.isArray(selectedCar.priceOptions) ? selectedCar.priceOptions : null,
       },
       client: null,
       driver: selectedCar.defaultDriver,
@@ -441,13 +502,21 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
 
   useEffect(() => {
     const carBasePrice = selectedCar?.priceLOC ?? 0;
-    const selectedOptionsTotal =
-      (fuel ? (fuelPrice ?? 0) : 0) +
-      (flex ? (flexPrice ?? 0) : 0) +
-      (premium ? (premiumPrice ?? 0) : 0);
+    const fuelTotal = fuel ? (fuelPrice ?? 0) * rentalDays : 0;
+    const flexTotal = dayExtensionCounts.flex * (flexPrice ?? 0);
+    const premiumTotal = dayExtensionCounts.premium * (premiumPrice ?? 0);
 
-    setTotalPrice((carBasePrice + selectedOptionsTotal) * rentalDays);
-  }, [selectedCar, fuel, fuelPrice, flex, flexPrice, premium, premiumPrice, rentalDays]);
+    setTotalPrice(carBasePrice * rentalDays + fuelTotal + flexTotal + premiumTotal);
+  }, [
+    selectedCar,
+    fuel,
+    fuelPrice,
+    flexPrice,
+    premiumPrice,
+    rentalDays,
+    dayExtensionCounts.flex,
+    dayExtensionCounts.premium,
+  ]);
 
   // Invalidate coupon when options or vehicle change
   useEffect(() => {
@@ -456,7 +525,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
       setAppliedCouponCode(null);
       setPromoFeedback(null);
     }
-  }, [selectedCar?.id, fuel, flex, premium, rentalDays]);
+  }, [selectedCar?.id, fuel, rentalDays, dayExtensions.map((item) => `${item.day}:${item.type}`).join('|')]);
 
   // Clear promo feedback if user manually edits code
   useEffect(() => {
@@ -562,8 +631,8 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
 
     if (etape === EtapeReservation.OPTION && selectedCar) {
       const extraOptions: string[] = [];
-      if (flex) extraOptions.push('flex');
-      if (premium) extraOptions.push('premium');
+      if (hasFlexSelected) extraOptions.push('flex');
+      if (hasPremiumSelected) extraOptions.push('premium');
       analytics.trackVehicleOptionsChosen(selectedCar.id, {
         withFuel: fuel,
         withDriver: !!selectedCar.defaultDriverId,
@@ -615,72 +684,94 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     });
   };
 
-  const handleFlexChange = (value: boolean) => {
-    setFlex(value);
-    if (value) {
-      setPremium(false);
-    }
+  const handleDayExtensionChange = (dayKey: string, value: DayExtensionChoice) => {
+    setDayExtensionByDay((previous) => ({
+      ...previous,
+      [dayKey]: value,
+    }));
   };
 
-  const handlePremiumChange = (value: boolean) => {
-    setPremium(value);
-    if (value) {
-      setFlex(false);
-    }
+  const handleSelectSavedGuest = (guest: SavedGuest) => {
+    setIsGuestSectionOpen(true);
+    setSelectedSavedGuestId(guest.id);
+    setGuestName(guest.fullName);
+    setGuestPhone(guest.phone);
+    setGuestEmail(guest.email ?? '');
   };
 
-  const handlePickGuestFromContacts = async () => {
-    if (Platform.OS === 'web') {
+  const handleSaveCurrentGuest = () => {
+    const trimmedName = guestName.trim();
+    const trimmedPhone = guestPhone.trim();
+    if (!trimmedName || !trimmedPhone) {
       toast({
-        title: t('common.information'),
-        description: t('booking.contactImportUnsupported'),
+        title: t('common.error'),
+        description: t('guests.validationPhone'),
+        action: 'error',
+      });
+      return;
+    }
+
+    const input = {
+      fullName: trimmedName,
+      phone: trimmedPhone,
+      email: guestEmail.trim() || null,
+    };
+    const duplicate = findDuplicateGuest(input);
+    if (duplicate) {
+      setSelectedSavedGuestId(duplicate.id);
+      toast({
+        title: t('guests.title'),
+        description: t('guests.duplicateError'),
         action: 'info',
       });
       return;
     }
 
-    try {
-      const { status: existingStatus } = await Contacts.getPermissionsAsync();
-      const finalStatus =
-        existingStatus === 'granted'
-          ? existingStatus
-          : (await Contacts.requestPermissionsAsync()).status;
+    const created = addSavedGuest(input);
+    setSelectedSavedGuestId(created.id);
+    toast({
+      title: t('guests.title'),
+      description: t('guests.savedCurrent'),
+      action: 'success',
+    });
+  };
 
-      if (finalStatus !== 'granted') {
+  const handlePickGuestFromContacts = async () => {
+    try {
+      const picked = await pickGuestFromContacts();
+
+      if (!picked) {
+        return;
+      }
+
+      setIsGuestSectionOpen(true);
+      setSelectedSavedGuestId(null);
+      setGuestName(picked.fullName);
+      setGuestPhone(picked.phone);
+      setGuestEmail(picked.email);
+
+      if (!picked.phone) {
         toast({
-          title: t('common.error'),
-          description: t('booking.contactImportPermissionDenied'),
-          action: 'error',
+          title: t('common.information'),
+          description: t('booking.contactImportPhoneMissing'),
+          action: 'info',
+        });
+      }
+    } catch (error) {
+      if (error instanceof ContactPickError) {
+        toast({
+          title: error.code === 'unsupported' ? t('common.information') : t('common.error'),
+          description:
+            error.code === 'unsupported'
+              ? t('booking.contactImportUnsupported')
+              : error.code === 'permission_denied'
+                ? t('booking.contactImportPermissionDenied')
+                : t('booking.contactImportFailed'),
+          action: error.code === 'unsupported' ? 'info' : 'error',
         });
         return;
       }
 
-      const selectedContact = await Contacts.presentContactPickerAsync();
-
-      if (!selectedContact) {
-        return;
-      }
-
-      const contactName =
-        selectedContact.name?.trim() ||
-        [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ').trim();
-      const phoneValue = normalizeGuestPhone(selectedContact.phoneNumbers?.[0]?.number);
-
-      if (contactName) {
-        setGuestName(contactName);
-      }
-
-      if (phoneValue) {
-        setGuestPhone(phoneValue);
-        return;
-      }
-
-      toast({
-        title: t('common.information'),
-        description: t('booking.contactImportPhoneMissing'),
-        action: 'info',
-      });
-    } catch (error) {
       toast({
         title: t('common.error'),
         description:
@@ -1115,28 +1206,30 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                   />
                 ) : null}
 
-                {hasFlexOption ? (
-                  <BookingOptionToggleRow
-                    title={t('booking.flexExtraHours')}
-                    description={t('booking.flexExtraHoursDescription')}
-                    priceLabel={`${flexPrice} $`}
-                    icon="time-outline"
-                    checked={flex}
-                    onCheckedChange={handleFlexChange}
-                    showDivider={hasFuelOption}
-                  />
-                ) : null}
-
-                {hasPremiumOption ? (
-                  <BookingOptionToggleRow
-                    title={t('booking.premiumExtraHours')}
-                    description={t('booking.premiumExtraHoursDescription')}
-                    priceLabel={`${premiumPrice} $`}
-                    icon="moon-outline"
-                    checked={premium}
-                    onCheckedChange={handlePremiumChange}
-                    showDivider={hasFuelOption || hasFlexOption}
-                  />
+                {hasExtraHoursOptions ? (
+                  <View className={hasFuelOption ? 'mt-4 border-t border-outline-100 pt-4' : ''}>
+                    <Text className="font-medium text-typography-900" style={{ fontSize: font.base }}>
+                      {t('booking.extraHoursByDayTitle')}
+                    </Text>
+                    <Text className="mt-1 text-typography-500" style={{ fontSize: font.sm }}>
+                      {t('booking.extraHoursByDayDescription')}
+                    </Text>
+                    {rentalDayKeys.map((dayKey) => (
+                      <DayExtensionPicker
+                        key={dayKey}
+                        dayLabel={formatBookingDate(dayKeyToDate(dayKey), appLocale)}
+                        value={dayExtensionByDay[dayKey] ?? null}
+                        flexPrice={flexPrice}
+                        premiumPrice={premiumPrice}
+                        hasFlex={hasFlexOption}
+                        hasPremium={hasPremiumOption}
+                        noneLabel={t('booking.extraHoursNone')}
+                        flexLabel={t('booking.flexExtraHoursShort')}
+                        premiumLabel={t('booking.premiumExtraHoursShort')}
+                        onChange={(value) => handleDayExtensionChange(dayKey, value)}
+                      />
+                    ))}
+                  </View>
                 ) : null}
               </BookingOptionSectionCard>
             ) : null}
@@ -1247,6 +1340,13 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                 ) : null}
 
                 <CollapsibleContent>
+                  <SavedGuestsPicker
+                    guests={savedGuests}
+                    selectedId={selectedSavedGuestId}
+                    onSelect={handleSelectSavedGuest}
+                    onManagePress={() => router.push('/guests')}
+                  />
+
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void handlePickGuestFromContacts()}
@@ -1271,7 +1371,10 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                       placeholder={t('booking.fullName')}
                       placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestName}
-                      onChangeText={setGuestName}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestName(value);
+                      }}
                     />
                   </Input>
 
@@ -1283,10 +1386,42 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                       placeholder={t('booking.phoneNumber')}
                       placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestPhone}
-                      onChangeText={setGuestPhone}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestPhone(value);
+                      }}
                       keyboardType="phone-pad"
                     />
                   </Input>
+
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className="mt-3 rounded-xl border border-outline-100 bg-background-100">
+                    <InputField
+                      placeholder={t('guests.emailOptional')}
+                      placeholderTextColor={fieldThemeColors.placeholder}
+                      value={guestEmail}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestEmail(value);
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </Input>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleSaveCurrentGuest}
+                    className="mt-3 flex-row items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 active:opacity-80 dark:border-[#5B3428] dark:bg-[#3D241C]">
+                    <Ionicons name="bookmark-outline" size={s(18)} color={color.primary} />
+                    <Text
+                      className="ml-2 font-semibold"
+                      style={{ color: color.primary, fontSize: font.sm }}>
+                      {t('guests.saveCurrent')}
+                    </Text>
+                  </Pressable>
                 </CollapsibleContent>
               </BookingOptionSectionCard>
             </Collapsible>
@@ -1320,12 +1455,18 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     const travelerName = isGuestSectionOpen ? trimmedGuestName : userFullName;
     const travelerPhone = isGuestSectionOpen ? trimmedGuestPhone : userPhone;
     const travelerEmail = isGuestSectionOpen ? '' : userEmail;
-    const serviceEndDate = getDailyServiceEndDate(locationDoc, flex, premium);
+    const serviceEndDate = getDailyServiceEndDate(
+      locationDoc,
+      hasFlexSelected,
+      hasPremiumSelected
+    );
     const startDate = toDate(locationDoc.dateStart);
     const scheduledEndDate = toDate(locationDoc.dateEnd);
     const isEndNextDay = serviceEndDate.toDateString() !== scheduledEndDate.toDateString();
     const pickupAddress = locationDoc.location.description ?? t('booking.addressUnavailable');
     const vehicleRentalTotal = (selectedCar?.priceLOC ?? 0) * rentalDays;
+    const flexTotal = dayExtensionCounts.flex * (flexPrice ?? 0);
+    const premiumTotal = dayExtensionCounts.premium * (premiumPrice ?? 0);
     const rentalPeriodLabel = `${formatBookingDate(startDate, appLocale)} – ${formatBookingDate(serviceEndDate, appLocale)}`;
 
     const selectedOptionItems: BookingRecapSelectedOption[] = [
@@ -1339,34 +1480,27 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             },
           ]
         : []),
-      ...(flex && flexPrice !== null
-        ? [
-            {
-              icon: 'moon-outline' as const,
-              title: t('booking.flexExtraHours'),
-              description: t('booking.flexExtraHoursDescription'),
-              priceLabel: formatRecapPriceWithCurrency(flexPrice * rentalDays),
-            },
-          ]
-        : []),
-      ...(premium && premiumPrice !== null
-        ? [
-            {
-              icon: 'moon-outline' as const,
-              title: t('booking.premiumExtraHours'),
-              description: t('booking.premiumExtraHoursDescription'),
-              priceLabel: formatRecapPriceWithCurrency(premiumPrice * rentalDays),
-            },
-          ]
-        : []),
+      ...dayExtensions.map((extension) => {
+        const isFlex = extension.type === 'flex';
+        const unitPrice = isFlex ? flexPrice : premiumPrice;
+        const icon = isFlex ? ('time-outline' as const) : ('moon-outline' as const);
+        return {
+          icon,
+          title: `${isFlex ? t('booking.flexExtraHoursShort') : t('booking.premiumExtraHoursShort')} · ${formatBookingDate(dayKeyToDate(extension.day), appLocale)}`,
+          description: isFlex
+            ? t('booking.flexExtraHoursDescription')
+            : t('booking.premiumExtraHoursDescription'),
+          priceLabel: formatRecapPriceWithCurrency(unitPrice ?? 0),
+        };
+      }),
     ];
 
     const includedItems = [
       t('booking.professionalDriver'),
       tf('booking.rentalZone', { city: t('booking.kinshasa') }),
       ...(fuel ? [t('booking.fuelIncludedShort')] : []),
-      ...(flex ? [t('booking.flexExtraHoursShort')] : []),
-      ...(premium ? [t('booking.premiumExtraHoursShort')] : []),
+      ...(hasFlexSelected ? [t('booking.flexExtraHoursShort')] : []),
+      ...(hasPremiumSelected ? [t('booking.premiumExtraHoursShort')] : []),
       t('booking.dailyCancellationSummary'),
       t('booking.freeModificationsSummary'),
     ];
@@ -1382,9 +1516,9 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
           ]),
       {
         icon: 'time-outline' as const,
-        text: premium
+        text: hasPremiumSelected
           ? t('booking.extendedServiceHoursNotice')
-          : flex
+          : hasFlexSelected
             ? t('booking.flexServiceHoursNotice')
             : t('booking.standardServiceHoursNotice'),
       },
@@ -1392,7 +1526,7 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
 
     const priceLines = [
       {
-        label: tf('booking.recapVehicleRental', {
+        label: tf('booking.recapVehicleRentalNamed', {
           vehicle: selectedCar?.name ?? t('booking.noVehicle'),
           period: rentalPeriodLabel,
         }),
@@ -1406,19 +1540,19 @@ export function LocDaily({ isDarkMode, onSubmit, etape, setEtape }: Props) {
             },
           ]
         : []),
-      ...(flex && flexPrice !== null
+      ...(dayExtensionCounts.flex > 0 && flexPrice !== null
         ? [
             {
-              label: t('booking.flexExtraHours'),
-              value: formatRecapPriceWithCurrency(flexPrice * rentalDays),
+              label: `${t('booking.flexExtraHours')} × ${dayExtensionCounts.flex}`,
+              value: formatRecapPriceWithCurrency(flexTotal),
             },
           ]
         : []),
-      ...(premium && premiumPrice !== null
+      ...(dayExtensionCounts.premium > 0 && premiumPrice !== null
         ? [
             {
-              label: t('booking.premiumExtraHours'),
-              value: formatRecapPriceWithCurrency(premiumPrice * rentalDays),
+              label: `${t('booking.premiumExtraHours')} × ${dayExtensionCounts.premium}`,
+              value: formatRecapPriceWithCurrency(premiumTotal),
             },
           ]
         : []),

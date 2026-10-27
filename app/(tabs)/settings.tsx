@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  FileText,
   HelpCircle,
   Languages,
   LogOut,
@@ -287,6 +288,24 @@ export default function SettingsScreen() {
               </CollapsibleContent>
             </Collapsible>
 
+            <MenuItem
+              icon={FileText}
+              iconColor="#EA580C"
+              iconBackgroundColor="#FFF7ED"
+              label={t('settings.billing')}
+              isDark={isDark}
+              onPress={() => router.push('/billing')}
+            />
+
+            <MenuItem
+              icon={Users}
+              iconColor="#2563EB"
+              iconBackgroundColor="#EFF6FF"
+              label={t('settings.guests')}
+              isDark={isDark}
+              onPress={() => router.push('/guests')}
+            />
+
             <Link href="https://aficab.com/politique-de-confidentialite" asChild>
               <MenuItem
                 icon={Shield}
@@ -383,9 +402,9 @@ export default function SettingsScreen() {
             </Link>
 
             <MenuItem
-              icon={Users}
-              iconColor="#2563EB"
-              iconBackgroundColor="#EFF6FF"
+              icon={Share2}
+              iconColor="#7C3AED"
+              iconBackgroundColor="#F5F3FF"
               label={t('settings.inviteFriend')}
               isDark={isDark}
               onPress={async () => {

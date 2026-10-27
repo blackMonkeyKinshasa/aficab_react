@@ -262,7 +262,7 @@ export function LocationSelector({
           }
         }}
         query={{
-          key: 'AIzaSyD_1-Bzu8tGciu7Z5-QJWYMapflwCEWB3o',
+          key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || '',
           language: placesLanguage,
           components: 'country:cd',
           location: '-4.325,15.3222',

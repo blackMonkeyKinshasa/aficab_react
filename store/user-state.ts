@@ -7,9 +7,6 @@ import { User } from '@/constants/dataInterface';
 
 export const USER_CACHE_DURATION_MS = 1 * 24 * 60 * 60 * 1000;
 
-type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
-type StoreGetter<T> = () => T;
-
 export interface UserState {
   user: User | null;
   lastFetchedAt: number | null;
@@ -21,7 +18,7 @@ export interface UserState {
 
 export const useMyStateUser = create<UserState>()(
   persist(
-    (set: StoreSetter<UserState>, get: StoreGetter<UserState>) => ({
+    (set, get) => ({
       user: null,
       lastFetchedAt: null,
 
@@ -32,7 +29,7 @@ export const useMyStateUser = create<UserState>()(
         }),
 
       updateUser: (updates: Partial<User>) =>
-        set((state: UserState) => ({
+        set((state) => ({
           user: state.user
             ? {
                 ...state.user,

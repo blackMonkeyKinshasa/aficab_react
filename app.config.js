@@ -6,7 +6,13 @@ function toPositiveInt(value) {
 }
 
 module.exports = ({ config }) => {
-  const baseConfig = config ?? appJson.expo;
+  const rawConfig = config ?? appJson.expo;
+  // Native-only app: never enable Expo web / static SSR bundling.
+  const { web: _ignoredWeb, ...withoutWeb } = rawConfig;
+  const baseConfig = {
+    ...withoutWeb,
+    platforms: ['ios', 'android'],
+  };
   const shouldSyncNativeVersions = process.env.EAS_BUILD === 'true';
 
   if (!shouldSyncNativeVersions) {

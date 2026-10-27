@@ -67,7 +67,7 @@ function hasAuthCallbackParams(params: AuthCallbackParams) {
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
-  const routeParams = useLocalSearchParams<RouteAuthCallbackParams>();
+  const routeParams = useLocalSearchParams() as RouteAuthCallbackParams;
   const routeAuthParams = useMemo(() => getAuthCallbackParamsFromRoute(routeParams), [routeParams]);
 
   useEffect(() => {

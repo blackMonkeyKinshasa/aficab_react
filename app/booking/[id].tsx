@@ -23,7 +23,7 @@ import { buildStackScreenOptions } from '@/components/my-ui/ScreenHeader';
 import { TripSummaryView } from '@/components/my-ui/TripSummaryView';
 import { canClientCancelBooking } from '@/components/reservation/reservation-helpers';
 import { color } from '@/constants/colors';
-import { ClientType, PaymentProvider, SUPPORT_PHONE } from '@/constants/databaseEnum';
+import { ClientType, PaymentProvider, ResStatus, SUPPORT_PHONE } from '@/constants/databaseEnum';
 import {
   Booking,
   CreateBookingInput,

@@ -17,6 +17,10 @@ import { ClientType, ResStatus, ResType } from '@/constants/databaseEnum';
 import { TranslationKey } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 
+import { InvoiceDownloadButton } from '@/components/reservation/InvoiceDownloadButton';
+import { resolveInvoiceKind } from '@/lib/invoice-kind';
+import { buildPriceRecap, formatRecapPriceWithCurrency } from '@/lib/recap-format';
+
 import {
   canClientCancelBooking,
   CAR_PLACEHOLDER,
@@ -85,31 +89,41 @@ export function BookingDetailModal({
   const hasGuestBooking = Boolean(guestName || guestPhone || guestEmail);
   const bookingOptions = booking.options ?? {};
   const optionItems = Array.isArray(bookingOptions.options) ? bookingOptions.options : [];
-  const extraTimeName = bookingOptions.extraTime?.name?.trim().toLowerCase() ?? '';
-  const fuelOptionAmount =
-    typeof bookingOptions.fuel === 'number'
-      ? bookingOptions.fuel
-      : (optionItems.find(
-          (option) =>
-            option.name.toLowerCase().includes('fuel') ||
-            option.name.toLowerCase().includes('carburant')
-        )?.price ?? 0);
-  const flexOptionAmount =
-    typeof bookingOptions.flex === 'number'
-      ? bookingOptions.flex
-      : extraTimeName === 'flex'
-        ? (bookingOptions.extraTime?.price ?? 0)
-        : 0;
-  const premiumOptionAmount =
-    typeof bookingOptions.premium === 'number'
-      ? bookingOptions.premium
-      : extraTimeName === 'premium'
-        ? (bookingOptions.extraTime?.price ?? 0)
-        : 0;
+  const dayExtensions = Array.isArray(bookingOptions.dayExtensions)
+    ? bookingOptions.dayExtensions
+    : [];
+  const hasFuelOption = optionItems.some((option) => {
+    const name = option.name?.toLowerCase() ?? '';
+    return name.includes('fuel') || name.includes('carburant');
+  });
+  const hasFlexExtension =
+    dayExtensions.some((item) => item.type === 'flex') ||
+    (bookingOptions.extraTime?.name ?? '').toLowerCase().includes('flex') ||
+    (typeof bookingOptions.flex === 'number' && bookingOptions.flex > 0);
+  const hasPremiumExtension =
+    dayExtensions.some((item) => item.type === 'premium') ||
+    (bookingOptions.extraTime?.name ?? '').toLowerCase().includes('premium') ||
+    (typeof bookingOptions.premium === 'number' && bookingOptions.premium > 0);
   const couponDiscountAmount =
     typeof booking.originalTotal === 'number' && typeof booking.total === 'number'
       ? Math.max(0, booking.originalTotal - booking.total)
       : null;
+  const priceRecap = buildPriceRecap(
+    booking,
+    {
+      rental: (days) =>
+        `${t('reservations.type.dailyRental')} · ${days} ${
+          days > 1 ? t('booking.dayPlural') : t('booking.daySingular')
+        }`,
+      transfer: t('reservations.type.airportTransfer'),
+      flex: t('booking.flexShort'),
+      premium: t('booking.premiumShort'),
+      extraHoursFallback: t('booking.flexExtraHours'),
+      discount: t('booking.discount'),
+      total: t('booking.totalToPay'),
+    },
+    appLocale
+  );
   const dailyDetails =
     booking.type === ResType.LOC
       ? ([
@@ -117,9 +131,11 @@ export function BookingDetailModal({
           t('booking.serviceHoursSummary'),
           `${t('booking.city')}: ${t('booking.kinshasa')}`,
           t('booking.dailyCancellationSummary'),
-          fuelOptionAmount > 0 ? t('booking.fuelIncluded') : t('booking.fuelAtClientExpense'),
-          flexOptionAmount > 0 ? t('booking.flexHoursSummary') : null,
-          premiumOptionAmount > 0 ? t('booking.premiumHoursSummary') : null,
+          hasFuelOption || (typeof bookingOptions.fuel === 'number' && bookingOptions.fuel > 0)
+            ? t('booking.fuelIncluded')
+            : t('booking.fuelAtClientExpense'),
+          hasFlexExtension ? t('booking.flexHoursSummary') : null,
+          hasPremiumExtension ? t('booking.premiumHoursSummary') : null,
           booking.couponCode ? `${t('booking.promoCodeLabel')}: ${booking.couponCode}` : null,
           couponDiscountAmount && couponDiscountAmount > 0
             ? `${t('booking.discount')}: - ${couponDiscountAmount} $`
@@ -232,7 +248,10 @@ export function BookingDetailModal({
               label={t('reservations.field.departure')}
               value={booking.departure?.label ?? '—'}
             />
-            <Row label={t('reservations.field.arrival')} value={booking.arrival?.label ?? '—'} />
+            <Row
+              label={t('reservations.field.arrival')}
+              value={booking.type === ResType.LOC ? '...' : (booking.arrival?.label ?? '—')}
+            />
             {booking.taVolNumber && (
               <Row label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />
             )}
@@ -249,6 +268,45 @@ export function BookingDetailModal({
               ))}
             </View>
           ) : null}
+
+          <View style={[styles.card, { backgroundColor: bg, padding: 10, marginTop: 10 }]}>
+            <Text style={[styles.sectionTitle, { color: fg }]}>{t('booking.priceDetails')}</Text>
+            {priceRecap.optionsMissing ? (
+              <Text style={{ color: sub, fontSize: 13, marginBottom: 8 }}>
+                {t('booking.priceDetailUnavailable')}
+              </Text>
+            ) : null}
+            {priceRecap.lines
+              .filter((line) => line.group !== 'total')
+              .map((line, index) => (
+                <Row
+                  key={`recap-${index}-${line.label}`}
+                  label={line.label}
+                  value={
+                    line.group === 'discount'
+                      ? `- ${formatRecapPriceWithCurrency(Math.abs(line.amount))}`
+                      : line.amount > 0
+                        ? formatRecapPriceWithCurrency(line.amount)
+                        : '—'
+                  }
+                />
+              ))}
+            <Row
+              label={t('booking.rentalPrice')}
+              value={formatRecapPriceWithCurrency(priceRecap.rentalSubtotal)}
+            />
+            {priceRecap.extraHoursSubtotal > 0 ||
+            priceRecap.lines.some((line) => line.group === 'extraHours') ? (
+              <Row
+                label={t('booking.extraHoursPrice')}
+                value={formatRecapPriceWithCurrency(priceRecap.extraHoursSubtotal)}
+              />
+            ) : null}
+            <Row
+              label={t('booking.totalToPay')}
+              value={formatRecapPriceWithCurrency(Number(booking.total) || 0)}
+            />
+          </View>
 
           {booking.driver &&
           (booking.status === ResStatus.CONFIRMED || booking.status === ResStatus.STARTED) ? (
@@ -377,6 +435,18 @@ export function BookingDetailModal({
                 {t('reservations.section.comment')}
               </Text>
               <Text style={[styles.commentText, { color: sub }]}>{booking.commentaire}</Text>
+            </View>
+          ) : null}
+
+          {resolveInvoiceKind({
+            status: booking.status,
+            isPaid: Boolean(booking.isPaid),
+          }) !== 'none' ? (
+            <View style={[styles.card, { backgroundColor: bg, padding: 14, marginTop: 10 }]}>
+              <Text style={[styles.sectionTitle, { color: fg, marginBottom: 10 }]}>
+                {t('billing.title')}
+              </Text>
+              <InvoiceDownloadButton booking={booking} />
             </View>
           ) : null}
 

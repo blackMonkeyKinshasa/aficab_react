@@ -4,8 +4,6 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { Location } from '@/constants/constants';
 
-type StoreSetter<T> = (partial: T | Partial<T> | ((state: T) => T | Partial<T>)) => void;
-
 export interface LocationState {
   recentLocations: Location[];
   addLocation: (location: Location) => void;
@@ -15,15 +13,15 @@ export interface LocationState {
 
 export const useMyStateLocation = create<LocationState>()(
   persist(
-    (set: StoreSetter<LocationState>) => ({
+    (set) => ({
       recentLocations: [],
 
       addLocation: (location: Location) =>
-        set((state: LocationState) => {
+        set((state) => {
           const normalizedDescription = location.description.trim().toLowerCase();
 
           const exists = state.recentLocations.some(
-            (item: Location) => item.description.trim().toLowerCase() === normalizedDescription
+            (item) => item.description.trim().toLowerCase() === normalizedDescription
           );
 
           if (exists) {
@@ -36,9 +34,9 @@ export const useMyStateLocation = create<LocationState>()(
         }),
 
       removeLocation: (location: Location) =>
-        set((state: LocationState) => ({
+        set((state) => ({
           recentLocations: state.recentLocations.filter(
-            (item: Location) =>
+            (item) =>
               item.description.trim().toLowerCase() !== location.description.trim().toLowerCase()
           ),
         })),

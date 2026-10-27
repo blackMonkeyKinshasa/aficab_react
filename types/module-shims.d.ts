@@ -1,6 +1,5 @@
 declare module 'expo-router';
 declare module '@react-navigation/elements';
-declare module 'expo-contacts';
 declare module '@react-navigation/native-stack' {
   export type NativeStackNavigationOptions = Record<string, unknown>;
 }

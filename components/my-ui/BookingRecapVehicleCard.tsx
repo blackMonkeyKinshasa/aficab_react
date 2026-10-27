@@ -41,8 +41,8 @@ export function BookingRecapVehicleCard({
 }: BookingRecapVehicleCardProps) {
   const { t } = useI18n();
   const { s, font } = useLayoutScale();
-  const imageWidth = s(112);
-  const imageHeight = s(72);
+  const imageWidth = s(148);
+  const imageHeight = s(100);
 
   return (
     <View
@@ -50,18 +50,8 @@ export function BookingRecapVehicleCard({
         bookingSheetCardClassName,
         'mb-4 overflow-hidden bg-white p-4 dark:bg-[#1E1E1E]'
       )}>
-      <View className="flex-row gap-3">
-        <View
-          className="items-center justify-center overflow-hidden rounded-lg"
-          style={{ width: imageWidth, height: imageHeight }}>
-          <Image
-            source={{ uri: imageUri || PLACEHOLDER_IMAGE }}
-            style={{ width: imageWidth, height: imageHeight }}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View className="flex-1 justify-center">
+      <View className="flex-row items-center gap-3">
+        <View className="min-w-0 flex-1 justify-center">
           <Text className="font-bold text-typography-900" style={{ fontSize: font.lg }} numberOfLines={2}>
             {name}
           </Text>
@@ -74,6 +64,16 @@ export function BookingRecapVehicleCard({
             <SpecItem icon="briefcase" label={`${baggage} ${t('booking.baggageItems')}`} />
             <SpecItem icon="snow" label={t('booking.airConditioning')} />
           </View>
+        </View>
+
+        <View
+          className="items-center justify-center overflow-hidden rounded-lg"
+          style={{ width: imageWidth, height: imageHeight }}>
+          <Image
+            source={{ uri: imageUri || PLACEHOLDER_IMAGE }}
+            style={{ width: imageWidth, height: imageHeight }}
+            resizeMode="contain"
+          />
         </View>
       </View>
     </View>

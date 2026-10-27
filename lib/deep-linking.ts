@@ -14,12 +14,18 @@ const ROUTE_ALIASES: Record<string, string> = {
   '/notifications-page': '/notificationsPage',
   '/notificationspage': '/notificationsPage',
   '/settings': '/(tabs)/settings',
+  '/billing': '/billing',
+  '/facturation': '/billing',
+  '/guests': '/guests',
+  '/invites': '/guests',
 };
 
 const ALLOWED_APP_ROUTES = new Set([
   '/',
   '/(tabs)/reservation',
   '/(tabs)/settings',
+  '/billing',
+  '/guests',
   '/notificationsPage',
   '/edit-profile',
   '/create-profile',

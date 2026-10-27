@@ -1,5 +1,9 @@
 import {
+  BookingInvoice,
   BookingPayment,
+  BookingQuoteInput,
+  BookingQuoteResponse,
+  ClientUpdateBookingInput,
   CreateBookingInput,
   CreateBookingResponse,
   CreateReviewResponse,
@@ -7,7 +11,7 @@ import {
   PawapayPaymentInput,
   PawapayPaymentResponse,
 } from '@/constants/dataInterface';
-import { apiAuthFetch } from './apiConfig';
+import { apiAuthFetch, apiAuthFetchBinary } from './apiConfig';
 import { ResType } from '@/constants/databaseEnum';
 import { createReview } from './review';
 
@@ -74,6 +78,32 @@ export function clientCancelBooking(
   return apiAuthFetch(`/booking/${bookingId}/client-cancel`, {
     method: 'POST',
     body: JSON.stringify({ status, clientId }),
+  });
+}
+
+// POST /booking/:id/client-update
+export function clientUpdateBooking(bookingId: string, body: ClientUpdateBookingInput) {
+  return apiAuthFetch(`/booking/${bookingId}/client-update`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+// GET /booking/:id/invoice
+export function getBookingInvoice(bookingId: string): Promise<BookingInvoice> {
+  return apiAuthFetch<BookingInvoice>(`/booking/${bookingId}/invoice`, { method: 'GET' });
+}
+
+// GET /booking/:id/invoice.pdf
+export function getBookingInvoicePdf(bookingId: string) {
+  return apiAuthFetchBinary(`/booking/${bookingId}/invoice.pdf`, { method: 'GET' });
+}
+
+// POST /booking/quote
+export function quoteBooking(body: BookingQuoteInput): Promise<BookingQuoteResponse> {
+  return apiAuthFetch<BookingQuoteResponse>('/booking/quote', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }
 

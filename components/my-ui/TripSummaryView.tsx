@@ -19,11 +19,7 @@ import {
   BookingRecapStatusRow,
 } from '@/components/my-ui/BookingRecapStatusCards';
 import { BookingRideProgress } from '@/components/my-ui/BookingRideProgress';
-import { color } from '@/constants/colors';
-import { ClientType, ResStatus, ResType, SUPPORT_PHONE } from '@/constants/databaseEnum';
-import { Booking } from '@/constants/dataInterface';
-import { TranslationKey } from '@/lib/i18n';
-import { useLayoutScale } from '@/lib/layout-scale';
+import { InvoiceDownloadButton } from '@/components/reservation/InvoiceDownloadButton';
 import {
   CAR_PLACEHOLDER,
   canClientCancelBooking,
@@ -33,12 +29,40 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
 } from '@/components/reservation/reservation-helpers';
+import { color } from '@/constants/colors';
+import { ClientType, ResStatus, ResType, SUPPORT_PHONE } from '@/constants/databaseEnum';
+import { Booking } from '@/constants/dataInterface';
+import { TranslationKey } from '@/lib/i18n';
+import { useLayoutScale } from '@/lib/layout-scale';
+import {
+  buildPriceRecap,
+  formatRecapPriceWithCurrency,
+  type PriceRecapLine,
+} from '@/lib/recap-format';
 
 type PriceLine = {
   label: string;
   value: string;
+  amount?: number;
+  hint?: string;
   muted?: boolean;
+  emphasize?: 'discount' | 'total' | 'subtotal';
 };
+
+type PriceBreakdown = {
+  rentalLines: PriceLine[];
+  extraHourLines: PriceLine[];
+  otherLines: PriceLine[];
+  rentalSubtotal: number;
+  extraHoursSubtotal: number;
+  optionsMissing: boolean;
+};
+
+type TranslateFn = (key: TranslationKey) => string;
+type TranslateFormatFn = (
+  key: TranslationKey,
+  values: Record<string, string | number | undefined>
+) => string;
 
 function getDiscountAmount(booking: Booking) {
   const optionDiscount = booking.options?.couponDiscountAmount;
@@ -54,69 +78,74 @@ function getDiscountAmount(booking: Booking) {
   return 0;
 }
 
-function getRentalDurationLabel(booking: Booking, t: (key: TranslationKey) => string) {
+function getRentalDurationLabel(booking: Booking, t: TranslateFn) {
   const rentalDays = getRentalDays(booking);
   const dayLabel = rentalDays > 1 ? t('booking.dayPlural') : t('booking.daySingular');
   return `${rentalDays} ${dayLabel}`;
 }
 
-function getPriceLines(booking: Booking, t: (key: TranslationKey) => string): PriceLine[] {
-  const options = booking.options ?? {};
-  const discount = getDiscountAmount(booking);
-  const lines: PriceLine[] = [];
-  const original =
-    typeof booking.originalTotal === 'number' && booking.originalTotal > 0
-      ? booking.originalTotal
-      : Math.max(0, (booking.total ?? 0) + discount);
+function money(amount: number) {
+  return formatRecapPriceWithCurrency(amount);
+}
 
-  if (original > 0) {
-    lines.push({
-      label:
-        booking.type === ResType.LOC
-          ? t('reservations.type.dailyRental')
-          : t('reservations.type.airportTransfer'),
-      value: `${original} $`,
-    });
-  }
+function toDisplayLine(line: PriceRecapLine): PriceLine {
+  return {
+    label: line.label,
+    value: money(Math.abs(line.amount)),
+    amount: line.amount,
+    emphasize: line.group === 'discount' ? 'discount' : undefined,
+  };
+}
 
-  if (booking.type === ResType.LOC) {
-    lines.push({
-      label: t('booking.duration'),
-      value: getRentalDurationLabel(booking, t),
-      muted: true,
-    });
-  }
+function getPriceBreakdown(
+  booking: Booking,
+  t: TranslateFn,
+  tf: TranslateFormatFn,
+  appLocale: string
+): PriceBreakdown {
+  const recap = buildPriceRecap(
+    booking,
+    {
+      rental: (days) =>
+        tf('booking.recapVehicleRental', {
+          period: `${days} ${days > 1 ? t('booking.dayPlural') : t('booking.daySingular')}`,
+        }),
+      transfer: tf('booking.recapTripLine', {
+        vehicle: booking.car?.name?.trim() || t('booking.vehicleUnknown'),
+      }),
+      flex: t('booking.flexShort'),
+      premium: t('booking.premiumShort'),
+      extraHoursFallback: t('booking.flexExtraHours'),
+      discount: t('booking.discount'),
+      total: t('booking.totalToPay'),
+    },
+    appLocale
+  );
 
-  if (typeof options.distanceKm === 'number') {
-    lines.push({
-      label: `${t('booking.distance')} (${options.distanceKm.toFixed(1)} km)`,
-      value: '',
-      muted: true,
-    });
-  }
+  const rentalLines = recap.lines
+    .filter((line) => line.group === 'rental' || line.group === 'catalog')
+    .map(toDisplayLine);
+  const extraHourLines = recap.lines
+    .filter((line) => line.group === 'extraHours')
+    .map((line) => ({
+      ...toDisplayLine(line),
+      value: line.amount > 0 ? money(line.amount) : '—',
+    }));
+  const otherLines = recap.lines
+    .filter((line) => line.group === 'discount')
+    .map((line) => ({
+      ...toDisplayLine(line),
+      value: `- ${money(Math.abs(line.amount))}`,
+    }));
 
-  if (typeof options.fuel === 'number' && options.fuel > 0) {
-    lines.push({ label: t('booking.fuelFees'), value: `${options.fuel} $` });
-  }
-  if (typeof options.flex === 'number' && options.flex > 0) {
-    lines.push({ label: t('booking.flexExtraHours'), value: `${options.flex} $` });
-  }
-  if (typeof options.premium === 'number' && options.premium > 0) {
-    lines.push({ label: t('booking.premiumExtraHours'), value: `${options.premium} $` });
-  }
-
-  const extraOptions = Array.isArray(options.options) ? options.options : [];
-  extraOptions.forEach((option) => {
-    if (option?.name && typeof option.price === 'number' && option.price > 0) {
-      lines.push({ label: option.name, value: `${option.price} $` });
-    }
-  });
-
-  if (discount > 0) {
-    lines.push({ label: t('reservations.field.discount'), value: `- ${discount} $` });
-  }
-
-  return lines;
+  return {
+    rentalLines,
+    extraHourLines,
+    otherLines,
+    rentalSubtotal: recap.rentalSubtotal,
+    extraHoursSubtotal: recap.extraHoursSubtotal,
+    optionsMissing: recap.optionsMissing,
+  };
 }
 
 type InfoRow = {
@@ -231,11 +260,13 @@ export function TripSummaryView({
     booking.status === ResStatus.ENDED ||
     booking.status === ResStatus.CANCELED ||
     booking.status === ResStatus.ARCHIVED;
-  const priceLines = useMemo(() => getPriceLines(booking, t), [booking, t]);
+  const priceBreakdown = useMemo(
+    () => getPriceBreakdown(booking, t, tf, appLocale),
+    [booking, t, tf, appLocale]
+  );
   const otherInfoRows = useMemo(() => getOtherInfoRows(booking, t), [booking, t]);
-  const promoCode = booking.couponCode?.trim() || null;
   const discount = getDiscountAmount(booking);
-  const totalValue = `${booking.total ?? 0} ${booking.currency ?? 'USD'}`;
+  const totalValue = money(booking.total ?? 0);
   const isDailyRental = booking.type === ResType.LOC;
   const rentalDurationLabel = isDailyRental ? getRentalDurationLabel(booking, t) : null;
   const pickupLabel = booking.departure?.label?.trim() || '—';
@@ -318,6 +349,38 @@ export function TripSummaryView({
                 : 'Complete payment to confirm your booking.'
               : t('booking.driverAssignmentPending');
 
+  const renderPriceLine = (line: PriceLine, key: string) => (
+    <View key={key} className="mb-2">
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="min-w-0 flex-1">
+          <Text
+            style={{
+              color: line.emphasize === 'discount' ? '#16A34A' : line.muted ? sub : fg,
+              fontSize: font.sm,
+              fontWeight: line.emphasize === 'discount' ? '600' : '500',
+            }}>
+            {line.label}
+          </Text>
+          {line.hint ? (
+            <Text className="mt-0.5" style={{ color: sub, fontSize: font.xs }}>
+              {line.hint}
+            </Text>
+          ) : null}
+        </View>
+        {line.value ? (
+          <Text
+            className="font-semibold"
+            style={{
+              color: line.emphasize === 'discount' ? '#16A34A' : line.muted ? sub : fg,
+              fontSize: font.sm,
+            }}>
+            {line.value}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+
   const priceDetailsCard = (
     <View
       className="mb-4 rounded-xl border px-4 py-4"
@@ -325,28 +388,62 @@ export function TripSummaryView({
       <View className="mb-3 flex-row items-center">
         <Ionicons name="calculator-outline" size={s(18)} color={fg} />
         <Text className="ml-2 font-semibold" style={{ color: fg, fontSize: font.base }}>
-          {t('reservations.section.price')}
+          {t('booking.priceDetails')}
         </Text>
       </View>
-      {priceLines.map((line) => (
-        <View key={`${line.label}-${line.value}`} className="mb-2 flex-row justify-between">
-          <Text className="mr-3 flex-1" style={{ color: sub, fontSize: font.sm }}>
-            {line.label}
-          </Text>
-          {line.value ? (
-            <Text
-              className="font-semibold"
-              style={{ color: line.muted ? sub : fg, fontSize: font.sm }}>
-              {line.value}
-            </Text>
-          ) : null}
-        </View>
-      ))}
-      <View className="mt-2 flex-row justify-between border-t pt-3" style={{ borderColor }}>
-        <Text className="font-semibold" style={{ color: fg, fontSize: font.base }}>
-          {t('reservations.field.total')}
+
+      {priceBreakdown.optionsMissing ? (
+        <Text className="mb-3" style={{ color: sub, fontSize: font.sm }}>
+          {t('booking.priceDetailUnavailable')}
         </Text>
-        <Text className="font-bold" style={{ color: fg, fontSize: font.lg }}>
+      ) : null}
+
+      {priceBreakdown.rentalLines.map((line, index) =>
+        renderPriceLine(line, `rental-${index}-${line.label}`)
+      )}
+
+      {priceBreakdown.extraHourLines.length > 0 ? (
+        <View className="mt-1">
+          {priceBreakdown.extraHourLines.map((line, index) =>
+            renderPriceLine(line, `extra-${index}-${line.label}`)
+          )}
+        </View>
+      ) : null}
+
+      {priceBreakdown.otherLines.map((line, index) =>
+        renderPriceLine(line, `other-${index}-${line.label}`)
+      )}
+
+      <View className="mt-2 border-t pt-3" style={{ borderColor }}>
+        <View className="mb-2 flex-row justify-between">
+          <Text style={{ color: sub, fontSize: font.sm }}>{t('booking.rentalPrice')}</Text>
+          <Text className="font-semibold" style={{ color: fg, fontSize: font.sm }}>
+            {money(priceBreakdown.rentalSubtotal)}
+          </Text>
+        </View>
+        {priceBreakdown.extraHoursSubtotal > 0 || priceBreakdown.extraHourLines.length > 0 ? (
+          <View className="mb-2 flex-row justify-between">
+            <Text style={{ color: sub, fontSize: font.sm }}>{t('booking.extraHoursPrice')}</Text>
+            <Text className="font-semibold" style={{ color: fg, fontSize: font.sm }}>
+              {money(priceBreakdown.extraHoursSubtotal)}
+            </Text>
+          </View>
+        ) : null}
+        {discount > 0 && typeof booking.originalTotal === 'number' ? (
+          <View className="mb-2 flex-row justify-between">
+            <Text style={{ color: sub, fontSize: font.sm }}>
+              {t('reservations.field.beforeDiscount')}
+            </Text>
+            <Text style={{ color: sub, fontSize: font.sm }}>{money(booking.originalTotal)}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View className="mt-1 flex-row justify-between border-t pt-3" style={{ borderColor }}>
+        <Text className="font-bold" style={{ color: fg, fontSize: font.base }}>
+          {t('booking.totalToPay')}
+        </Text>
+        <Text className="font-bold" style={{ color: color.primary, fontSize: font.xl }}>
           {totalValue}
         </Text>
       </View>
@@ -367,17 +464,15 @@ export function TripSummaryView({
         <View
           className="mb-4 rounded-xl border p-4"
           style={{ borderColor, backgroundColor: cardBg }}>
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1">
-              <Text className="font-bold" style={{ color: fg, fontSize: font.base }}>
+          <View className="flex-row items-center gap-3">
+            <View className="min-w-0 flex-1">
+              <Text className="font-bold" style={{ color: fg, fontSize: font.base }} numberOfLines={2}>
                 {booking.car?.name ?? t('booking.vehicleUnknown')}
               </Text>
-              <Text className="mt-1" style={{ color: sub, fontSize: font.xs }}>
+              <Text className="mt-1" style={{ color: sub, fontSize: font.xs }} numberOfLines={2}>
                 {vehicleMeta.length > 0 ? vehicleMeta.join(' · ') : typeLabel}
               </Text>
-            </View>
-            <View className="ml-3 items-end">
-              <Text className="font-bold" style={{ color: fg, fontSize: font.lg }}>
+              <Text className="mt-2 font-bold" style={{ color: fg, fontSize: font.lg }}>
                 {totalValue}
               </Text>
               <View className="mt-1 flex-row items-center">
@@ -402,11 +497,9 @@ export function TripSummaryView({
                 )}
               </View>
             </View>
-          </View>
-          <View className="mt-3 items-center">
             <Image
               source={{ uri: getCarImage(booking) }}
-              style={{ width: s(100), height: s(70) }}
+              style={{ width: s(148), height: s(100) }}
               resizeMode="contain"
             />
           </View>
@@ -498,7 +591,7 @@ export function TripSummaryView({
                 {pickupLabel}
               </Text>
             </View>
-            {destinationLabel ? (
+            {isDailyRental || destinationLabel ? (
               <View className="flex-1">
                 <View className="mb-1 flex-row items-center">
                   <Ionicons name="navigate-outline" size={s(14)} color={sub} />
@@ -510,7 +603,7 @@ export function TripSummaryView({
                   className="mt-1 font-semibold"
                   style={{ color: fg, fontSize: font.sm }}
                   numberOfLines={3}>
-                  {destinationLabel}
+                  {isDailyRental ? '...' : destinationLabel}
                 </Text>
               </View>
             ) : null}
@@ -683,23 +776,6 @@ export function TripSummaryView({
 
         {priceDetailsCard}
 
-        {promoCode || discount > 0 ? (
-          <View
-            className="mb-4 rounded-xl border p-4"
-            style={{ borderColor, backgroundColor: cardBg }}>
-            <View className="flex-row items-center justify-between">
-              <Text className="font-semibold" style={{ color: fg, fontSize: font.sm }}>
-                {promoCode || t('booking.promoCodeLabel')}
-              </Text>
-              {discount > 0 ? (
-                <Text className="font-bold text-green-600" style={{ fontSize: font.base }}>
-                  - {discount} $
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        ) : null}
-
         {otherInfoRows.length > 0 ? (
           <View
             className="mb-4 rounded-xl border p-4"
@@ -749,6 +825,12 @@ export function TripSummaryView({
                 ? t('reservations.field.fuelIncluded')
                 : t('reservations.field.fuelClientExpense')}
             </Text>
+          </View>
+        ) : null}
+
+        {booking.status !== ResStatus.CANCELED ? (
+          <View className="mb-4">
+            <InvoiceDownloadButton booking={booking} />
           </View>
         ) : null}
 

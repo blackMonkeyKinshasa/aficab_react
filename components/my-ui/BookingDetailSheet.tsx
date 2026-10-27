@@ -257,14 +257,15 @@ export function BookingDetailSheet({
           <DetailRow
             label={t('reservations.field.departure')}
             value={booking.departure?.label ?? '—'}
-
           />
-          { booking.arrival?.label && (  
-                <DetailRow
-                label={t('reservations.field.return')}
-                value={booking.arrival?.label ?? '—'}
-              />)
-             }
+          {booking.type === ResType.LOC ? (
+            <DetailRow label={t('reservations.field.arrival')} value="..." />
+          ) : booking.arrival?.label ? (
+            <DetailRow
+              label={t('reservations.field.return')}
+              value={booking.arrival.label}
+            />
+          ) : null}
          
           {booking.taVolNumber ? (
             <DetailRow label={t('reservations.field.flightNumber')} value={booking.taVolNumber} />

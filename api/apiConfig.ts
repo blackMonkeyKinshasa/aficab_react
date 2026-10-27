@@ -6,7 +6,12 @@ import {
 } from '@/lib/network';
 import { supabase } from '@/lib/supabase';
 
-const API_URL = isDev ? 'https://aficab.vercel.app/api' : 'https://aficab.com/api';
+const DEFAULT_API_URL_DEV = 'https://aficab.vercel.app/api';
+const DEFAULT_API_URL_PROD = 'https://aficab.com/api';
+
+const API_URL = isDev
+  ? process.env.EXPO_PUBLIC_API_URL_DEV?.trim() || DEFAULT_API_URL_DEV
+  : process.env.EXPO_PUBLIC_API_URL_PROD?.trim() || DEFAULT_API_URL_PROD;
 
 export type ApiRequestOptions = Omit<RequestInit, 'headers' | 'body'> & {
   headers?: Record<string, string | undefined>;
@@ -196,4 +201,66 @@ export async function apiAuthFetch<T = unknown>(
     ...options,
     headers: { ...options.headers, Authorization: `Bearer ${resolvedToken}` },
   });
+}
+
+/** Authenticated fetch that returns raw bytes (PDF, etc.). */
+export async function apiAuthFetchBinary(
+  endpoint: string,
+  options: ApiRequestOptions = {}
+): Promise<{ data: ArrayBuffer; contentType: string | null; fileName: string | null }> {
+  const resolvedToken = await getRequiredAccessToken();
+  const headers = resolveHeaders(
+    {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${resolvedToken}`,
+        Accept: 'application/pdf,application/octet-stream,*/*',
+        'Content-Type': undefined,
+      },
+    },
+    resolvedToken
+  );
+
+  let response = await performFetch(endpoint, headers, options);
+
+  if (response.status === 401) {
+    const { data, error } = await supabase.auth.refreshSession();
+    const refreshedToken = data.session?.access_token;
+
+    if (!error && refreshedToken) {
+      const retryHeaders = resolveHeaders(
+        {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${refreshedToken}`,
+            Accept: 'application/pdf,application/octet-stream,*/*',
+            'Content-Type': undefined,
+          },
+        },
+        refreshedToken
+      );
+      response = await performFetch(endpoint, retryHeaders, options);
+    }
+  }
+
+  if (!response.ok) {
+    const errorBody = await parseErrorResponse(response);
+    throw buildApiError(response, errorBody);
+  }
+
+  const contentDisposition = response.headers.get('content-disposition');
+  const fileNameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1].replace(/"/g, '')) : null;
+
+  return {
+    data: await response.arrayBuffer(),
+    contentType: response.headers.get('content-type'),
+    fileName,
+  };
+}
+
+export function getApiBaseUrl() {
+  return API_URL;
 }

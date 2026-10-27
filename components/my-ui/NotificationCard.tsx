@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
@@ -144,69 +144,69 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
-  },
+  } satisfies ViewStyle,
   headRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-  },
+  } satisfies ViewStyle,
   iconContainer: {
     width: 36,
     height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
+  } satisfies ViewStyle,
   headerContent: {
     flex: 1,
     minWidth: 0,
-  },
+  } satisfies ViewStyle,
   title: {
-    fontWeight: '650',
+    fontWeight: '600',
     lineHeight: 22,
-  },
+  } satisfies TextStyle,
   meta: {
     marginTop: 1,
     fontWeight: '500',
-  },
+  } satisfies TextStyle,
   metaRow: {
     marginTop: 3,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
+  } satisfies ViewStyle,
   unreadDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
     backgroundColor: '#245EE8',
-  },
+  } satisfies ViewStyle,
   message: {
     marginTop: 12,
     lineHeight: 20,
     fontWeight: '500',
-  },
+  } satisfies TextStyle,
   date: {
     marginTop: 10,
     fontWeight: '700',
-  },
+  } satisfies TextStyle,
   routeBlock: {
     marginTop: 14,
     marginLeft: 4,
     paddingLeft: 12,
     borderLeftWidth: 2,
     gap: 10,
-  },
+  } satisfies ViewStyle,
   routeItem: {
     gap: 2,
-  },
+  } satisfies ViewStyle,
   routeLabel: {
     fontWeight: '600',
-  },
+  } satisfies TextStyle,
   routeValue: {
     lineHeight: 20,
     fontWeight: '500',
-  },
+  } satisfies TextStyle,
   actionButton: {
     marginTop: 14,
     alignSelf: 'flex-start',
@@ -216,18 +216,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     gap: 8,
-  },
+  } satisfies ViewStyle,
   actionText: {
     fontWeight: '700',
-  },
+  } satisfies TextStyle,
   detailBlock: {
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     gap: 4,
-  },
+  } satisfies ViewStyle,
   detailLine: {
     lineHeight: 18,
     fontWeight: '500',
-  },
+  } satisfies TextStyle,
 });

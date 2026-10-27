@@ -75,24 +75,110 @@ export interface BookingExtraTimeOption {
   price?: number | null;
 }
 
-export interface BookingSelectedOption {
+/** Catalogue line persisted by API (fuel, baby seat, …). */
+export type BookingOptionLine = {
   name: string;
-  number: number;
   price: number;
+  number: number;
   required?: boolean;
+};
+
+/** @deprecated Prefer BookingOptionLine — same shape. */
+export type BookingSelectedOption = BookingOptionLine;
+
+/** API expects lowercase enum values. */
+export type DayExtensionType = 'flex' | 'premium';
+
+export interface DayExtension {
+  /** Local calendar day YYYY-MM-DD */
+  day: string;
+  type: DayExtensionType;
 }
 
+export type BookingDayExtension = DayExtension;
+
+/**
+ * Persisted booking.options (POST/GET /booking).
+ * Zod only keeps options / extraTime / dayExtensions.
+ */
 export interface BookingOptionsPayload {
+  /** Catalogue lines (carburant, …) — unit price; LOC amount = price × number × days */
+  options?: BookingOptionLine[];
+  /** Legacy summary of extra hours (daily unit rate) */
   extraTime?: BookingExtraTimeOption | null;
-  options?: BookingSelectedOption[];
+  /** Flex/Premium per calendar day (recommended for LOC) */
+  dayExtensions?: BookingDayExtension[];
+
+  /** @deprecated Not persisted by API — UI/local only */
   fuel?: number;
+  /** @deprecated Not persisted by API — UI/local only */
   flex?: number;
+  /** @deprecated Not persisted by API — UI/local only */
   premium?: number;
+  /** @deprecated Not persisted by API — derive from dates */
   rentalDays?: number;
+  /** TA client helpers (may be stripped by API) */
   tripType?: 'one-way' | 'round-trip';
   distanceKm?: number | null;
   priceTA?: CarPriceTA | null;
   couponDiscountAmount?: number;
+}
+
+/** GET /booking/{id}/invoice — modèle décidé serveur via `proforma` */
+export interface BookingInvoice {
+  id: string; // "PRO-…" | "FAC-…"
+  bookingId: string;
+  proforma: boolean;
+  issuedAt: string;
+  dueAt: string;
+  paidAt: string | null;
+  currency: string;
+  total: number | null;
+  isPaid: boolean;
+  status: string;
+  deferredBilling: boolean;
+  client: {
+    id: string;
+    full_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  vehicle: string | null;
+  service: string;
+  departureAt: string | null;
+  arrivalAt: string | null;
+}
+
+/** Body for POST /booking/quote */
+export interface BookingQuoteInput {
+  type: ResType;
+  carId: string;
+  departureAt: string;
+  arrivalAt?: string;
+  departure?: LocationPoint;
+  arrival?: LocationPoint;
+  options?: BookingOptionsPayload;
+  couponCode?: string;
+  taReturn?: boolean;
+  distanceKm?: number | null;
+}
+
+export interface BookingQuoteResponse {
+  total: number;
+  currency?: string;
+  originalTotal?: number;
+  breakdown?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Body for POST /booking/{id}/client-update */
+export interface ClientUpdateBookingInput {
+  commentaire?: string | null;
+  guest?: BookingGuest | null;
+  departureAt?: string;
+  arrivalAt?: string;
+  options?: BookingOptionsPayload;
+  [key: string]: unknown;
 }
 
 /** Body sent to POST /booking */
@@ -216,6 +302,10 @@ export interface BookingCar {
   registrationId: string;
   images: unknown[];
   category: Record<string, unknown> | null;
+  /** Present when API includes car pricing (needed for dayExtensions recap). */
+  priceLOC?: number | null;
+  extraTime?: { flex?: number; premium?: number } | null;
+  priceOptions?: Array<{ name?: string; price?: number }> | null;
 }
 
 export interface Driver {

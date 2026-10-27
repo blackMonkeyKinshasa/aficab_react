@@ -3,7 +3,6 @@ import {
   Alert,
   FlatList,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -11,12 +10,12 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import * as Contacts from 'expo-contacts';
 import { useRouter } from 'expo-router';
 
 import { calculateDistance, generateIDBooking, getAllBookings } from '@/api/booking';
 import { getTaCars } from '@/api/car';
 import { validateCoupon } from '@/api/coupon';
+import { SavedGuestsPicker } from '@/components/guests/SavedGuestsPicker';
 import { BookingOptionSectionCard } from '@/components/my-ui/BookingOptionSectionCard';
 import {
   BookingDateTimeRow,
@@ -66,9 +65,11 @@ import { useLayoutScale } from '@/lib/layout-scale';
 import { getAddressName } from '@/lib/location-utils';
 import { formatRecapPriceWithCurrency } from '@/lib/recap-format';
 import { supabase } from '@/lib/supabase';
+import { ContactPickError, pickGuestFromContacts } from '@/lib/pick-contact';
 import { getEarliestBookingDate, hasMinimumBookingLeadTime } from '@/lib/time-utils';
 import { useAppToast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { SavedGuest, useGuestsState } from '@/store/guests-state';
 import { useMyStateUser, type UserState } from '@/store/user-state';
 
 const FIRST_BOOKING_PROMO_CODE = 'VSFMFE9Q';
@@ -218,32 +219,6 @@ function getCouponFinalTotal(coupon: CouponValidationValidResponse | null, order
   return Math.max(0, orderTotal - getCouponDiscountAmount(coupon, orderTotal));
 }
 
-function normalizeGuestPhone(phoneNumber: string | null | undefined) {
-  if (!phoneNumber) {
-    return '';
-  }
-
-  const digits = phoneNumber.replace(/\D/g, '');
-
-  if (!digits) {
-    return '';
-  }
-
-  if (digits.startsWith('243') && digits.length >= 12) {
-    return digits.slice(3, 12);
-  }
-
-  if (digits.startsWith('0') && digits.length >= 10) {
-    return digits.slice(1, 10);
-  }
-
-  if (digits.length > 9) {
-    return digits.slice(-9);
-  }
-
-  return digits;
-}
-
 export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const theme = isDarkMode ? dark : light;
   const router = useRouter();
@@ -293,7 +268,12 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
   const [flyNumber, setFlyNumber] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [selectedSavedGuestId, setSelectedSavedGuestId] = useState<string | null>(null);
   const [isGuestSectionOpen, setIsGuestSectionOpen] = useState(false);
+  const savedGuests = useGuestsState((state) => state.guests);
+  const addSavedGuest = useGuestsState((state) => state.addGuest);
+  const findDuplicateGuest = useGuestsState((state) => state.findDuplicate);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingCreatedAt, setBookingCreatedAt] = useState<string | null>(null);
   const [isPositionAller, setPositionAller] = useState(true);
@@ -339,6 +319,7 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     const trimmedFlyNumber = flyNumber.trim();
     const trimmedGuestName = isGuestSectionOpen ? guestName.trim() : '';
     const trimmedGuestPhone = isGuestSectionOpen ? guestPhone.trim() : '';
+    const trimmedGuestEmail = isGuestSectionOpen ? guestEmail.trim() : '';
     const resolvedTripPrice = getAirportTripPrice(resolvedCar, distanceKm);
     const resolvedTotalPrice = resolvedTripPrice * (locationDoc.tripType === 'round-trip' ? 2 : 1);
     const resolvedDiscountAmount = resolvedCar.id === selectedCar?.id ? promoDiscountAmount : 0;
@@ -368,10 +349,11 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
         couponDiscountAmount: resolvedDiscountAmount,
       },
       guest:
-        trimmedGuestName || trimmedGuestPhone
+        trimmedGuestName || trimmedGuestPhone || trimmedGuestEmail
           ? {
-              fullName: trimmedGuestName || null,
-              phone: trimmedGuestPhone || null,
+              ...(trimmedGuestName ? { fullName: trimmedGuestName } : {}),
+              ...(trimmedGuestPhone ? { phone: trimmedGuestPhone } : {}),
+              ...(trimmedGuestEmail ? { email: trimmedGuestEmail } : {}),
             }
           : null,
       name: trimmedGuestName || null,
@@ -551,58 +533,87 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
     void loadCars(1, true);
   };
 
-  const handlePickGuestFromContacts = async () => {
-    if (Platform.OS === 'web') {
+  const handleSelectSavedGuest = (guest: SavedGuest) => {
+    setIsGuestSectionOpen(true);
+    setSelectedSavedGuestId(guest.id);
+    setGuestName(guest.fullName);
+    setGuestPhone(guest.phone);
+    setGuestEmail(guest.email ?? '');
+  };
+
+  const handleSaveCurrentGuest = () => {
+    const trimmedName = guestName.trim();
+    const trimmedPhone = guestPhone.trim();
+    if (!trimmedName || !trimmedPhone) {
       toast({
-        title: t('common.information'),
-        description: t('booking.contactImportUnsupported'),
+        title: t('common.error'),
+        description: t('guests.validationPhone'),
+        action: 'error',
+      });
+      return;
+    }
+
+    const input = {
+      fullName: trimmedName,
+      phone: trimmedPhone,
+      email: guestEmail.trim() || null,
+    };
+    const duplicate = findDuplicateGuest(input);
+    if (duplicate) {
+      setSelectedSavedGuestId(duplicate.id);
+      toast({
+        title: t('guests.title'),
+        description: t('guests.duplicateError'),
         action: 'info',
       });
       return;
     }
 
-    try {
-      const { status: existingStatus } = await Contacts.getPermissionsAsync();
-      const finalStatus =
-        existingStatus === 'granted'
-          ? existingStatus
-          : (await Contacts.requestPermissionsAsync()).status;
+    const created = addSavedGuest(input);
+    setSelectedSavedGuestId(created.id);
+    toast({
+      title: t('guests.title'),
+      description: t('guests.savedCurrent'),
+      action: 'success',
+    });
+  };
 
-      if (finalStatus !== 'granted') {
+  const handlePickGuestFromContacts = async () => {
+    try {
+      const picked = await pickGuestFromContacts();
+
+      if (!picked) {
+        return;
+      }
+
+      setIsGuestSectionOpen(true);
+      setSelectedSavedGuestId(null);
+      setGuestName(picked.fullName);
+      setGuestPhone(picked.phone);
+      setGuestEmail(picked.email);
+
+      if (!picked.phone) {
         toast({
-          title: t('common.error'),
-          description: t('booking.contactImportPermissionDenied'),
-          action: 'error',
+          title: t('common.information'),
+          description: t('booking.contactImportPhoneMissing'),
+          action: 'info',
+        });
+      }
+    } catch (error) {
+      if (error instanceof ContactPickError) {
+        toast({
+          title: error.code === 'unsupported' ? t('common.information') : t('common.error'),
+          description:
+            error.code === 'unsupported'
+              ? t('booking.contactImportUnsupported')
+              : error.code === 'permission_denied'
+                ? t('booking.contactImportPermissionDenied')
+                : t('booking.contactImportFailed'),
+          action: error.code === 'unsupported' ? 'info' : 'error',
         });
         return;
       }
 
-      const selectedContact = await Contacts.presentContactPickerAsync();
-
-      if (!selectedContact) {
-        return;
-      }
-
-      const contactName =
-        selectedContact.name?.trim() ||
-        [selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ').trim();
-      const phoneValue = normalizeGuestPhone(selectedContact.phoneNumbers?.[0]?.number);
-
-      if (contactName) {
-        setGuestName(contactName);
-      }
-
-      if (phoneValue) {
-        setGuestPhone(phoneValue);
-        return;
-      }
-
-      toast({
-        title: t('common.information'),
-        description: t('booking.contactImportPhoneMissing'),
-        action: 'info',
-      });
-    } catch (error) {
       toast({
         title: t('common.error'),
         description:
@@ -1164,6 +1175,13 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                 ) : null}
 
                 <CollapsibleContent>
+                  <SavedGuestsPicker
+                    guests={savedGuests}
+                    selectedId={selectedSavedGuestId}
+                    onSelect={handleSelectSavedGuest}
+                    onManagePress={() => router.push('/guests')}
+                  />
+
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void handlePickGuestFromContacts()}
@@ -1188,7 +1206,10 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                       placeholder={t('booking.fullName')}
                       placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestName}
-                      onChangeText={setGuestName}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestName(value);
+                      }}
                     />
                   </Input>
 
@@ -1200,10 +1221,42 @@ export function LocAirport({ isDarkMode, onSubmit, etape, setEtape }: Props) {
                       placeholder={t('booking.phoneNumber')}
                       placeholderTextColor={fieldThemeColors.placeholder}
                       value={guestPhone}
-                      onChangeText={setGuestPhone}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestPhone(value);
+                      }}
                       keyboardType="phone-pad"
                     />
                   </Input>
+
+                  <Input
+                    variant="outline"
+                    size="control"
+                    className="mt-3 rounded-xl border border-outline-100 bg-background-100">
+                    <InputField
+                      placeholder={t('guests.emailOptional')}
+                      placeholderTextColor={fieldThemeColors.placeholder}
+                      value={guestEmail}
+                      onChangeText={(value) => {
+                        setSelectedSavedGuestId(null);
+                        setGuestEmail(value);
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </Input>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleSaveCurrentGuest}
+                    className="mt-3 flex-row items-center justify-center rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 active:opacity-80 dark:border-[#5B3428] dark:bg-[#3D241C]">
+                    <Ionicons name="bookmark-outline" size={s(18)} color={color.primary} />
+                    <Text
+                      className="ml-2 font-semibold"
+                      style={{ color: color.primary, fontSize: font.sm }}>
+                      {t('guests.saveCurrent')}
+                    </Text>
+                  </Pressable>
                 </CollapsibleContent>
               </BookingOptionSectionCard>
             </Collapsible>

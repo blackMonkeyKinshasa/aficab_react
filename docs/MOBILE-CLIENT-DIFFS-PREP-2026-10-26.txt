@@ -1,0 +1,254 @@
+================================================================================
+AFICAB — ÉCARTS & PRÉPARATION MODIFS — APP CLIENT MOBILE (Expo)
+Date : 2026-10-26
+Repos : Client Expo  C:\Users\hp\Documents\projet_expo\Aficab
+           vs Web      C:\Users\hp\Documents\projet_react\aficab
+Driver (Aficab_Diver) : aperçu en §8 — détail dans un second passage.
+================================================================================
+
+
+--------------------------------------------------------------------------------
+0. MÉTHODE
+--------------------------------------------------------------------------------
+
+Parité métier = même contrat API + mêmes règles (proforma / options / édition).
+Pas de redesign UI : on liste ce que le Client mobile doit brancher ou corriger
+pour coller au web actuel (funnel + facturation proforma inclus).
+
+
+--------------------------------------------------------------------------------
+1. SYNTHÈSE — CLIENT MOBILE vs WEB
+--------------------------------------------------------------------------------
+
+| Domaine              | Web (actuel)                         | Expo Client                         | Écart |
+|----------------------|--------------------------------------|-------------------------------------|-------|
+| Facturation          | Portail + PDF proforma/facture       | Aucun écran / aucun appel invoice   | CRITIQUE |
+| Invoice API          | GET /booking/{id}/invoice (JSON + proforma) | Non branché                    | CRITIQUE |
+| Invoice PDF REST     | PDF généré navigateur (pas de .pdf)  | Besoin stream serveur pour Share/FS | À PRÉPARER CÔTÉ WEB |
+| Options LOC          | dayExtensions jour par jour          | Flex/Premium global sur toute la LOC | MÉTIER |
+| Carburant            | priceOptions catalogue voiture       | priceOptions (déjà)                 | OK tendance |
+| Places               | GET /booking/places                  | Google Places SDK (bypass API)      | API |
+| Création résa        | generate-id + POST /booking          | idem                                | OK |
+| Édition client       | POST …/client-update                 | Absent                              | GAP |
+| Annulation           | client-cancel                        | Branché                             | OK |
+| Paiement MM          | PawaPay (+ autres web)               | PawaPay only                        | PARTIEL |
+| Paiement carte       | Maxicash (+ Avada web)               | Maxicash card                       | PARTIEL |
+| Cash / pay later     | premium / différé limité             | cash + « Payer plus tard »          | Spécifique Expo |
+| Quote serveur        | /booking/quote (+ catalog)           | Calcul local LocDaily / airport     | ALIGNER |
+| Config API           | —                                    | URLs en dur apiConfig.ts            | CONFIG |
+
+
+--------------------------------------------------------------------------------
+2. FACTURATION — PRIORITÉ P1 CLIENT
+--------------------------------------------------------------------------------
+
+2.1 État Expo
+  Fichiers concernés aujourd’hui : aucun helper invoice dans api/booking.ts
+  Onglets : (tabs)/reservation.tsx, settings — pas d’entrée « Facturation »
+  BookingDetailModal : paie / annule / review — pas de téléchargement document
+
+2.2 Ce que le backend offre DÉJÀ (web livré)
+  GET /api/booking/{id}/invoice
+    Auth : client propriétaire | ORG_BOOKER | admin
+    Refus : status CANCELED uniquement
+    Réponse :
+      - proforma: true  → id PRO-{bookingId} si non payé / non ENDED|ARCHIVED
+      - proforma: false → id FAC-{bookingId} si isPaid || ENDED || ARCHIVED
+      - total, issuedAt, dueAt, paidAt, client, vehicle, service…
+
+2.3 Ce qu’il manque encore côté backend pour Expo
+  GET /api/booking/{id}/invoice.pdf
+    Même auth / mêmes règles proforma vs facture
+    Content-Type: application/pdf
+    Content-Disposition: attachment; filename="PRO-….pdf" | "FAC-….pdf"
+  Raison : invoice-pdf.ts web utilise fetch logo + canvas (navigateur).
+  Expo ne peut pas réutiliser ce module tel quel → PDF serveur obligatoire.
+
+2.4 Modifs Expo Client à préparer (checklist fichiers)
+
+  [ ] api/booking.ts
+        + getBookingInvoice(id) → GET /booking/{id}/invoice
+        + getBookingInvoicePdf(id) → GET /booking/{id}/invoice.pdf (blob/arraybuffer)
+
+  [ ] constants/dataInterface.ts
+        + BookingInvoice { id, bookingId, proforma, issuedAt, dueAt, paidAt,
+                           total, currency, isPaid, status, … }
+
+  [ ] lib/i18n.ts
+        + billing.* / invoice.downloadProforma / invoice.downloadInvoice
+
+  [ ] Nouvel écran ou section
+        Option A (recommandée, parité portail) :
+          app/(tabs)/… ou settings → « Facturation »
+          Liste résas non annulées + CTA proforma/facture
+        Option B (minimal) :
+          Bouton dans BookingDetailModal + carte liste
+
+  [ ] Composants
+        components/reservation/InvoiceDownloadButton.tsx
+          - label selon proforma
+          - FileSystem + Sharing (expo-sharing) pour ouvrir le PDF
+        components/reservation/BillingList.tsx (si Option A)
+
+  [ ] Navigation
+        Entrée menu settings / tab si Option A
+        Deep-link optionnel : aficab://billing?id=
+
+2.5 Règles UI à recopier du web (billing-view)
+  - CANCELED → aucun document
+  - Non payé → « Télécharger le proforma »
+  - Payé / ENDED / ARCHIVED → « Télécharger la facture »
+  - Afficher préfixe PRO- / FAC- + montant + statut
+
+  Guide modèles proforma / facture (décision serveur + UX Expo) :
+    docs/MOBILE-INVOICE-MODELS.md
+
+
+--------------------------------------------------------------------------------
+3. FUNNEL RÉSERVATION — ÉCARTS MÉTIER
+--------------------------------------------------------------------------------
+
+3.1 dayExtensions (LOC) + format options — écart majeur vs web
+  Web : options Flex/Premium par jour calendaire (dayExtensions[{day,type}])
+        + options[] { name, price, number } persistés
+  Expo LocDaily.tsx :
+        un seul flex OU premium pour toute la location
+        payload options: { fuel, flex, premium, rentalDays, … }  ← IGNORÉ par API
+        PAS de dayExtensions / options[]
+
+  Guide détaillé (envoi + lecture récap) :
+    docs/MOBILE-BOOKING-OPTIONS-RECAP.md
+
+  Modifs Expo à préparer :
+  [ ] BookingOptionsPayload conforme API (options[] + extraTime + dayExtensions)
+  [ ] LocDaily : mapper fuel/flex/premium → ce format avant POST
+  [ ] buildPriceRecap depuis GET booking.options pour détail / RECAP
+  [ ] UI dayExtensions (optionnel phase 2) ; fallback extraTime legacy OK
+
+3.2 Places
+  Web : GET /booking/places
+  Expo : LocationSelector → GooglePlacesAutocomplete (clé côté app)
+  api/booking.searchPlaces existe mais n’est pas le chemin UI principal
+
+  Modifs (P2) :
+  [ ] Soit brancher searchPlaces + UI locale
+  [ ] Soit garder Google SDK mais EXPO_PUBLIC_GOOGLE_MAPS_API_KEY only
+  [ ] Retirer clé hardcodée dans api/googlePlaces.ts si encore présente
+
+3.3 Édition réservation
+  Web : POST /booking/{id}/client-update
+  Expo : absent (seulement cancel + pay sur existante)
+
+  Modifs (P2) :
+  [ ] api/booking.ts → clientUpdateBooking(id, body)
+  [ ] UI édition limitée (créneau / commentaire / guest) selon droits API
+
+3.4 Quote serveur
+  Web : POST /booking/quote (+ priceOptionsCatalog)
+  Expo : total calculé dans LocDaily / LocAirport
+
+  Modifs (P2) :
+  [ ] Appeler /booking/quote avant RECAP / paiement
+  [ ] Afficher total serveur ; bloquer si écart
+
+
+--------------------------------------------------------------------------------
+4. PAIEMENT — ALIGNEMENT
+--------------------------------------------------------------------------------
+
+Expo déjà OK pour le cœur :
+  - PawaPay (orange / airtel / mpesa via PaymentMethod enum)
+  - Maxicash card
+  - Cash premium
+  - Pay later → re-POST /booking même id (spécifique mobile — garder documenté)
+
+Écarts vs web :
+  [ ] Pas Avada / CinetPay sur mobile (acceptable si produit = Pawa+Maxi)
+  [ ] Harmoniser labels / valeurs MM avec web (orangemoney / airtelmoney) — déjà enum
+  [ ] Après paiement réussi : rester sur Mes réservations (comme web) — vérifier deep-link callback.tsx
+
+Fichiers paiement Expo :
+  api/booking.ts (pawapayPay, maxicashVISA, maxicashPay mort ?)
+  components/my-ui/PaymentModal.tsx
+  app/new_booking/[doc].tsx ; app/booking/[id].tsx ; app/(tabs)/reservation.tsx
+
+
+--------------------------------------------------------------------------------
+5. CONFIG / HYGIÈNE API CLIENT
+--------------------------------------------------------------------------------
+
+  [ ] api/apiConfig.ts
+        Remplacer URL en dur par :
+          EXPO_PUBLIC_API_URL_DEV / EXPO_PUBLIC_API_URL_PROD
+  [ ] Purger ou brancher wrappers morts :
+        searchPlaces (si UI Google reste) ; maxicashPay ; checkPayment si inutilisés
+  [ ] Même pattern d’erreurs ApiError (déjà OK Client)
+
+
+--------------------------------------------------------------------------------
+6. ORDRE D’EXÉCUTION RECOMMANDÉ — CLIENT MOBILE
+--------------------------------------------------------------------------------
+
+Phase W0 — Backend (repo web, ce repo) — PRÉREQUIS PDF mobile
+  1. Extraire génération PDF serveur (sans canvas DOM)
+  2. GET /api/booking/{id}/invoice.pdf (proforma|facture, mêmes règles JSON)
+  3. Documenter OpenAPI invoice + invoice.pdf
+
+Phase C1 — Facturation Expo (parité portail)
+  4. Helpers getBookingInvoice + getBookingInvoicePdf
+  5. CTA proforma/facture dans détail réservation
+  6. Écran / section Facturation (liste)
+
+Phase C2 — Parité funnel LOC
+  7. dayExtensions dans LocDaily + types + POST body
+  8. Recap / total alignés serveur (quote optionnel)
+
+Phase C3 — Alignements
+  9. client-update ; Places/env ; quote
+
+
+--------------------------------------------------------------------------------
+7. CONTRATS API À RESPECTER (RÉFÉRENCE RAPIDE)
+--------------------------------------------------------------------------------
+
+GET  /api/booking/{id}/invoice
+  200 { id, bookingId, proforma, issuedAt, dueAt, paidAt, total, … }
+  403 FORBIDDEN | 404 BOOKING_NOT_FOUND | 409 INVOICE_NOT_AVAILABLE (canceled)
+
+GET  /api/booking/{id}/invoice.pdf   ← À AJOUTER
+  200 application/pdf
+  mêmes 403/404/409
+
+POST /api/booking
+  options.dayExtensions?: [{ day: "YYYY-MM-DD", type: "Flex"|"Premium" }]
+  options fuel / priceOptions côté catalogue voiture
+
+POST /api/booking/{id}/client-update
+POST /api/booking/{id}/client-cancel
+
+
+--------------------------------------------------------------------------------
+8. APERÇU DRIVER (prochain document dédié)
+--------------------------------------------------------------------------------
+
+Ne pas mélanger avec Client. Gaps déjà connus (audit) :
+  - Documents véhicule : lecture GET /car/{cid}.documents (non branché UI)
+  - Ajout document : droits DRIVER manquants sur POST /document
+  - availability PATCH : risque 403
+  - mark-paid / review / photo checkout : gaps app
+→ Document suivant : MOBILE-DRIVER-DIFFS-PREP-*.txt
+
+
+--------------------------------------------------------------------------------
+9. DÉCISION PRODUIT À TRANCHER (si besoin avant code)
+--------------------------------------------------------------------------------
+
+A. Facturation mobile = section dédiée (comme portail) ou seulement bouton détail ?
+B. PDF : uniquement serveur (.pdf) ou aussi JSON + rendu local Expo (déconseillé) ?
+C. dayExtensions : portage UI complète web, ou étape intermédiaire (un Flex/Premium
+   global → expansion en N lignes dayExtensions côté client avant POST) ?
+
+
+================================================================================
+Fin — Client mobile first
+================================================================================

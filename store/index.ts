@@ -1,4 +1,5 @@
 import { useAppConfigState } from './app-config-state';
+import { useGuestsState } from './guests-state';
 import { useAppLanguageState } from './language-state';
 import { useMyStateLocation } from './location-state';
 import { useMyStateNotif } from './notification-state';
@@ -8,6 +9,7 @@ export {
   USER_CACHE_DURATION_MS,
   useAppConfigState,
   useAppLanguageState,
+  useGuestsState,
   useMyStateLocation,
   useMyStateNotif,
   useMyStateUser,
@@ -18,4 +20,5 @@ export function resetUserSessionState() {
   useMyStateUser.getState().clearUser();
   useMyStateLocation.getState().clearLocations();
   useMyStateNotif.getState().clearCountNotif({ resetUser: true });
+  useGuestsState.getState().clearGuests();
 }
